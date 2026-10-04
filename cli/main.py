@@ -649,15 +649,20 @@ def _previous_frames_rel(ws, video_wi, video: Path):
     recorded = (video_wi.extra or {}).get("extracted_frames") or []
     if not recorded:
         return None
-    folder = Path(recorded[0]).parent
-    derived = ws.derived_dir()
-    try:
-        rel = folder.resolve().relative_to(derived.resolve()).as_posix()
-    except (ValueError, OSError):
+    # Match on the part after "derived/", not the absolute path: a bundle
+    # that has been moved still records its old location.
+    parts = Path(recorded[0]).parent.parts
+    lowered = [p.lower() for p in parts]
+    if "derived" not in lowered:
         return None
+    start = len(lowered) - 1 - lowered[::-1].index("derived") + 1
+    rel_parts = parts[start:]
+    if not rel_parts:
+        return None
+    folder = ws.derived_dir().joinpath(*rel_parts)
     if not folder.is_dir() or frames_dir_taken(folder, video):
         return None
-    return rel
+    return Path(*rel_parts).as_posix()
 
 
 def _extract_videos_into_workspace(ws, source: Path, args) -> None:

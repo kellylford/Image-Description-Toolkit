@@ -321,3 +321,51 @@ def test_batch_images_carry_their_batch(monkeypatch):
     w.run()
     failed = [e for e in posted if isinstance(e, workers_wx.ProcessingFailedEventData)]
     assert failed[0].batch is marker
+
+
+def test_request_ids_do_not_make_identical_failures_differ():
+    """Anthropic error text embeds a per-request id (fourth review)."""
+    body = ("Error code: 400 - {'type': 'error', 'error': {'type': "
+            "'invalid_request_error', 'message': 'Your credit balance is too low'}, "
+            "'request_id': 'REQ'}")
+    a = ProviderError("x", kind=ErrorKind.INVALID_REQUEST,
+                      raw_message=body.replace("REQ", "req_011CAbc123"))
+    b = ProviderError("y", kind=ErrorKind.INVALID_REQUEST,
+                      raw_message=body.replace("REQ", "req_011CXyz789"))
+    assert workers_wx._failure_signature(a) == workers_wx._failure_signature(b)
+
+
+def test_streak_halt_is_flagged_and_fatal_halt_is_not(monkeypatch):
+    names = [f"{i}.jpg" for i in range(12)]
+    done, _ = _run_batch(monkeypatch, names, {n: "plain" for n in names})
+    assert done.halted_streak is True
+    done, _ = _run_batch(monkeypatch, ["a.jpg", "b.jpg"], {"a.jpg": ErrorKind.AUTH})
+    assert done.halted_streak is False and done.halted_files == ["C:/p/a.jpg"]
+
+
+def test_empty_description_after_retries_is_a_failure(monkeypatch, tmp_path):
+    """Returned, it was stored as a blank description and counted as described."""
+    import ai_providers
+    posted = []
+    monkeypatch.setattr(workers_wx.wx, "PostEvent", lambda win, evt: posted.append(evt))
+    monkeypatch.setattr(workers_wx.time, "sleep", lambda s: None)
+
+    class _Empty:
+        last_usage = {"finish_reason": "stop"}
+
+        def describe_image(self, *a, **k):
+            return ""
+    monkeypatch.setattr(ai_providers, "get_all_providers",
+                        lambda: {"ollama": _Empty()}, raising=False)
+    monkeypatch.setattr(workers_wx, "get_all_providers",
+                        lambda: {"ollama": _Empty()}, raising=False)
+    workers_wx.ProcessingWorker._provider_cache = {}
+    img = tmp_path / "a.jpg"
+    from PIL import Image
+    Image.new("RGB", (8, 8)).save(img)
+    w = workers_wx.ProcessingWorker(None, str(img), "ollama", "m", "narrative", "", None)
+    monkeypatch.setattr(w, "_inject_exif_context", lambda p: (p, ""), raising=False)
+    w.run()
+    assert w.result_ok is False
+    assert "empty description" in (w.result_error or "")
+    assert not [e for e in posted if isinstance(e, workers_wx.ProcessingCompleteEventData)]

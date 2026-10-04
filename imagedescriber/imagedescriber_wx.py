@@ -23,6 +23,7 @@ import logging
 import re
 import subprocess
 import threading
+from types import SimpleNamespace
 import time
 import base64
 import tempfile
@@ -745,8 +746,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # exactly that (see _abort_run).
         self._preparing_queue = None
         self._preparing_state = None
-        # True while _save_bundle_with_progress pumps events (see on_workflow_complete).
+        # True while _save_bundle_with_progress pumps events, and the batch
+        # completions that arrived meanwhile (see on_workflow_complete).
         self._progress_save_active = False
+        self._deferred_completions = []
         # Failed images in the current batch (see on_worker_failed).
         self._batch_failures = 0
         self._batch_first_failure = None
@@ -4500,6 +4503,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             )
         finally:
             self._progress_save_active = False
+            # Batch completions that arrived during the save (see
+            # on_workflow_complete), handled now that it is done.
+            pending, self._deferred_completions = self._deferred_completions, []
+            for snapshot in pending:
+                wx.CallAfter(self._deliver_completion, snapshot)
+
+    def _deliver_completion(self, snapshot) -> None:
+        if self and not self.IsBeingDeleted():
+            self.on_workflow_complete(snapshot)
 
     def _launch_batch_impl(self, cancel: threading.Event, to_process: list,
                            options: dict, skip_existing: bool, video_preamble):
@@ -6153,7 +6165,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # completion nested inside that save meant a second save, modals, and
         # the pause handler then labelling a finished batch "paused".
         if is_batch and self._progress_save_active:
-            wx.CallLater(250, self.on_workflow_complete, event)
+            # Copy the event: wx deletes a posted event's C++ object once this
+            # handler returns, so re-dispatching the event itself raised on its
+            # first attribute access and the completion was lost (a finished
+            # batch left "paused", unsaved, and offered for resume).
+            snapshot = SimpleNamespace(
+                input_dir=event.input_dir,
+                output_dir=event.output_dir,
+                worker=source,
+                halted=getattr(event, 'halted', None),
+                halted_files=list(getattr(event, 'halted_files', None) or ()),
+                halted_streak=getattr(event, 'halted_streak', False),
+            )
+
+            # Delivered when the save finishes (_save_bundle_with_progress).
+            # Not a timer: timers don't fire while a save pumps events.
+            self._deferred_completions.append(snapshot)
             return
         if is_batch:
             if source is self._stopping_worker:
@@ -6360,8 +6387,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.batch_progress_dialog:
             summary = (f"Stopped after {event.input_dir}: {halted}" if halted
                        else event.input_dir)
+            # Requeued streak images were counted as failures but will be
+            # retried; a run-fatal halt's image was never counted.
             n_failed = self._batch_failures - (
-                len(getattr(event, 'halted_files', None) or ()) if halted else 0)
+                len(getattr(event, 'halted_files', None) or ())
+                if halted and getattr(event, 'halted_streak', False) else 0)
             if n_failed > 0:
                 summary += f" ({n_failed} failed)"
             self.batch_progress_dialog.mark_complete(summary, stopped=bool(halted))
@@ -6381,8 +6411,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Read the failure count now: the save below runs the event loop.
         failures, first_failure = self._batch_failures, self._batch_first_failure
-        if halted:
-            # Requeued images were not really failures.
+        if halted and getattr(event, 'halted_streak', False):
+            # Requeued streak images were counted but will be retried.
             failures = max(0, failures - len(getattr(event, 'halted_files', None) or ()))
         self._batch_failures = 0
         self._batch_first_failure = None

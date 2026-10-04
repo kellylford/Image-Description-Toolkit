@@ -614,3 +614,54 @@ def test_halted_dialog_says_stopped(_frame):
         assert "Complete" not in dlg.GetTitle()
     finally:
         dlg.Destroy()
+
+
+
+def test_completion_during_a_progress_save_is_delivered(frame, monkeypatch):
+    """A REAL posted event arriving while the real progress save pumps events
+    (pause with the last image in flight). Re-dispatching the event itself
+    failed (wx had deleted it) and the finished batch was left looking paused
+    (fourth review); a timer-based retry never fired inside the save loop."""
+    import workers_wx
+    f = frame
+    w = _FakeWorker()
+    f.batch_worker = w
+    f.workspace.batch_state = {"total_queued": 1}
+    real_save = f._save_bundle
+    posted = []
+
+    def save_while_the_batch_finishes(*a, **k):
+        if not posted:               # posted from the save thread, mid-save
+            posted.append(1)
+            wx.PostEvent(f, workers_wx.WorkflowCompleteEventData(
+                input_dir="1/1 images", output_dir="", worker=w))
+            time.sleep(0.3)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", save_while_the_batch_finishes)
+
+    f._save_bundle_with_progress()     # the real one (as on_pause_batch calls it)
+    assert posted
+    assert _pump_until(lambda: f.batch_worker is None, 5), "deferred completion lost"
+    assert f.workspace.batch_state is None
+
+def test_fatal_halt_count_excludes_nothing(frame, monkeypatch):
+    """Two ordinary failures then a sign-out halt: 2 failed, not 1."""
+    f = frame
+    monkeypatch.setattr(f, "_save_bundle", lambda *a, **k: None)
+    w = _FakeWorker()
+    f.batch_worker = w
+    f._batch_failures, f._batch_first_failure = 0, None
+    from batch_progress_dialog import BatchProgressDialog
+    f.batch_progress_dialog = BatchProgressDialog(f, 9)
+    dlg = f.batch_progress_dialog
+    img = str(f.src / "a.jpg")
+    for _ in range(2):
+        f.on_worker_failed(SimpleNamespace(file_path=img, error="bad", kind=None,
+                                           run_fatal=False, batch=w))
+    seen = []
+    monkeypatch.setattr(dlg, "mark_complete", lambda summary, stopped=False: seen.append(summary))
+    f.on_workflow_complete(SimpleNamespace(input_dir="3/9 images", output_dir="", worker=w,
+                                           halted="signed out", halted_files=[img],
+                                           halted_streak=False))
+    dlg.Destroy()
+    assert seen and "(2 failed)" in seen[0]

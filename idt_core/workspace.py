@@ -94,28 +94,48 @@ def _same_path_key(path) -> str:
     return key.lower() if sys.platform == "darwin" else key
 
 
-def frames_dir_taken(frames_dir: Path, video) -> bool:
-    """True if ``frames_dir`` already belongs to a different, existing video.
+def _file_size(path) -> Optional[int]:
+    try:
+        return Path(path).stat().st_size
+    except OSError:
+        return None
 
-    An owner that no longer exists (the source was moved or renamed) does not
-    hold the folder: otherwise moving a library would re-extract every video
-    into a second, hashed folder.
+
+def frames_dir_taken(frames_dir: Path, video) -> bool:
+    """True if ``frames_dir`` belongs to a different video than ``video``.
+
+    Different means a different path, or the same path holding a different
+    file (another memory card mounted at the same drive letter: a different
+    size). An owner that can't be found still holds its folder: an unplugged
+    card or offline share looks exactly like a moved library from here, and
+    freeing the folder let a same-named video overwrite its frames. A moved
+    library extracts into new folders instead; nothing is overwritten.
     """
     try:
-        owner = (Path(frames_dir) / FRAMES_OWNER_FILE).read_text(encoding="utf-8").strip()
+        text = (Path(frames_dir) / FRAMES_OWNER_FILE).read_text(encoding="utf-8").strip()
     except OSError:
         return False
-    if not owner or _same_path_key(owner) == _same_path_key(video):
+    if not text:
         return False
-    return Path(owner).exists()
+    try:
+        record = json.loads(text)
+    except ValueError:
+        record = {"path": text}          # first form: the path alone
+    if not isinstance(record, dict) or not record.get("path"):
+        return False
+    if _same_path_key(record["path"]) != _same_path_key(video):
+        return True
+    size, recorded = _file_size(video), record.get("size")
+    return size is not None and recorded is not None and size != recorded
 
 
 def claim_frames_dir(frames_dir: Path, video) -> None:
-    """Create ``frames_dir`` and record ``video`` as its owner."""
+    """Create ``frames_dir`` and record ``video`` (path and size) as its owner."""
     frames_dir = Path(frames_dir)
     frames_dir.mkdir(parents=True, exist_ok=True)
     (frames_dir / FRAMES_OWNER_FILE).write_text(
-        os.path.abspath(str(video)), encoding="utf-8")
+        json.dumps({"path": os.path.abspath(str(video)), "size": _file_size(video)}),
+        encoding="utf-8")
 
 
 def source_relative_subfolder(file_path, source_root) -> Optional[str]:

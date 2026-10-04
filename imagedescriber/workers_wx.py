@@ -84,6 +84,17 @@ SAME_FAILURE_STREAK = 10
 
 _TIMESTAMP_TAIL = re.compile(r"\s*-\s*\(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(,\d+)?\)\s*$")
 _HEX_ADDRESS = re.compile(r"0x[0-9a-fA-F]+")
+#: Per-request identifiers that API error bodies embed (Anthropic puts
+#: 'request_id': 'req_…' in str(exc)); with them, no two failures matched.
+_REQUEST_ID = re.compile(
+    r"\breq_[A-Za-z0-9]+|"
+    r"""(request[_-]?id['"]?\s*[:=]\s*['"]?)[A-Za-z0-9_-]+""",
+    re.IGNORECASE)
+
+
+def _normalise_failure_text(text: str) -> str:
+    text = _HEX_ADDRESS.sub("0x", text)
+    return _REQUEST_ID.sub(lambda m: (m.group(1) or "") + "<id>", text)
 
 
 def _failure_signature(exc: BaseException):
@@ -101,10 +112,10 @@ def _failure_signature(exc: BaseException):
         raw = getattr(probe, "raw_message", None)
         if isinstance(raw, str):
             return (getattr(probe, "kind", None), getattr(probe, "status_code", None),
-                    _HEX_ADDRESS.sub("0x", raw))
+                    _normalise_failure_text(raw))
         probe = probe.__cause__ or probe.__context__
     text = _TIMESTAMP_TAIL.sub("", str(exc))
-    return (_provider_error_kind(exc), None, _HEX_ADDRESS.sub("0x", text))
+    return (_provider_error_kind(exc), None, _normalise_failure_text(text))
 
 
 def _provider_error_kind(exc: BaseException):
@@ -239,13 +250,14 @@ class WorkflowCompleteEventData(WorkflowCompleteEvent):
         really tried, so they go back in the resume queue.
     """
     def __init__(self, input_dir, output_dir, worker=None, halted=None,
-                 halted_files=None):
+                 halted_files=None, halted_streak=False):
         WorkflowCompleteEvent.__init__(self)
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.worker = worker
         self.halted = halted
         self.halted_files = list(halted_files or [])
+        self.halted_streak = halted_streak   # halted on identical failures
 
 
 class WorkflowFailedEventData(WorkflowFailedEvent):
@@ -665,6 +677,17 @@ class ProcessingWorker(threading.Thread):
                                 f"{MAX_EMPTY_RETRIES + 1} attempts — giving up."
                             )
                         break
+
+                # Still empty after the retries: a failure, not a description.
+                # Returned, it was stored as a blank description and the image
+                # counted as described, so Describe Undescribed skipped it.
+                if not (description and description.strip()):
+                    finish_reason = None
+                    if hasattr(provider, 'last_usage') and provider.last_usage:
+                        finish_reason = provider.last_usage.get('finish_reason')
+                    raise RuntimeError(
+                        f"{self.provider} returned an empty description"
+                        + (f" (finish_reason: {finish_reason})" if finish_reason else ""))
 
                 # Return both description and provider instance for token usage tracking
                 return (description, provider)
@@ -1144,6 +1167,7 @@ class BatchProcessingWorker(threading.Thread):
 
             halted = None
             halted_files = []
+            halted_streak = False
             streak, streak_key = [], None
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
@@ -1222,7 +1246,11 @@ class BatchProcessingWorker(threading.Thread):
                 fatal = not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS
                 if fatal or len(streak) >= SAME_FAILURE_STREAK:
                     halted = worker.result_error or "The provider refused the request."
-                    halted_files = list(streak) if streak else [file_path]
+                    # A run-fatal halt requeues just that image (the window
+                    # never counted it as a failure); a streak requeues the
+                    # whole streak (each one was counted).
+                    halted_streak = not fatal
+                    halted_files = list(streak) if halted_streak else [file_path]
                     if run_log:
                         why = (f"({worker.result_kind})" if fatal else
                                f"({len(streak)} images in a row failed identically)")
@@ -1245,6 +1273,7 @@ class BatchProcessingWorker(threading.Thread):
                 worker=self,
                 halted=halted,
                 halted_files=halted_files,
+                halted_streak=halted_streak,
             )
             wx.PostEvent(self.parent_window, evt)
 

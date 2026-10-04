@@ -46,15 +46,43 @@ def test_folder_ownership(tmp_path):
     assert frames_dir_taken(d, b)
 
 
-def test_moved_owner_does_not_hold_the_folder(tmp_path):
-    """A library moved to a new drive must not re-extract into hashed folders."""
-    old, new = tmp_path / "old" / "a.mp4", tmp_path / "new" / "a.mp4"
-    new.parent.mkdir()
-    new.write_bytes(b"x")
-    d = tmp_path / "frames" / "a"
-    claim_frames_dir(d, old)          # recorded owner no longer exists
-    assert not frames_dir_taken(d, new)
+def test_offline_owner_still_holds_the_folder(tmp_path):
+    """An unplugged card looks like a moved library. Freeing the folder let a
+    same-named video from another card overwrite its frames (fourth review)."""
+    card1 = tmp_path / "card1" / "DCIM" / "IMG_0001.mp4"     # not mounted now
+    card2 = tmp_path / "card2" / "DCIM" / "IMG_0001.mp4"
+    card2.parent.mkdir(parents=True)
+    card2.write_bytes(b"x" * 10)
+    d = tmp_path / "frames" / "DCIM" / "IMG_0001"
+    claim_frames_dir(d, card1)
+    assert frames_dir_taken(d, card2)
 
+
+def test_same_path_different_file_is_another_video(tmp_path):
+    """Two cards mounted at the same drive letter: same path, different file."""
+    v = tmp_path / "DCIM" / "IMG_0001.mp4"
+    v.parent.mkdir()
+    v.write_bytes(b"x" * 10)
+    d = tmp_path / "frames" / "IMG_0001"
+    claim_frames_dir(d, v)
+    assert not frames_dir_taken(d, v)
+    v.write_bytes(b"y" * 99)              # the other card's video
+    assert frames_dir_taken(d, v)
+
+
+def test_cli_finds_previous_folder_after_the_bundle_moved(tmp_path):
+    from cli.main import _previous_frames_rel
+    from idt_core.workspace import WorkspaceItem
+    ws = Workspace.create(tmp_path / "moved" / "w.idtw")
+    legacy = ws.derived_dir("frames") / "IMG_0001"
+    legacy.mkdir(parents=True)
+    video = tmp_path / "phone" / "IMG_0001.mp4"
+    vwi = WorkspaceItem(image=video.name, source_path=str(video), storage="reference",
+                        item_type="video")
+    # Recorded when the bundle lived somewhere else.
+    vwi.extra["extracted_frames"] = [
+        str(tmp_path / "old_place" / "w.idtw" / "derived" / "frames" / "IMG_0001" / "a.jpg")]
+    assert _previous_frames_rel(ws, vwi, video) == "frames/IMG_0001"
 
 def test_owner_compared_case_insensitively_where_the_fs_is(tmp_path):
     if sys.platform not in ("win32", "darwin"):
