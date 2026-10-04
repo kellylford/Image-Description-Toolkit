@@ -6,8 +6,10 @@ expired" message. A signed-out provider, refused credentials or a provider that
 is not set up fails every image identically, so the batch now stops at the
 first one, keeps its resume state and says why.
 
-Classification is structural (a ProviderError kind; `claude auth status` for
-Claude Code), never by matching error wording.
+The decision rides on a ProviderError kind. Claude Code confirms an expired
+sign-in with `claude auth status`; its own sign-in wording is a fallback for
+when the status still says signed in. Apple Intelligence flags setup problems
+where it detects them.
 """
 
 import sys
@@ -155,3 +157,88 @@ def test_ordinary_failures_do_not_halt(monkeypatch):
                          {"a.jpg": "plain", "b.jpg": ErrorKind.RATE_LIMIT})
     assert _FakeImageWorker.seen == names
     assert done.halted is None
+
+
+# --------------------------------------------------------------------------- #
+# Found by the second independent review                                       #
+# --------------------------------------------------------------------------- #
+
+def test_sign_in_wording_is_whole_words_only():
+    for text in ("Failed to authenticate", "OAuth session expired", "Please log in",
+                 "Please login"):
+        assert cc._SIGN_IN_WORDING.search(text), text
+    for text in ("backlog in queue", "catalog index", "dialog in progress"):
+        assert not cc._SIGN_IN_WORDING.search(text), text
+
+
+def test_adapter_keeps_claude_codes_message_and_halts(monkeypatch, tmp_path):
+    """Signed out must read as Claude Code's own message, not "check API key",
+    and still carry a kind that stops a batch."""
+    import ai_providers
+    import idt_core.converter as conv
+
+    class _SignedOut:
+        def __init__(self, *a, **k):
+            pass
+
+        def describe(self, *a, **k):
+            raise cc.ClaudeCodeSignInError(
+                "Claude Code: OAuth session expired — run: claude auth login")
+    monkeypatch.setattr(cc, "ClaudeCodeProvider", _SignedOut)
+    monkeypatch.setattr(conv, "load_for_api", lambda p: (b"x", "image/jpeg"))
+    img = tmp_path / "a.jpg"
+    img.write_bytes(b"x")
+    with pytest.raises(ProviderError) as info:
+        ai_providers.ClaudeCodeProvider().describe_image(str(img), "describe", "haiku")
+    assert info.value.kind in workers_wx.RUN_FATAL_KINDS
+    assert "OAuth session expired" in str(info.value)
+    assert "API key" not in str(info.value)
+
+
+def test_real_processing_worker_records_kind_and_flags_event(monkeypatch):
+    posted = []
+    monkeypatch.setattr(workers_wx.wx, "PostEvent", lambda win, evt: posted.append(evt))
+    w = workers_wx.ProcessingWorker(None, "C:/p/a.jpg", "claude-code", "haiku",
+                                    "narrative", "", None)
+
+    def fail(*a, **k):
+        try:
+            raise ProviderError("signed out", kind=ErrorKind.UNAVAILABLE)
+        except Exception as e:
+            raise Exception(f"AI processing failed: {e}") from e
+    monkeypatch.setattr(w, "_process_with_ai", fail)
+    monkeypatch.setattr(w, "_inject_exif_context", lambda p: (p, ""), raising=False)
+    w.run()
+    assert w.result_ok is False
+    assert w.result_kind == ErrorKind.UNAVAILABLE
+    failed = [e for e in posted if isinstance(e, workers_wx.ProcessingFailedEventData)]
+    assert failed and failed[0].run_fatal
+
+
+def test_apple_setup_flag_halts_but_server_crash_does_not(monkeypatch, tmp_path):
+    import ai_providers
+    from idt_core.providers import apple
+    import idt_core.converter as conv
+    monkeypatch.setattr(conv, "load_for_api", lambda p: (b"x", "image/jpeg"))
+    img = tmp_path / "a.jpg"
+    img.write_bytes(b"x")
+
+    def run_with(exc):
+        class _P:
+            def __init__(self, *a, **k):
+                pass
+
+            def describe(self, *a, **k):
+                raise exc
+        monkeypatch.setattr(apple, "AppleProvider", _P)
+        prov = ai_providers.AppleProvider()
+        try:
+            prov.describe_image(str(img), "describe", "")
+        except ProviderError as e:
+            return e.kind
+        return None
+
+    crash = apple.AppleFMError("Apple Intelligence server stopped: /usr/bin/fm exited")
+    setup = apple.AppleFMError("Run sudo fm license", setup=True)
+    assert run_with(setup) == ErrorKind.UNAVAILABLE
+    assert run_with(crash) not in workers_wx.RUN_FATAL_KINDS

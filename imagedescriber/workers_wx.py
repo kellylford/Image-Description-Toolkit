@@ -172,11 +172,17 @@ class ProcessingCompleteEventData(ProcessingCompleteEvent):
 
 
 class ProcessingFailedEventData(ProcessingFailedEvent):
-    """Event data for processing failure"""
-    def __init__(self, file_path, error):
+    """Event data for processing failure
+
+    kind: the provider ErrorKind when known. A run-fatal kind ends a batch,
+        whose own message explains it, so the per-image error box is skipped.
+    """
+    def __init__(self, file_path, error, kind=None):
         ProcessingFailedEvent.__init__(self)
         self.file_path = file_path
         self.error = error
+        self.kind = kind
+        self.run_fatal = kind in RUN_FATAL_KINDS
 
 
 class ProgressUpdateEventData(ProgressUpdateEvent):
@@ -196,13 +202,17 @@ class WorkflowCompleteEventData(WorkflowCompleteEvent):
         stopped batch's late completion from the current batch's.
     halted: set when the batch stopped itself on a failure every remaining
         image would hit (see RUN_FATAL_KINDS); the provider's message.
+    halted_file: the image that failed that way. It was not really tried, so
+        it goes back in the resume queue.
     """
-    def __init__(self, input_dir, output_dir, worker=None, halted=None):
+    def __init__(self, input_dir, output_dir, worker=None, halted=None,
+                 halted_file=None):
         WorkflowCompleteEvent.__init__(self)
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.worker = worker
         self.halted = halted
+        self.halted_file = halted_file   # the image whose failure halted it
 
 
 class WorkflowFailedEventData(WorkflowFailedEvent):
@@ -383,10 +393,11 @@ class ProcessingWorker(threading.Thread):
 
         except Exception as e:
             # Emit failure
-            evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e))
-            wx.PostEvent(self.parent_window, evt)
             self.result_error = str(e)
             self.result_kind = _provider_error_kind(e)
+            evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e),
+                                            kind=self.result_kind)
+            wx.PostEvent(self.parent_window, evt)
     
     def _post_progress(self, message: str):
         """Post progress update to parent window"""
@@ -1091,6 +1102,7 @@ class BatchProcessingWorker(threading.Thread):
                 wx.PostEvent(self.parent_window, evt)
 
             halted = None
+            halted_file = None
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
@@ -1152,6 +1164,7 @@ class BatchProcessingWorker(threading.Thread):
                 # remaining image would fail identically, so stop here.
                 if not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS:
                     halted = worker.result_error or "The provider refused the request."
+                    halted_file = file_path
                     if run_log:
                         run_log.warning(
                             f"run halted after {completed} images: every remaining "
@@ -1171,6 +1184,7 @@ class BatchProcessingWorker(threading.Thread):
                 output_dir="",
                 worker=self,
                 halted=halted,
+                halted_file=halted_file,
             )
             wx.PostEvent(self.parent_window, evt)
 

@@ -82,3 +82,76 @@ defaults, an older full save keeping a newer checkpoint, Stop not leaving
 batch_state behind, Save As catching up. Full suite: 1859 passed, 47 skipped.
 A dev-mode end-to-end run to completion ended with all images described,
 batch_state cleared and the defaults kept.
+
+## Batch stop/restart with videos (commits eb36bdf, 6ed0010)
+
+Reported: start a batch with videos, Stop, then Process > Describe All
+Undescribed. Frames were extracted again, then describing failed with "file
+not found". Reproduced by driving the real ImageDescriberFrame in dev mode
+(scratch harness: real Ollama moondream, generated videos). Root causes:
+
+1. Stop was ignored during "Extracting frames" and "Saving workspace". No
+   describe worker existed yet, and the dialog's Stop button was disabled. Stop
+   during the save left `_start_describing` calling `.start()` on None.
+2. No guard against a second run. A second Process during extraction ran a
+   second extraction into the same folder, and extraction clears the folder
+   first, so it deleted the first run's frames. Seven entry points started
+   batches with no check.
+3. `_persist_extracted_frames_to_bundle` saved frames as `storage="copy"`
+   without copying them. After a reopen, every frame resolved to
+   `images/<name>`, which doesn't exist.
+4. Same-named videos in different folders shared `derived/frames/<stem>`, so
+   frames were deleted or overwritten with the other video's pictures.
+
+Fix: a run lifecycle (`_run_cancel`, busy guard on every entry point, Stop
+cancels at every stage, per-frame cancel in extraction, exception-safe), plus
+per-video frame folders and frame sidecar subfolders. Persisting frames goes
+through `gui_item_to_ws_item` with a name index. `Workspace.image_path` falls
+back for old frame records, and those records are corrected when rewritten.
+Completion events carry their worker.
+
+Also, from a real run: an expired Claude Code sign-in failed 533 of 11,545
+images in 17 minutes. A batch now stops on the first AUTH/UNAVAILABLE failure,
+keeps batch_state, and says why. Claude Code confirms sign-in with
+`claude auth status` (ClaudeCodeSignInError), not with the error's wording.
+
+Independent review of eb36bdf found seven confirmed problems and four lower
+ones; all were fixed in 6ed0010, with tests. A second review of 6ed0010 is
+pending at the time of writing.
+
+Tests: `test_batch_stop_restart.py` (23), `test_batch_halt_on_signin.py` (10).
+Full suite: 1896 passed. Real dev-mode runs: Stop during extraction, then
+Process (one extraction, no deletion); Stop during describing, reopen, then
+Process (no re-extraction, no missing frames); same-named videos (separate
+folders, 16/16 frames kept through a reopen); copy-originals mode.
+
+Not tested: a built exe; macOS; a halt against a real signed-out Claude Code
+(the CLI was signed back in before that test ran; covered by unit tests with a
+faked `claude auth status`).
+
+Unexplained: the user's `C:\Users\kelly\Documents\idt\iPhone.idtw` (the
+11,545-image run) was gone by 13:43. It wasn't in the Recycle Bin or anywhere
+under the home folder. No ImageDescriber code path deletes a named bundle (the
+only rmtree of a bundle is the empty-Untitled cleanup on close), and no command
+in this session targeted it.
+
+### Second review (of 6ed0010), fixed in the next commit
+- Claude Code sign-in was raised as AUTH, whose text is "check API key" and
+  drops the CLI's message. It is now UNAVAILABLE, which is also run-fatal and
+  keeps the message.
+- The "log in" wording substring matched "backlog in". It now matches whole
+  words. The docs no longer claim that wording plays no part: the CLI's own
+  sign-in text is a fallback.
+- After a halt, the triggering image is pending again. The halt message offers
+  to resume the same batch (resume_batch_processing), not Describe All
+  Undescribed, which widened folder batches and skipped Redescribe batches.
+- The progress window says "Batch Stopped" on a halt. The per-image error box
+  is skipped for run-fatal failures in a batch, so modals no longer stack.
+- The cancelled-save resave ends the run only after it finishes. `_abort_run`
+  undoes only what the failed run set. The storage correction is limited to
+  frames under derived/.
+- Apple Intelligence flags setup problems (`AppleFMError(setup=True)`) where
+  they are detected. A server crash whose log mentions /usr/bin/fm no longer
+  halts a batch.
+- `check_subscription` rejects non-dict status JSON.
+Full suite: 1904 passed.

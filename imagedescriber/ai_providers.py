@@ -1944,8 +1944,10 @@ class ClaudeCodeProvider(AIProvider):
             image_bytes, mime_type = load_for_api(Path(image_path))
             result = core.describe(image_bytes, mime_type, prompt)
         except ClaudeCodeSignInError as exc:
-            # Confirmed by `claude auth status`: a batch stops on AUTH.
-            raise_provider_error(provider="Claude Code", kind=ErrorKind.AUTH,
+            # Confirmed by `claude auth status`. UNAVAILABLE, not AUTH: the
+            # AUTH text is "check API key", wrong for a subscription sign-in,
+            # and drops the CLI's own message. Both kinds stop a batch.
+            raise_provider_error(provider="Claude Code", kind=ErrorKind.UNAVAILABLE,
                                  message=str(exc))
         except ClaudeCodeError as exc:
             message = str(exc)
@@ -2038,9 +2040,11 @@ class AppleProvider(AIProvider):
                 # Server start, or the request itself. Both are worth one retry:
                 # the model may simply have been paging in.
                 kind = ErrorKind.TIMEOUT
-            elif ("sudo fm license" in lowered or "macos 27" in lowered
-                    or "not ready" in lowered or "/usr/bin/fm" in lowered):
-                # Setup problems: no request was made, and retrying cannot help.
+            elif getattr(exc, "setup", False):
+                # Setup problems, flagged where detected: no request can
+                # succeed until the user acts, so a batch stops on these. Not
+                # read from the wording: a server crash whose log tail mentions
+                # /usr/bin/fm used to match here and would halt a batch.
                 kind = ErrorKind.UNAVAILABLE
             else:
                 # Includes a prompt too long for the 4,096-token window, which

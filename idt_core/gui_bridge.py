@@ -372,6 +372,14 @@ def _reconstruct_video_frame_links(ws: Workspace, items: dict) -> None:
 # Writing one GUI item into an open bundle                                     #
 # --------------------------------------------------------------------------- #
 
+def _under(path: Path, folder: Path) -> bool:
+    try:
+        path.resolve().relative_to(folder.resolve())
+        return True
+    except ValueError:
+        return False
+
+
 def _same_file(a, b) -> bool:
     return os.path.normcase(os.path.abspath(str(a))) == os.path.normcase(os.path.abspath(str(b)))
 
@@ -446,8 +454,12 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict,
         existing.extra.update(extra)
         # ImageDescriber up to 4.6.1 recorded extracted frames as copied into
         # images/ without copying them. Correct the record when it is rewritten.
-        if (existing.storage == "copy" and existing.source_path
+        # Same scope as Workspace.image_path's fallback: only frames under this
+        # bundle's derived/, never an image whose real copy has gone missing.
+        if (existing.storage == "copy" and existing.item_type == "extracted_frame"
+                and existing.source_path
                 and not ws._image_copy_path(existing.image, existing.subfolder).exists()
+                and _under(Path(existing.source_path), ws.derived_dir())
                 and Path(existing.source_path).exists()):
             existing.storage = "reference"
         return existing

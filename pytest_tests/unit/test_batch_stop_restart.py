@@ -158,6 +158,11 @@ def frame(_frame, tmp_path, monkeypatch):
     for name in ("show_info", "show_warning", "show_error"):
         monkeypatch.setattr(imagedescriber_wx, name,
                             lambda _p, msg, *a, **k: f.infos.append(msg))
+    # Questions are recorded and answered No unless a test says otherwise.
+    f.questions = []
+    f.answer = False
+    monkeypatch.setattr(imagedescriber_wx, "ask_yes_no",
+                        lambda _p, msg, *a, **k: (f.questions.append(msg), f.answer)[1])
     monkeypatch.setattr(f, "_load_video_extraction_config", lambda: {})
     f.src = src
     yield f
@@ -437,7 +442,8 @@ def test_halted_batch_keeps_resume_state_and_says_why(frame, monkeypatch):
         halted="Claude Code is not signed in. Run: claude auth login"))
     assert f.workspace.batch_state == {"total_queued": 2}
     assert f.workspace.items[str(f.src / "a.jpg")].processing_state == "pending"
-    assert any("claude auth login" in m for m in f.infos)
+    # The provider's own message is shown, with an offer to resume.
+    assert any("claude auth login" in q and "resume" in q for q in f.questions)
     assert f.batch_worker is None
 
 
@@ -515,3 +521,70 @@ def test_name_index_matches_unindexed_lookup(tmp_path):
     with_idx = gui_item_to_ws_item(ws, str(target), {"descriptions": []}, idx)
     without = gui_item_to_ws_item(ws, str(target), {"descriptions": []})
     assert with_idx.subfolder == without.subfolder and with_idx.image == without.image
+
+
+# --------------------------------------------------------------------------- #
+# Halt follow-ups from the second review                                       #
+# --------------------------------------------------------------------------- #
+
+def test_halting_image_requeued_and_yes_resumes(frame, monkeypatch):
+    f = frame
+    monkeypatch.setattr(f, "_save_bundle", lambda *a, **k: None)
+    resumed = []
+    monkeypatch.setattr(f, "resume_batch_processing", lambda: resumed.append(1))
+    img = str(f.src / "a.jpg")
+    f.workspace.items[img].processing_state = "failed"
+    f.workspace.items[img].processing_error = "signed out"
+    w = _FakeWorker()
+    f.batch_worker = w
+    f.workspace.batch_state = {"total_queued": 1}
+    f.answer = True
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
+                                           worker=w, halted="signed out",
+                                           halted_file=img))
+    assert f.workspace.items[img].processing_state == "pending"
+    assert f.workspace.items[img].processing_error is None
+    assert resumed == [1]
+
+
+def test_run_fatal_failure_in_batch_shows_no_per_image_box(frame):
+    f = frame
+    w = _FakeWorker()
+    w.start()
+    f.batch_worker = w
+    img = str(f.src / "a.jpg")
+    f.on_worker_failed(SimpleNamespace(file_path=img, error="signed out",
+                                       kind="unavailable", run_fatal=True))
+    assert f.infos == []
+    f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
+                                       kind=None, run_fatal=False))
+    assert f.infos, "ordinary failures still report"
+    f.batch_worker = None
+
+
+def test_failed_start_keeps_a_halted_batchs_resume_state(frame, monkeypatch):
+    f = frame
+    halted_state = {"total_queued": 9, "provider": "claude-code"}
+    f.workspace.batch_state = halted_state
+    other = str(f.src / "clip.mp4")
+    f.workspace.items[other].processing_state = "pending"
+
+    def boom(*a, **k):
+        raise RuntimeError("persist exploded")
+    # Fails before the new run sets batch_state or marks anything pending.
+    monkeypatch.setattr(f, "_persist_extracted_frames_to_bundle", boom)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert f.workspace.batch_state is halted_state
+    assert f.workspace.items[other].processing_state == "pending"
+    assert f._batch_busy_message() is None
+
+
+def test_halted_dialog_says_stopped(_frame):
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 10)
+    try:
+        dlg.mark_complete("3/10 images: signed out", stopped=True)
+        assert "Stopped" in dlg.GetTitle()
+        assert "Complete" not in dlg.GetTitle()
+    finally:
+        dlg.Destroy()

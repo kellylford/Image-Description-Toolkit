@@ -189,11 +189,19 @@ class AppleFMError(RuntimeError):
     chat classifier reads it off the exception before it falls back to matching
     the message text, so a transient failure can be marked as such without
     smuggling the word "500" into a sentence shown to the user.
+
+    ``setup`` is True when nothing can succeed until the user changes
+    something (wrong Mac, no ``fm``, licence not accepted, model switched off,
+    ``fm`` cannot be launched). A batch stops on those instead of failing every
+    remaining image; it is set where the condition is detected, so callers
+    never have to recognise it from the wording.
     """
 
-    def __init__(self, message: str, status_code: Optional[int] = None):
+    def __init__(self, message: str, status_code: Optional[int] = None,
+                 setup: bool = False):
         super().__init__(message)
         self.status_code = status_code
+        self.setup = setup
 
 
 # ---------------------------------------------------------------------------
@@ -269,12 +277,12 @@ def license_accepted(fm: Optional[str] = None, force: bool = False) -> bool:
 def check_ready(fm: Optional[str] = None) -> None:
     """Raise :class:`AppleFMError` unless a request could actually succeed."""
     if platform.system() != "Darwin" or platform.machine() != "arm64":
-        raise AppleFMError(_NOT_MACOS_HINT)
+        raise AppleFMError(_NOT_MACOS_HINT, setup=True)
     fm = fm or find_fm()
     if not fm:
-        raise AppleFMError(_NO_FM_HINT)
+        raise AppleFMError(_NO_FM_HINT, setup=True)
     if not license_accepted(fm):
-        raise AppleFMError(LICENSE_HINT)
+        raise AppleFMError(LICENSE_HINT, setup=True)
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +439,7 @@ class FmServer:
             log = open(self._log_path, "wb")
         except OSError as exc:
             self._cleanup_locked()
-            raise AppleFMError(f"Could not start Apple Intelligence: {exc}")
+            raise AppleFMError(f"Could not start Apple Intelligence: {exc}", setup=True)
         try:
             # stdout and stderr go to a file, never a pipe: nothing in this
             # process reads them during a run, and a full pipe buffer would
@@ -444,7 +452,7 @@ class FmServer:
         except OSError as exc:
             log.close()
             self._cleanup_locked()
-            raise AppleFMError(f"Could not start Apple Intelligence: {exc}")
+            raise AppleFMError(f"Could not start Apple Intelligence: {exc}", setup=True)
         finally:
             log.close()
 
@@ -513,7 +521,8 @@ class FmServer:
                 reason = entry.get("reason") or "the on-device model is unavailable"
                 raise AppleFMError(
                     f"Apple Intelligence is not ready: {reason} "
-                    "Check System Settings > Apple Intelligence & Siri."
+                    "Check System Settings > Apple Intelligence & Siri.",
+                    setup=True,
                 )
 
     def _log_tail(self, limit: int = 400) -> str:

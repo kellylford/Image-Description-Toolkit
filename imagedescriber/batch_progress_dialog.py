@@ -363,7 +363,7 @@ class BatchProgressDialog(wx.Dialog):
             if hasattr(self.parent_window, 'on_stop_batch'):
                 self.parent_window.on_stop_batch()
 
-    def mark_complete(self, summary: str = ""):
+    def mark_complete(self, summary: str = "", stopped: bool = False):
         """
         Called when batch processing finishes naturally — keeps dialog open
         so the user can review stats before dismissing.
@@ -375,13 +375,17 @@ class BatchProgressDialog(wx.Dialog):
         # Append completion notice to the live stats list
         self.stats_list.Append(SEP_LINE)
         self.separator_indices.add(self.stats_list.GetCount() - 1)
-        self.stats_list.Append("\u2713  Batch Complete!")
+        # stopped: the batch ended itself before the last image (e.g. the
+        # provider is signed out). Say so; the title is what a screen
+        # reader announces, and "Complete" would be wrong.
+        self.stats_list.Append("Batch stopped" if stopped else "\u2713  Batch Complete!")
         if summary:
             self.stats_list.Append(f"     {summary}")
         self.stats_list.EnsureVisible(self.stats_list.GetCount() - 1)
 
-        # Fill progress bar
-        self.progress_bar.SetValue(100)
+        # Fill progress bar (a stopped batch keeps the progress it made)
+        if not stopped:
+            self.progress_bar.SetValue(100)
 
         # Update controls
         self.pause_button.SetLabel("Pause")
@@ -394,7 +398,8 @@ class BatchProgressDialog(wx.Dialog):
         self.Layout()
 
         # Update window title so screen readers announce completion
-        self.SetTitle("Batch Complete  —  Review stats then close")
+        self.SetTitle("Batch Stopped  —  Review stats then close" if stopped
+                      else "Batch Complete  —  Review stats then close")
     
     def reset_pause_button(self):
         """Reset pause button to 'Pause' state"""

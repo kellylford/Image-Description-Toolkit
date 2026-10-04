@@ -11,8 +11,8 @@
 
 **A batch stops when the AI provider can't be used**
 - When Claude Code's sign-in expired partway through a large batch, ImageDescriber kept going and failed every remaining image the same way: 533 images in 17 minutes, with thousands more queued.
-- If the provider is signed out, rejects your API key, or isn't set up, the batch now stops at the first such failure. It tells you what went wrong and keeps its place, so after you fix it (for Claude Code, `claude auth login`), **Process → Describe All Undescribed** carries on where it stopped. Other failures, such as a single unreadable image or a temporary server error, don't stop the batch.
-- For Claude Code, ImageDescriber checks `claude auth status` to confirm a failure was a sign-in problem, instead of judging by the error message.
+- If the provider is signed out, rejects your API key, or isn't set up, the batch now stops at the first such failure. It shows the provider's own message and offers to resume: fix the problem (for Claude Code, run `claude auth login`), then choose **Yes** to carry on with the same images, provider and prompt. Choose **No** to resume later; reopening the workspace offers it. Other failures, such as a single unreadable image or a temporary server error, don't stop the batch.
+- For Claude Code, a failed image triggers a check of `claude auth status`, so an expired sign-in is recognised even when Claude Code's message is unclear. Claude Code's own sign-in messages still count too. Apple Intelligence stops a batch only on setup problems it detects itself (wrong Mac, licence not accepted, model switched off), not on a server error that a retry recovers from.
 
 ## [4.6.1] - 2026-10-04
 

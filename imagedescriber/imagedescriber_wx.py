@@ -741,6 +741,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # last image.
         self._run_cancel: Optional[threading.Event] = None
         self._stopping_worker = None
+        # What the run being prepared changed, so a failed start can undo
+        # exactly that (see _abort_run).
+        self._preparing_queue = None
+        self._preparing_state = None
         # Guard against EVT_TREE_SEL_CHANGED firing during programmatic SelectItem() calls
         # inside refresh_image_list().  wx.TreeCtrl.SelectItem() fires the event unlike
         # wx.ListBox.SetSelection() which does not - so without this flag every list
@@ -4662,12 +4666,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         worker = self.batch_worker
         if worker is not None and not worker.is_alive():
             self.batch_worker = None
+        # Undo only what this run set. A batch halted earlier keeps its
+        # batch_state and pending flags until this run replaces them, and a
+        # failed start must not wipe that resume information.
         if self.workspace:
-            self.workspace.batch_state = None
-            for item in self.workspace.items.values():
-                if item.processing_state == "pending":
+            state = self._preparing_state
+            if state is not None and self.workspace.batch_state is state:
+                self.workspace.batch_state = None
+            for fp in self._preparing_queue or ():
+                item = self.workspace.items.get(fp)
+                if item is not None and item.processing_state == "pending":
                     item.processing_state = None
                     item.batch_queue_position = None
+        self._preparing_queue = self._preparing_state = None
         try:
             self._close_progress_dialog()
             self.processing_items.clear()
@@ -4708,7 +4719,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.refresh_image_list()
         self.mark_modified()
 
-        # Mark items as pending
+        # Mark items as pending (recorded first, so _abort_run can undo it)
+        self._preparing_queue = list(to_process)
         for i, fp in enumerate(to_process):
             if fp in self.workspace.items:
                 it = self.workspace.items[fp]
@@ -4716,7 +4728,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 it.batch_queue_position = i
 
         # Store batch_state so resume works
-        self.workspace.batch_state = {
+        self._preparing_state = self.workspace.batch_state = {
             "provider": options['provider'],
             "model": options['model'],
             "prompt_style": options.get('prompt_style', 'default'),
@@ -4757,11 +4769,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # (it used to call .start() on the None the stop left behind).
                 if cancel.is_set() or self.batch_worker is not worker:
                     logger.info("Batch stopped before describing started")
-                    self._end_run(cancel)
-                    self._flush_checkpoints()
-                    self._save_bundle_with_progress()
+                    # The run stays busy until this resave is done: it pumps
+                    # events, and a run started meanwhile would share its
+                    # progress window and race its manifest write.
+                    try:
+                        self._flush_checkpoints()
+                        self._save_bundle_with_progress()
+                    finally:
+                        self._end_run(cancel)
                     return
                 self._end_run(cancel)
+                self._preparing_queue = self._preparing_state = None
                 self._begin_stage("Describing", len(to_process), can_interrupt=True)
                 worker.start()
                 self.SetStatusText(f"Processing {len(to_process)} images…", 0)
@@ -6228,6 +6246,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.followup_worker and not self.followup_worker.is_alive():
             self.followup_worker = None
 
+        # In a batch, a failure every remaining image would hit (signed out,
+        # key refused, provider not set up) ends the batch, and the batch's
+        # completion explains it once. A box here as well stacked two modals.
+        if self._batch_worker_running() and getattr(event, 'run_fatal', False):
+            return
+
         # Enhanced error message for provider unavailability
         error_msg = event.error
         if "not available" in error_msg.lower():
@@ -6498,6 +6522,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # batch_state and the pending flags so the rest can be resumed, and
         # say why plainly instead of leaving thousands of failed images.
         halted = getattr(event, 'halted', None)
+        if halted:
+            # The image whose failure halted the batch was never really tried:
+            # put it back in the queue so resuming describes it.
+            halted_file = getattr(event, 'halted_file', None)
+            item = self.workspace.items.get(halted_file) if halted_file else None
+            if item is not None:
+                item.processing_state = "pending"
+                item.processing_error = None
 
         # Phase 3: Clear batch state on successful completion
         if self.workspace.batch_state and not halted:
@@ -6513,7 +6545,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.batch_progress_dialog:
             summary = (f"Stopped after {event.input_dir}: {halted}" if halted
                        else event.input_dir)
-            self.batch_progress_dialog.mark_complete(summary)
+            self.batch_progress_dialog.mark_complete(summary, stopped=bool(halted))
             self.batch_progress_dialog = None  # detach ref; dialog stays visible until user closes it
 
         # Phase 3: Clear worker reference
@@ -6551,13 +6583,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.refresh_image_list()
 
         if halted:
-            show_error(
+            # Offer to resume exactly this batch (same images, provider and
+            # prompt), not Describe All Undescribed, which would widen a folder
+            # batch to the whole workspace and skip a Redescribe batch. The
+            # question can stay open while the user fixes the problem.
+            if ask_yes_no(
                 self,
                 "Batch stopped: every remaining image would fail the same way.\n\n"
                 f"{halted}\n\n"
-                "Nothing else was sent. Fix the problem above (for Claude Code, run "
-                "'claude auth login' in a terminal), then choose Process > Describe "
-                "All Undescribed to continue where this stopped.")
+                "Nothing else was sent. Fix the problem above, then choose Yes to "
+                "resume this batch where it stopped. Choose No to resume later: "
+                "reopening this workspace offers to resume it."):
+                self.resume_batch_processing()
 
     def on_workflow_failed(self, event):
         """Handle workflow failures"""

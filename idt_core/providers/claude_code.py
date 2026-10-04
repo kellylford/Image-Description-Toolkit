@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import base64
 import json
+import re
 import os
 import shutil
 import subprocess
@@ -109,6 +110,11 @@ _INSTALL_HINT = (
     "Claude Code is not installed or not on PATH. "
     "Install it from https://claude.com/claude-code, then run: claude auth login"
 )
+
+
+#: Sign-in wording in the CLI's own failure text, used only to add advice.
+#: Whole words: a bare "log in" substring also matched "backlog in".
+_SIGN_IN_WORDING = re.compile(r"\bauthenticat|\boauth\b|\blog ?in\b", re.IGNORECASE)
 
 
 class ClaudeCodeError(RuntimeError):
@@ -200,6 +206,8 @@ def check_subscription(claude: Optional[str] = None, force: bool = False) -> Non
     if _subscription_confirmed and not force:
         return
     status = auth_status(claude)
+    if not isinstance(status, dict):
+        raise ClaudeCodeError(f"Could not read 'claude auth status': {status!r}")
     if not status.get("loggedIn"):
         _subscription_confirmed = False
         raise ClaudeCodeSignInError("Claude Code is not signed in. Run: claude auth login")
@@ -273,8 +281,9 @@ def result_error(data: dict) -> Optional[str]:
     if not data.get("is_error") and text:
         return None
     message = text or data.get("subtype") or "no response"
-    lowered = message.lower()
-    if "authenticate" in lowered or "oauth" in lowered or "log in" in lowered:
+    # Advice only. Whether a failure stops a batch is decided by
+    # ClaudeCodeProvider.describe asking `claude auth status`.
+    if _SIGN_IN_WORDING.search(message):
         message += " — run: claude auth login"
     return f"Claude Code: {message}"
 
