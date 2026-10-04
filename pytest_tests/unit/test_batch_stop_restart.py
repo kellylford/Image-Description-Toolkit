@@ -212,10 +212,14 @@ def test_second_run_refused_while_extracting(frame, monkeypatch):
     assert len(calls) == 1, "a second extraction of the same video started"
     assert any("already running" in m for m in f.infos)
 
-    # After Stop and before the thread has ended, still refused.
+    # After Stop and before the run has ended, still refused. The run can only
+    # end in a CallAfter, so with no event pumping in between it is still on.
     f.on_stop_batch()
-    f._run_cancel and f.on_process_all(None, skip_existing=True, preset_options=OPTIONS)
+    assert f._run_cancel is not None
+    f.infos.clear()
+    f.on_process_all(None, skip_existing=True, preset_options=OPTIONS)
     assert len(calls) == 1
+    assert any("still finishing" in m for m in f.infos)
     assert _pump_until(lambda: f._run_cancel is None)
 
 
@@ -281,8 +285,10 @@ def test_stopped_workers_completion_does_not_rerun_completion(frame, monkeypatch
     f = frame
     saves = []
     monkeypatch.setattr(f, "_save_bundle", lambda *a, **k: saves.append(1))
-    f._stopping_worker = SimpleNamespace(is_alive=lambda: False)
-    f.on_workflow_complete(SimpleNamespace(input_dir="3/26 images", output_dir=""))
+    stopped = SimpleNamespace(is_alive=lambda: False)
+    f._stopping_worker = stopped
+    f.on_workflow_complete(SimpleNamespace(input_dir="3/26 images", output_dir="",
+                                           worker=stopped, halted=None))
     assert f._stopping_worker is None
     assert saves == []
 
@@ -349,3 +355,163 @@ def test_persisted_frames_resolve_after_reopen(frame, tmp_path):
         assert p in gui["items"], "frame no longer at its real path after reopen"
         assert gui["items"][p]["parent_video"] == vid
     assert gui["items"][vid]["extracted_frames"] == frames
+
+
+# --------------------------------------------------------------------------- #
+# Found by independent review of the first fix                                 #
+# --------------------------------------------------------------------------- #
+
+def test_stop_button_enabled_while_extracting(frame, monkeypatch):
+    """Stop must be reachable from the progress window in the extract stage
+    (it was disabled there, so the new stop path could only be reached from
+    the menu)."""
+    f = frame
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    dlg = f.batch_progress_dialog
+    assert dlg is not None
+    assert dlg.stop_button.IsEnabled()
+    assert not dlg.pause_button.IsEnabled()
+
+
+def test_failure_before_describing_does_not_leave_app_busy(frame, monkeypatch):
+    f = frame
+
+    def boom(*a, **k):
+        raise RuntimeError("dialog exploded")
+    monkeypatch.setattr(f, "_ensure_progress_dialog", boom)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert f._run_cancel is None
+    assert f._batch_busy_message() is None
+    assert any("could not start" in m for m in f.infos)
+    assert f.workspace.batch_state is None
+
+
+def test_failure_after_extraction_does_not_leave_app_busy(frame, monkeypatch):
+    f = frame
+    monkeypatch.setattr(f, "_extract_video_frames_sync",
+                        lambda vp, cfg, cancel=None, frames_dir=None: ([], {}))
+
+    def boom(*a, **k):
+        raise RuntimeError("persist exploded")
+    monkeypatch.setattr(f, "_launch_batch_impl", boom)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f._batch_busy_message() is None
+
+
+def test_manual_video_extraction_counts_as_busy(frame):
+    f = frame
+    f.video_worker = SimpleNamespace(is_alive=lambda: True)
+    try:
+        assert "being extracted" in f._batch_busy_message()
+    finally:
+        f.video_worker = None
+
+
+def test_stale_completion_does_not_clear_a_new_run(frame):
+    """A finished worker's queued completion must not end the batch after it."""
+    f = frame
+    old = SimpleNamespace(is_alive=lambda: False)
+    new = _FakeWorker()
+    new.start()
+    f.batch_worker = new
+    f.workspace.batch_state = {"total_queued": 1}
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
+                                           worker=old, halted=None))
+    assert f.batch_worker is new
+    assert f.workspace.batch_state == {"total_queued": 1}
+    f.batch_worker = None
+
+
+def test_halted_batch_keeps_resume_state_and_says_why(frame, monkeypatch):
+    f = frame
+    monkeypatch.setattr(f, "_save_bundle", lambda *a, **k: None)
+    w = _FakeWorker()
+    f.batch_worker = w
+    f.workspace.batch_state = {"total_queued": 2}
+    f.workspace.items[str(f.src / "a.jpg")].processing_state = "pending"
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="1/2 images", output_dir="", worker=w,
+        halted="Claude Code is not signed in. Run: claude auth login"))
+    assert f.workspace.batch_state == {"total_queued": 2}
+    assert f.workspace.items[str(f.src / "a.jpg")].processing_state == "pending"
+    assert any("claude auth login" in m for m in f.infos)
+    assert f.batch_worker is None
+
+
+def test_frame_folders_ignore_case_on_case_insensitive_systems(frame):
+    from data_models import ImageItem
+    if sys.platform not in ("win32", "darwin"):
+        pytest.skip("case-sensitive file system")
+    f = frame
+    a = ImageItem("C:/x/IMG_0001.MOV", "video")
+    b = ImageItem("C:/y/img_0001.mov", "video")
+    f.workspace.add_item(a)
+    f.workspace.add_item(b)
+    assert (f._frames_dir_for_video(a.file_path).name.lower()
+            != f._frames_dir_for_video(b.file_path).name.lower())
+
+
+def test_real_extraction_stops_on_cancel_and_writes_to_frames_dir(frame, tmp_path):
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+    import imagedescriber_wx
+    f = frame
+    video = tmp_path / "real.mp4"
+    w = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*"mp4v"), 10, (64, 48))
+    for i in range(200):
+        w.write(np.full((48, 64, 3), i % 255, np.uint8))
+    w.release()
+    out = tmp_path / "frames_here"
+    frames, meta = f._extract_video_frames_sync(
+        str(video), {"time_interval_seconds": 5}, frames_dir=out)
+    assert frames and all(Path(p).parent == out for p in frames)
+
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(imagedescriber_wx.ExtractionCancelled):
+        f._extract_video_frames_sync(str(video), {"time_interval_seconds": 5},
+                                     cancel=cancel, frames_dir=out)
+
+
+# --------------------------------------------------------------------------- #
+# Bundle layer follow-ups                                                      #
+# --------------------------------------------------------------------------- #
+
+def test_fallback_only_for_frames_under_derived(tmp_path):
+    """A copy-mode image whose copy is gone is still reported missing."""
+    src = tmp_path / "a.jpg"
+    src.write_bytes(b"x")
+    ws = Workspace.create(tmp_path / "w.idtw", copy_originals=True)
+    wi = ws.add_image(src)
+    (ws.images_dir / "a.jpg").unlink()
+    assert ws.image_path(wi) == ws.images_dir / "a.jpg"
+
+
+def test_old_copy_record_corrected_when_rewritten(tmp_path):
+    ws = Workspace.create(tmp_path / "w.idtw")
+    d = ws.derived_dir("frames/clip")
+    d.mkdir(parents=True)
+    fr = d / "clip_5.00s.jpg"
+    fr.write_bytes(b"x")
+    ws.save_item(WorkspaceItem(image=fr.name, source_path=str(fr), storage="copy",
+                               item_type="extracted_frame"))
+    wi = gui_item_to_ws_item(ws, str(fr), {"item_type": "extracted_frame",
+                                           "descriptions": []})
+    assert wi.storage == "reference"
+
+
+def test_name_index_matches_unindexed_lookup(tmp_path):
+    from idt_core.gui_bridge import sidecar_name_index
+    src = tmp_path / "p"
+    (src / "A").mkdir(parents=True)
+    (src / "A" / "x.jpg").write_bytes(b"x")
+    ws = Workspace.create(tmp_path / "w.idtw")
+    ws.add_source_folder(src)
+    target = src / "A" / "x.jpg"
+    idx = sidecar_name_index(ws)
+    with_idx = gui_item_to_ws_item(ws, str(target), {"descriptions": []}, idx)
+    without = gui_item_to_ws_item(ws, str(target), {"descriptions": []})
+    assert with_idx.subfolder == without.subfolder and with_idx.image == without.image

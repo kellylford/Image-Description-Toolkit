@@ -1,3 +1,19 @@
+## [Unreleased]
+
+### 🐛 Bug Fixes
+
+**Stopping and restarting a batch with videos in ImageDescriber**
+- Stopping a batch, then choosing **Process → Describe All Undescribed**, could extract a video's frames a second time and then fail on frames with "file not found". Four separate faults combined to cause this, and all four are fixed.
+- **Stop works at every stage.** While frames were being extracted or the workspace saved, there was no way to stop a batch: the progress window's Stop button was disabled and Stop All Processing ignored that stage, so the batch went on to describe. Stop is now available while frames are extracted, and Stop All Processing works at every stage. Stopping ends extraction at the next frame and keeps videos that were fully extracted. A video stopped partway through is extracted again next time.
+- **One batch at a time.** Starting a second batch while one was still extracting began a second extraction of the same video, which deleted the frames the first was about to describe. Process, Extract Video Frames and the other batch commands now say a batch is already running instead. After Stop, they wait until the image in progress is finished.
+- **Extracted frames are found after reopening a workspace.** Frames were recorded as copied into the workspace's `images` folder when they weren't, so after reopening every frame was "not found". New frames are recorded correctly, and workspaces saved with the old record still find their frames.
+- **Videos with the same name no longer share frames.** Two videos called, for example, `IMG_0001.MOV` in different folders were extracted into the same folder, so one video's frames were deleted or replaced with the other's pictures and given the wrong descriptions. Each video now has its own frames folder.
+
+**A batch stops when the AI provider can't be used**
+- When Claude Code's sign-in expired partway through a large batch, ImageDescriber kept going and failed every remaining image the same way: 533 images in 17 minutes, with thousands more queued.
+- If the provider is signed out, rejects your API key, or isn't set up, the batch now stops at the first such failure. It tells you what went wrong and keeps its place, so after you fix it (for Claude Code, `claude auth login`), **Process → Describe All Undescribed** carries on where it stopped. Other failures, such as a single unreadable image or a temporary server error, don't stop the batch.
+- For Claude Code, ImageDescriber checks `claude auth status` to confirm a failure was a sign-in problem, instead of judging by the error message.
+
 ## [4.6.1] - 2026-10-04
 
 Maintenance release. The two providers added in 4.6.0 are unchanged; these are

@@ -65,9 +65,27 @@ except ImportError:
 # import would restore the old behaviour of storing API errors as descriptions,
 # which is precisely the bug this guards (issue #230). Fail loudly instead.
 try:
-    from ai_providers import is_provider_error            # frozen mode
+    from ai_providers import is_provider_error, ErrorKind            # frozen mode
 except ImportError:
-    from imagedescriber.ai_providers import is_provider_error   # dev mode
+    from imagedescriber.ai_providers import is_provider_error, ErrorKind   # dev mode
+
+#: Failure kinds that every remaining image in a batch would hit too: the
+#: provider is signed out, refused the credentials, or is not set up. A batch
+#: stops on the first one instead of failing thousands of images one by one
+#: (an expired Claude Code sign-in failed 533 images in 17 minutes).
+RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
+
+
+def _provider_error_kind(exc: BaseException):
+    """The ErrorKind carried by `exc` or anything it was raised from, else None."""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        kind = getattr(exc, "kind", None)
+        if isinstance(kind, str):
+            return kind
+        exc = exc.__cause__ or exc.__context__
+    return None
 
 try:
     from idt_core.metadata import MetadataExtractor, NominatimGeocoder
@@ -172,11 +190,19 @@ class ProgressUpdateEventData(ProgressUpdateEvent):
 
 
 class WorkflowCompleteEventData(WorkflowCompleteEvent):
-    """Event data for workflow completion"""
-    def __init__(self, input_dir, output_dir):
+    """Event data for workflow completion
+
+    worker: the BatchProcessingWorker that finished, so the window can tell a
+        stopped batch's late completion from the current batch's.
+    halted: set when the batch stopped itself on a failure every remaining
+        image would hit (see RUN_FATAL_KINDS); the provider's message.
+    """
+    def __init__(self, input_dir, output_dir, worker=None, halted=None):
         WorkflowCompleteEvent.__init__(self)
         self.input_dir = input_dir
         self.output_dir = output_dir
+        self.worker = worker
+        self.halted = halted
 
 
 class WorkflowFailedEventData(WorkflowFailedEvent):
@@ -269,6 +295,7 @@ class ProcessingWorker(threading.Thread):
         self.result_input_tokens = 0
         self.result_output_tokens = 0
         self.result_error = None
+        self.result_kind = None   # ErrorKind of a provider failure, if known
 
     def run(self):
         """Execute processing in background thread"""
@@ -359,6 +386,7 @@ class ProcessingWorker(threading.Thread):
             evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e))
             wx.PostEvent(self.parent_window, evt)
             self.result_error = str(e)
+            self.result_kind = _provider_error_kind(e)
     
     def _post_progress(self, message: str):
         """Post progress update to parent window"""
@@ -597,7 +625,8 @@ class ProcessingWorker(threading.Thread):
                         logging.warning(f"Could not delete temp file {temp_image_path}: {e}")
                 
         except Exception as e:
-            raise Exception(f"AI processing failed: {str(e)}")
+            # "from e" keeps the ProviderError (and its kind) reachable.
+            raise Exception(f"AI processing failed: {str(e)}") from e
     
     def _convert_heic_to_jpeg(self, heic_path: str) -> Optional[str]:
         """Convert HEIC file to JPEG"""
@@ -1061,6 +1090,7 @@ class BatchProcessingWorker(threading.Thread):
                 )
                 wx.PostEvent(self.parent_window, evt)
 
+            halted = None
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
@@ -1104,6 +1134,8 @@ class BatchProcessingWorker(threading.Thread):
                 worker.start()
                 worker.join()  # Wait for completion
 
+                if not worker.result_ok:
+                    failed += 1
                 if run_log:
                     if worker.result_ok:
                         in_t = worker.result_input_tokens
@@ -1113,9 +1145,18 @@ class BatchProcessingWorker(threading.Thread):
                     else:
                         err = worker.result_error or "unknown error"
                         run_log.warning(f"{i}/{total}  {Path(file_path).name}: failed  {err}")
-                        failed += 1
 
                 completed += 1
+
+                # Signed out / credentials refused / provider not set up: every
+                # remaining image would fail identically, so stop here.
+                if not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS:
+                    halted = worker.result_error or "The provider refused the request."
+                    if run_log:
+                        run_log.warning(
+                            f"run halted after {completed} images: every remaining "
+                            f"image would fail the same way ({worker.result_kind})")
+                    break
 
             elapsed = time.time() - start_time
             if run_log:
@@ -1127,7 +1168,9 @@ class BatchProcessingWorker(threading.Thread):
             # Post final completion
             evt = WorkflowCompleteEventData(
                 input_dir=f"{completed}/{total} images",
-                output_dir=""
+                output_dir="",
+                worker=self,
+                halted=halted,
             )
             wx.PostEvent(self.parent_window, evt)
 

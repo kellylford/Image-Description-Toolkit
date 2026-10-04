@@ -577,10 +577,17 @@ class Workspace:
         copy_path = self._image_copy_path(item.image, item.subfolder)
         # ImageDescriber up to 4.6.1 recorded extracted video frames as
         # storage="copy" without copying them; they live at source_path under
-        # derived/frames/. Fall back to it rather than report the frame missing.
-        if (not copy_path.exists() and item.source_path
-                and Path(item.source_path).exists()):
-            return Path(item.source_path)
+        # this bundle's derived/frames/. Only that case: any other missing copy
+        # is still reported missing rather than quietly using an original.
+        if (item.item_type == "extracted_frame" and not copy_path.exists()
+                and item.source_path):
+            source = Path(item.source_path)
+            try:
+                source.resolve().relative_to(self.derived_dir().resolve())
+            except ValueError:
+                return copy_path
+            if source.exists():
+                return source
         return copy_path
 
     # ----- chats ----- #

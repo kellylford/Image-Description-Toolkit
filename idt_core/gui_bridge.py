@@ -376,7 +376,22 @@ def _same_file(a, b) -> bool:
     return os.path.normcase(os.path.abspath(str(a))) == os.path.normcase(os.path.abspath(str(b)))
 
 
-def _find_ws_item(ws: Workspace, p: Path, subfolder: Optional[str]) -> Optional[WorkspaceItem]:
+def sidecar_name_index(ws: Workspace) -> dict:
+    """Sidecar file name -> [sidecar paths], from one walk of descriptions/.
+
+    Pass it to gui_item_to_ws_item when converting many items: without it each
+    item with no sidecar yet walks the whole tree, which is quadratic — 200 new
+    frames against 5,000 sidecars took 5.7 s on the main thread.
+    """
+    index: dict = {}
+    if ws.descriptions_dir.is_dir():
+        for sidecar in ws.descriptions_dir.rglob("*.json"):
+            index.setdefault(sidecar.name, []).append(sidecar)
+    return index
+
+
+def _find_ws_item(ws: Workspace, p: Path, subfolder: Optional[str],
+                  index: Optional[dict] = None) -> Optional[WorkspaceItem]:
     """The bundle's sidecar for the GUI item at ``p``, or None if it has none yet.
 
     The sidecar at the item's own (subfolder, name) is taken as is. Failing
@@ -388,9 +403,13 @@ def _find_ws_item(ws: Workspace, p: Path, subfolder: Optional[str]) -> Optional[
     direct = ws._sidecar_path(p.name, subfolder)
     if direct.exists():
         return ws.get_item(p.name, subfolder)
-    if not ws.descriptions_dir.is_dir():
+    if index is not None:
+        candidates = index.get(f"{p.name}.json", [])
+    elif ws.descriptions_dir.is_dir():
+        candidates = ws.descriptions_dir.glob(f"**/{p.name}.json")
+    else:
         return None
-    for sidecar in ws.descriptions_dir.glob(f"**/{p.name}.json"):
+    for sidecar in candidates:
         try:
             wi = WorkspaceItem.from_dict(json.loads(sidecar.read_text(encoding="utf-8")))
         except Exception:
@@ -401,7 +420,8 @@ def _find_ws_item(ws: Workspace, p: Path, subfolder: Optional[str]) -> Optional[
     return None
 
 
-def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> WorkspaceItem:
+def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict,
+                        index: Optional[dict] = None) -> WorkspaceItem:
     """Merge one GUI item dict into the bundle's sidecar for it (not yet saved).
 
     Updates the existing sidecar's descriptions and GUI extras when the bundle
@@ -410,7 +430,7 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> Worksp
     """
     p = Path(file_path)
     subfolder = gui_item.get("subfolder")
-    existing = _find_ws_item(ws, p, subfolder)
+    existing = _find_ws_item(ws, p, subfolder, index)
     extra = {k: v for k, v in gui_item.items() if k not in _ITEM_CORE_GUI_KEYS}
     descs = [_gui_desc_to_ws(d) for d in gui_item.get("descriptions", [])]
 
@@ -424,6 +444,12 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> Worksp
             existing.active_description_id = existing.descriptions[-1].id
         existing.is_missing = gui_item.get("is_missing", False)
         existing.extra.update(extra)
+        # ImageDescriber up to 4.6.1 recorded extracted frames as copied into
+        # images/ without copying them. Correct the record when it is rewritten.
+        if (existing.storage == "copy" and existing.source_path
+                and not ws._image_copy_path(existing.image, existing.subfolder).exists()
+                and Path(existing.source_path).exists()):
+            existing.storage = "reference"
         return existing
 
     wi = WorkspaceItem(

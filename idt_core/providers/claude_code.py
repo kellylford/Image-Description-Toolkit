@@ -115,6 +115,15 @@ class ClaudeCodeError(RuntimeError):
     """Claude Code is missing, signed out, on the wrong account type, or a run failed."""
 
 
+class ClaudeCodeSignInError(ClaudeCodeError):
+    """Claude Code is signed out, or signed in to something other than claude.ai.
+
+    Decided from ``claude auth status``, never from an error's wording. Every
+    request fails until the user runs ``claude auth login``, so a batch should
+    stop on it rather than try each remaining image.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Locating and checking the CLI
 # ---------------------------------------------------------------------------
@@ -192,10 +201,12 @@ def check_subscription(claude: Optional[str] = None, force: bool = False) -> Non
         return
     status = auth_status(claude)
     if not status.get("loggedIn"):
-        raise ClaudeCodeError("Claude Code is not signed in. Run: claude auth login")
+        _subscription_confirmed = False
+        raise ClaudeCodeSignInError("Claude Code is not signed in. Run: claude auth login")
     method = status.get("authMethod")
     if method != "claude.ai":
-        raise ClaudeCodeError(
+        _subscription_confirmed = False
+        raise ClaudeCodeSignInError(
             f"Claude Code is signed in with '{method}', not a claude.ai "
             "subscription, so it would bill an API account. Run: claude auth login"
         )
@@ -468,6 +479,15 @@ class ClaudeCodeProvider(BaseProvider):
                 data = value
         error = result_error(data)
         if error:
+            # A sign-in that expired mid-batch shows up here as an ordinary
+            # failed run. Ask the CLI whether it is still signed in, so the
+            # caller gets a ClaudeCodeSignInError it can stop the batch on.
+            try:
+                check_subscription(self._claude, force=True)
+            except ClaudeCodeSignInError:
+                raise ClaudeCodeSignInError(error)
+            except ClaudeCodeError:
+                pass   # status unreadable: report the original failure
             raise ClaudeCodeError(error)
         input_tokens, output_tokens = usage_tokens(data)
         return DescriptionResult(

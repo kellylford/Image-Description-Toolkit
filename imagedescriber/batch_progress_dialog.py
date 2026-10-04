@@ -149,7 +149,7 @@ class BatchProgressDialog(wx.Dialog):
     
     def begin_stage(self, name: str, total: int,
                     stage_index: int = 0, stage_count: int = 0,
-                    can_interrupt: bool = True):
+                    can_interrupt: bool = True, can_stop=None):
         """Start a new stage, resetting the item counter and progress bar.
 
         A run moves through up to three stages (Extracting frames, Saving
@@ -165,6 +165,9 @@ class BatchProgressDialog(wx.Dialog):
             can_interrupt: Whether Pause/Stop apply.  Only the describe stage
                 runs under BatchProcessingWorker, so the copy/extract stages
                 pass False and the buttons are disabled.
+            can_stop: Override for Stop alone. The extract and save stages
+                of a run can be stopped (the run is cancelled before
+                describing) though they cannot be paused. None = can_interrupt.
         """
         self.stage_name = name
         self.total_images = total
@@ -173,7 +176,7 @@ class BatchProgressDialog(wx.Dialog):
 
         self.progress_bar.SetValue(0)
         self.pause_button.Enable(can_interrupt)
-        self.stop_button.Enable(can_interrupt)
+        self.stop_button.Enable(can_interrupt if can_stop is None else can_stop)
 
         # Title carries the stage so screen readers announce the transition
         # when the dialog is the active window.

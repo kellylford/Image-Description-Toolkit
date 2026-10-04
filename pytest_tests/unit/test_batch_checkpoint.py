@@ -272,7 +272,7 @@ def test_stop_does_not_leave_batch_state_behind(frame, bundle, monkeypatch):
     path, src = bundle
     f = frame
     f._checkpointer.manifest_every = 1          # every checkpoint writes the manifest
-    monkeypatch.setattr(f, "batch_worker", SimpleNamespace(stop=lambda: None))
+    monkeypatch.setattr(f, "batch_worker", SimpleNamespace(stop=lambda: None, is_alive=lambda: False))
     monkeypatch.setattr(f, "batch_progress_dialog", None)
     f.on_worker_complete(_completion(src / "a.jpg", "a"))
     f.on_stop_batch()

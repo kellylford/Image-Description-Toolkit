@@ -1936,12 +1936,17 @@ class ClaudeCodeProvider(AIProvider):
         from idt_core.converter import load_for_api
         from idt_core.providers.claude_code import (
             DEFAULT_MODEL, ClaudeCodeError, ClaudeCodeProvider as _CoreProvider,
+            ClaudeCodeSignInError,
         )
 
         try:
             core = _CoreProvider(model=model or DEFAULT_MODEL)
             image_bytes, mime_type = load_for_api(Path(image_path))
             result = core.describe(image_bytes, mime_type, prompt)
+        except ClaudeCodeSignInError as exc:
+            # Confirmed by `claude auth status`: a batch stops on AUTH.
+            raise_provider_error(provider="Claude Code", kind=ErrorKind.AUTH,
+                                 message=str(exc))
         except ClaudeCodeError as exc:
             message = str(exc)
             lowered = message.lower()
