@@ -991,10 +991,15 @@ class DescriptionListBox(wx.ListBox):
             
             self.Append(display_text)
         
-        # Create custom accessible for Windows screen readers
-        # (No effect on macOS, but harmless to set)
-        self.custom_accessible = AccessibleDescriptionListBox(self, self.descriptions_data)
-        self.SetAccessible(self.custom_accessible)
+        # Custom accessible for Windows screen readers. wx.Accessible is
+        # Windows-only: on macOS constructing it raises NotImplementedError,
+        # which wx swallowed in the caller's handler, silently skipping the
+        # rest of display_image_info whenever a described image was selected.
+        try:
+            self.custom_accessible = AccessibleDescriptionListBox(self, self.descriptions_data)
+            self.SetAccessible(self.custom_accessible)
+        except (NotImplementedError, AttributeError):
+            self.custom_accessible = None
     
     def GetFullDescription(self, index):
         """

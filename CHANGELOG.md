@@ -18,6 +18,9 @@ fixes found while using them.
 - A manual Save or Save As during a batch can no longer overwrite, or leave out, a description that finished while it ran.
 - Fixed while reviewing this change: when two folders held images with the same filename, saving one could write its description into the other's file, replacing that image's description.
 
+**ImageDescriber on macOS fully shows a described image when you select it**
+- On a Mac, selecting an image that had descriptions filled the description list but quietly skipped everything after it: the description editor and its details weren't updated. Building the Windows-only screen-reader helper for that list raised an error on macOS, and wx hid the error. The list now skips that helper on macOS, as the other controls already did.
+
 **Apple Intelligence retries when its model manager drops a request (#334)**
 - Apple's on-device model occasionally fails to load for a single request, reporting `ModelManagerServices.ModelManagerError error 1001` as an HTTP 500 — indistinguishable in shape from a safety refusal, which is permanent. This one is not: measured twice in a 90-image run, and both images described fine on a retry.
 - Anything the provider did not specifically recognise was classified as permanent, so each of those images was lost to a failure that fixes itself. Model-manager failures are now marked retryable and retried, and the retry count went from one to two because an attempt against a local model costs seconds.

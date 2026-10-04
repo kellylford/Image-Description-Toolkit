@@ -42,6 +42,9 @@ found while using them.
   Save. Now each image's description is written to the workspace when that image
   finishes. If the run is interrupted, reopening the workspace offers to resume at
   the first image not yet described.
+- **On a Mac, selecting a described image shows its description in full.**
+  Before, the description list filled in but the description editor next to it
+  could stay unchanged.
 - **Play a video from ImageDescriber.** Press **Enter** (or double-click) on a
   video in the image list, or choose **Process → Play Video**, to open it in your
   usual video player.
