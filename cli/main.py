@@ -591,16 +591,22 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
         source_relative_subfolder(video, source_root) if source_root else None
     )
 
+    video_wi = ws.get_item(video.name, video_subfolder)
+
     # One folder per video (see frames_relpath): keyed by name alone, two
     # same-named videos in different folders overwrote each other's frames.
-    frames_rel = frames_relpath(video, video_subfolder)
-    if frames_dir_taken(ws.derived_dir() / frames_rel, video):
-        frames_rel = frames_relpath(video, video_subfolder, disambiguate=True)
+    # A video extracted before (by an older version, into frames/<stem>)
+    # keeps its folder: a new one would re-add every frame as a new,
+    # undescribed item and describe them all again.
+    frames_rel = _previous_frames_rel(ws, video_wi, video)
+    if frames_rel is None:
+        frames_rel = frames_relpath(video, video_subfolder)
+        if frames_dir_taken(ws.derived_dir() / frames_rel, video):
+            frames_rel = frames_relpath(video, video_subfolder, disambiguate=True)
     frames_dir = ws.derived_dir() / frames_rel
     claim_frames_dir(frames_dir, video)
     result = extract_frames_to_dir(video, frames_dir, opts)
 
-    video_wi = ws.get_item(video.name, video_subfolder)
     if video_wi is None:
         video_wi = WorkspaceItem(
             image=video.name,
@@ -629,6 +635,29 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     video_wi.extra["extracted_frames"] = frame_paths
     ws.save_item(video_wi)
     return frame_items
+
+
+def _previous_frames_rel(ws, video_wi, video: Path):
+    """The frames folder (relative to derived/) this video already uses, or None.
+
+    Taken from the frames recorded on the video's item, and only if that
+    folder still exists and does not belong to a different video.
+    """
+    from idt_core.workspace import frames_dir_taken
+    if video_wi is None:
+        return None
+    recorded = (video_wi.extra or {}).get("extracted_frames") or []
+    if not recorded:
+        return None
+    folder = Path(recorded[0]).parent
+    derived = ws.derived_dir()
+    try:
+        rel = folder.resolve().relative_to(derived.resolve()).as_posix()
+    except (ValueError, OSError):
+        return None
+    if not folder.is_dir() or frames_dir_taken(folder, video):
+        return None
+    return rel
 
 
 def _extract_videos_into_workspace(ws, source: Path, args) -> None:

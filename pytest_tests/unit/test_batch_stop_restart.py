@@ -547,7 +547,7 @@ def test_halting_image_requeued_and_yes_resumes(frame, monkeypatch):
     assert resumed == [1]
 
 
-def test_run_fatal_failure_in_batch_shows_no_per_image_box(frame):
+def test_batch_failures_are_counted_not_boxed(frame):
     f = frame
     w = _FakeWorker()
     w.start()
@@ -555,22 +555,38 @@ def test_run_fatal_failure_in_batch_shows_no_per_image_box(frame):
     img = str(f.src / "a.jpg")
     f._batch_failures, f._batch_first_failure = 0, None
     f.on_worker_failed(SimpleNamespace(file_path=img, error="signed out",
-                                       kind="unavailable", run_fatal=True))
+                                       kind="unavailable", run_fatal=True, batch=w))
     assert f.infos == []
     assert f._batch_failures == 0, "the halt explains a run-fatal failure"
-    # Ordinary batch failures are counted for the end-of-batch summary, not
-    # shown one box per image.
     f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
-                                       kind=None, run_fatal=False))
+                                       kind=None, run_fatal=False, batch=w))
     assert f.infos == []
     assert f._batch_failures == 1 and "bad image" in f._batch_first_failure
-    # A single image processed on its own still reports its failure.
-    f.processing_items[img] = {"single": True}
+    # Counted even when the batch thread has already exited (last image).
+    w.stopped = True
     f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
-                                       kind=None, run_fatal=False))
-    assert f.infos, "single-image failures still report"
+                                       kind=None, run_fatal=False, batch=w))
+    assert f.infos == [] and f._batch_failures == 2
+    # A single image, follow-up question or rename (no batch) still reports.
+    f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
+                                       kind=None, run_fatal=False, batch=None))
+    assert f.infos, "non-batch failures still report"
     f.batch_worker = None
 
+
+def test_end_of_batch_reports_failures_once(frame):
+    """The final save opens a progress window; that used to reset the count
+    before the summary read it, so nothing was ever reported."""
+    f = frame
+    w = _FakeWorker()
+    f.batch_worker = w
+    f._batch_failures, f._batch_first_failure = 0, None
+    img = str(f.src / "a.jpg")
+    f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
+                                       kind=None, run_fatal=False, batch=w))
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
+                                           worker=w, halted=None, halted_files=[]))
+    assert any("could not be described" in m and "bad image" in m for m in f.infos)
 
 def test_failed_start_keeps_a_halted_batchs_resume_state(frame, monkeypatch):
     f = frame

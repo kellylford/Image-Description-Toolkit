@@ -6,6 +6,7 @@ Thread-safe worker classes for AI processing, batch operations, and workflow man
 Uses wx.lib.newevent for thread-to-GUI communication.
 """
 
+import re
 import sys
 import threading
 import time
@@ -79,6 +80,31 @@ RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 #: for failures that carry no run-fatal kind: a used-up Claude Code plan,
 #: Ollama not running. Large enough that a few bad files in a row don't trip it.
 SAME_FAILURE_STREAK = 10
+
+
+_TIMESTAMP_TAIL = re.compile(r"\s*-\s*\(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(,\d+)?\)\s*$")
+_HEX_ADDRESS = re.compile(r"0x[0-9a-fA-F]+")
+
+
+def _failure_signature(exc: BaseException):
+    """What makes two failures "the same", for the identical-failure halt.
+
+    The formatted message ends in a timestamp (format_provider_error), so two
+    identical failures never matched and the rule never fired. Prefer the
+    provider's raw text with kind and status; otherwise strip the timestamp
+    and object addresses (some transport errors embed one).
+    """
+    seen = set()
+    probe = exc
+    while probe is not None and id(probe) not in seen:
+        seen.add(id(probe))
+        raw = getattr(probe, "raw_message", None)
+        if isinstance(raw, str):
+            return (getattr(probe, "kind", None), getattr(probe, "status_code", None),
+                    _HEX_ADDRESS.sub("0x", raw))
+        probe = probe.__cause__ or probe.__context__
+    text = _TIMESTAMP_TAIL.sub("", str(exc))
+    return (_provider_error_kind(exc), None, _HEX_ADDRESS.sub("0x", text))
 
 
 def _provider_error_kind(exc: BaseException):
@@ -182,12 +208,13 @@ class ProcessingFailedEventData(ProcessingFailedEvent):
     kind: the provider ErrorKind when known. A run-fatal kind ends a batch,
         whose own message explains it, so the per-image error box is skipped.
     """
-    def __init__(self, file_path, error, kind=None):
+    def __init__(self, file_path, error, kind=None, batch=None):
         ProcessingFailedEvent.__init__(self)
         self.file_path = file_path
         self.error = error
         self.kind = kind
         self.run_fatal = kind in RUN_FATAL_KINDS
+        self.batch = batch   # the BatchProcessingWorker, or None
 
 
 class ProgressUpdateEventData(ProgressUpdateEvent):
@@ -277,7 +304,8 @@ class ProcessingWorker(threading.Thread):
                  prompt_style: str, custom_prompt: str = "",
                  prompt_config_path: Optional[str] = None,
                  api_key: Optional[str] = None,
-                 geocode: bool = False):
+                 geocode: bool = False,
+                 batch=None):
         """Initialize worker
 
         Args:
@@ -312,6 +340,12 @@ class ProcessingWorker(threading.Thread):
         self.result_output_tokens = 0
         self.result_error = None
         self.result_kind = None   # ErrorKind of a provider failure, if known
+        self.result_signature = None   # see _failure_signature
+        # The BatchProcessingWorker this image belongs to, or None. Carried on
+        # the failure event so the window can tell batch images from a single
+        # image, a follow-up question or a rename, and from a batch that has
+        # already been stopped or replaced.
+        self.batch = batch
 
     def run(self):
         """Execute processing in background thread"""
@@ -401,8 +435,9 @@ class ProcessingWorker(threading.Thread):
             # Emit failure
             self.result_error = str(e)
             self.result_kind = _provider_error_kind(e)
+            self.result_signature = _failure_signature(e)
             evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e),
-                                            kind=self.result_kind)
+                                            kind=self.result_kind, batch=self.batch)
             wx.PostEvent(self.parent_window, evt)
     
     def _post_progress(self, message: str):
@@ -1147,6 +1182,7 @@ class BatchProcessingWorker(threading.Thread):
                     self.custom_prompt,
                     self.prompt_config_path,
                     geocode=self.geocode,
+                    batch=self,
                 )
 
                 # Run synchronously and wait
@@ -1171,7 +1207,7 @@ class BatchProcessingWorker(threading.Thread):
                 if worker.result_ok:
                     streak = []
                 else:
-                    key = (worker.result_kind, worker.result_error)
+                    key = worker.result_signature
                     if streak and streak_key != key:
                         streak = []
                     streak_key = key

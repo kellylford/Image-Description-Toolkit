@@ -745,6 +745,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # exactly that (see _abort_run).
         self._preparing_queue = None
         self._preparing_state = None
+        # True while _save_bundle_with_progress pumps events (see on_workflow_complete).
+        self._progress_save_active = False
         # Failed images in the current batch (see on_worker_failed).
         self._batch_failures = 0
         self._batch_first_failure = None
@@ -2593,8 +2595,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_import_workflow(self, event):
         """Import descriptions from a completed workflow directory."""
-        if self._refuse_workspace_change():
-            return
         progress_dlg = None
         try:
             workflow_dir = select_directory_dialog(
@@ -3651,7 +3651,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             'provider': options['provider'],
             'model': options['model'],
             'embed_after_process': options.get('embed_after_process', False),
-            'single': True,   # not part of a batch (see on_worker_failed)
         }
         self.refresh_image_list()
 
@@ -4191,8 +4190,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._stage_no = 0
         self._batch_active = True
         self._token_records = []
-        self._batch_failures = 0
-        self._batch_first_failure = None
         self._batch_provider = options.get('provider', '')
         self._batch_model = options.get('model', '')
         self._batch_prompt = options.get('prompt_style', '')
@@ -4495,10 +4492,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         snap_seq = self._checkpointer.snapshot_seq()
         ws_dict = self.workspace.to_dict()
-        self._run_with_progress(
-            "Saving workspace", len(ws_dict.get("items") or {}),
-            lambda cb: self._save_bundle(progress=cb, ws_dict=ws_dict, snap_seq=snap_seq),
-        )
+        self._progress_save_active = True
+        try:
+            self._run_with_progress(
+                "Saving workspace", len(ws_dict.get("items") or {}),
+                lambda cb: self._save_bundle(progress=cb, ws_dict=ws_dict, snap_seq=snap_seq),
+            )
+        finally:
+            self._progress_save_active = False
 
     def _launch_batch_impl(self, cancel: threading.Event, to_process: list,
                            options: dict, skip_existing: bool, video_preamble):
@@ -4516,6 +4517,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._persist_extracted_frames_to_bundle()
         self.refresh_image_list()
         self.mark_modified()
+
+        # A new batch's failure count (not in _ensure_progress_dialog: that
+        # also opens the window for a plain save, which reset the count before
+        # the end-of-batch summary could read it).
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         # Mark items as pending (recorded first, so _abort_run can undo it)
         self._preparing_queue = list(to_process)
@@ -4705,6 +4712,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_open_workspace(self, event):
         """Open a .idtw workspace bundle."""
+        # Before the unsaved-changes question and the folder picker, not
+        # after them in load_workspace.
+        if self._refuse_workspace_change():
+            return
         if not self.confirm_unsaved_changes():
             return
 
@@ -6028,9 +6039,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_worker_failed(self, event):
         """Handle processing failures"""
-        # Remove from processing items; single-image runs mark their entry so
-        # their failure is still reported on its own (batch images are not).
-        single = bool((self.processing_items.pop(event.file_path, None) or {}).get('single'))
+        # Remove from processing items
+        self.processing_items.pop(event.file_path, None)
+        # Batch images carry their batch worker (see ProcessingWorker.batch);
+        # a single image, a follow-up question or a rename carry None.
+        batch = getattr(event, 'batch', None)
 
         # Phase 3: Set processing state to failed and store error
         if event.file_path in self.workspace.items:
@@ -6054,8 +6067,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # window; the batch's completion reports failures once. A failure every
         # remaining image would hit (signed out, key refused, provider not set
         # up) ends the batch, and its completion explains that instead.
-        if not single and self._batch_worker_running():
-            if not getattr(event, 'run_fatal', False):
+        # Decided by the tag, not by whether the batch thread is still alive:
+        # the last image's failure often arrives after the thread has exited.
+        if batch is not None:
+            if batch is self.batch_worker and not getattr(event, 'run_fatal', False):
                 name = Path(event.file_path).name
                 self._batch_failures += 1
                 if self._batch_first_failure is None:
@@ -6133,6 +6148,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         #   take a batch's completion as its own).
         source = getattr(event, 'worker', None)
         is_batch = source is not None
+        # A batch can finish while a save is pumping events (pause saves
+        # while the last image is still in flight). Running the whole
+        # completion nested inside that save meant a second save, modals, and
+        # the pause handler then labelling a finished batch "paused".
+        if is_batch and self._progress_save_active:
+            wx.CallLater(250, self.on_workflow_complete, event)
+            return
         if is_batch:
             if source is self._stopping_worker:
                 logger.info(f"Stopped batch finished its last image ({event.input_dir})")
@@ -6338,8 +6360,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.batch_progress_dialog:
             summary = (f"Stopped after {event.input_dir}: {halted}" if halted
                        else event.input_dir)
-            if self._batch_failures:
-                summary += f" ({self._batch_failures} failed)"
+            n_failed = self._batch_failures - (
+                len(getattr(event, 'halted_files', None) or ()) if halted else 0)
+            if n_failed > 0:
+                summary += f" ({n_failed} failed)"
             self.batch_progress_dialog.mark_complete(summary, stopped=bool(halted))
             self.batch_progress_dialog = None  # detach ref; dialog stays visible until user closes it
 
@@ -6354,6 +6378,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # CRITICAL: Clear processing items before updating title to prevent "Processing..." being stuck
         self.processing_items.clear()
+
+        # Read the failure count now: the save below runs the event loop.
+        failures, first_failure = self._batch_failures, self._batch_first_failure
+        if halted:
+            # Requeued images were not really failures.
+            failures = max(0, failures - len(getattr(event, 'halted_files', None) or ()))
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         # Reset window title to normal (remove processing percentage)
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
@@ -6379,15 +6411,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._batch_embed = False
         self.refresh_image_list()
 
-        if self._batch_failures and not halted:
+        if failures and not halted:
             show_warning(
                 self,
-                f"{self._batch_failures} image(s) in this batch could not be "
+                f"{failures} image(s) in this batch could not be "
                 "described. They are marked X in the image list, and "
                 "Process > Describe All Undescribed tries them again.\n\n"
-                f"First failure: {self._batch_first_failure}")
-        self._batch_failures = 0
-        self._batch_first_failure = None
+                f"First failure: {first_failure}")
 
         if halted:
             # Offer to resume exactly this batch (same images, provider and
@@ -6732,7 +6762,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # rather than freezing the app on a large workspace.
         self._save_bundle_with_progress()
 
-        self.SetStatusText("Batch processing paused", 0)
+        # The save runs the event loop; if the last image finished meanwhile,
+        # the batch has completed and is not paused.
+        if self.batch_worker is not None:
+            self.SetStatusText("Batch processing paused", 0)
 
     def on_resume_batch(self):
         """Resume paused batch processing"""
@@ -6912,6 +6945,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # completion event; until then new runs are refused (_batch_busy_message).
         self.batch_worker.stop()
         self._stopping_worker = self.batch_worker
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         # Clear batch state (won't resume automatically)
         self.workspace.batch_state = None
@@ -7277,6 +7312,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         logger.info(f"Auto-processing {len(image_paths)} downloaded images with defaults: {options['provider']}/{options['model']}")
         if self._refuse_if_batch_busy():
             return
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         # Mark images as pending for batch processing
         for i, img_path in enumerate(image_paths):
@@ -7356,6 +7393,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         if self._refuse_if_batch_busy():
             return
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         # Show processing options dialog
         dialog = ProcessingOptionsDialog(self.config, cached_ollama_models=self.cached_ollama_models, parent=self, on_apply=self._persist_processing_options)

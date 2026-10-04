@@ -36,11 +36,65 @@ def test_relpath_hash_is_stable_and_distinct():
 
 
 def test_folder_ownership(tmp_path):
+    a, b = tmp_path / "a.mp4", tmp_path / "b.mp4"
+    a.write_bytes(b"x")
+    b.write_bytes(b"x")
     d = tmp_path / "frames" / "clip"
-    assert not frames_dir_taken(d, tmp_path / "a.mp4")
-    claim_frames_dir(d, tmp_path / "a.mp4")
-    assert not frames_dir_taken(d, tmp_path / "a.mp4")
-    assert frames_dir_taken(d, tmp_path / "b.mp4")
+    assert not frames_dir_taken(d, a)
+    claim_frames_dir(d, a)
+    assert not frames_dir_taken(d, a)
+    assert frames_dir_taken(d, b)
+
+
+def test_moved_owner_does_not_hold_the_folder(tmp_path):
+    """A library moved to a new drive must not re-extract into hashed folders."""
+    old, new = tmp_path / "old" / "a.mp4", tmp_path / "new" / "a.mp4"
+    new.parent.mkdir()
+    new.write_bytes(b"x")
+    d = tmp_path / "frames" / "a"
+    claim_frames_dir(d, old)          # recorded owner no longer exists
+    assert not frames_dir_taken(d, new)
+
+
+def test_owner_compared_case_insensitively_where_the_fs_is(tmp_path):
+    if sys.platform not in ("win32", "darwin"):
+        pytest.skip("case-sensitive file system")
+    a = tmp_path / "Clip.mp4"
+    a.write_bytes(b"x")
+    d = tmp_path / "frames" / "Clip"
+    claim_frames_dir(d, a)
+    assert not frames_dir_taken(d, tmp_path / "clip.MP4")
+
+
+def test_cli_rerun_does_not_duplicate_frames(tmp_path):
+    pytest.importorskip("cv2")
+    from cli.main import _extract_one_video_into_workspace
+    from idt_core.video import VideoExtractionOptions
+    src = tmp_path / "phone"
+    clip = src / "jan" / "IMG_0001.mp4"
+    _video(clip, 20, 90)
+    ws = Workspace.create(tmp_path / "w.idtw")
+    opts = VideoExtractionOptions(mode="interval", interval_seconds=5.0)
+    first = _extract_one_video_into_workspace(ws, clip, opts, src)
+    second = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert len(first) == len(second)
+    frames = [i for i in ws.items() if i.item_type == "extracted_frame"]
+    assert len(frames) == len(first)
+
+
+def test_cli_keeps_a_legacy_frames_folder(tmp_path):
+    """Bundles from older versions put frames in frames/<stem>; keep using it."""
+    from cli.main import _previous_frames_rel
+    from idt_core.workspace import WorkspaceItem
+    ws = Workspace.create(tmp_path / "w.idtw")
+    legacy = ws.derived_dir("frames") / "IMG_0001"
+    legacy.mkdir(parents=True)
+    (legacy / "IMG_0001_0.00s.jpg").write_bytes(b"x")
+    video = tmp_path / "phone" / "jan" / "IMG_0001.mp4"
+    vwi = WorkspaceItem(image=video.name, source_path=str(video), storage="reference",
+                        item_type="video", subfolder="phone/jan")
+    vwi.extra["extracted_frames"] = [str(legacy / "IMG_0001_0.00s.jpg")]
+    assert _previous_frames_rel(ws, vwi, video) == "frames/IMG_0001"
 
 
 def _video(path: Path, seconds: int, shade: int):

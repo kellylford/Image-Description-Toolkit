@@ -114,6 +114,8 @@ class _FakeImageWorker:
         self.result_ok = outcome == "ok"
         self.result_error = None if self.result_ok else f"failed: {outcome}"
         self.result_kind = None if outcome in ("ok", "plain") else outcome
+        self.result_signature = (None if self.result_ok
+                                 else (self.result_kind, None, self.result_error))
 
     def start(self):
         _FakeImageWorker.seen.append(Path(self.file_path).name)
@@ -273,3 +275,49 @@ def test_a_success_resets_the_streak(monkeypatch):
     done, _ = _run_batch(monkeypatch, names, script)
     assert _FakeImageWorker.seen == names
     assert done.halted is None
+
+
+def test_identical_failures_match_despite_timestamps():
+    """Real formatted provider errors end in a timestamp; the streak rule
+    compared those strings and so never fired (found by the third review)."""
+    import time
+    from ai_providers import format_provider_error
+
+    def failure():
+        try:
+            try:
+                raise ProviderError(
+                    format_provider_error(provider="Claude Code", kind=ErrorKind.UNKNOWN,
+                                          message="You have hit your limit"),
+                    kind=ErrorKind.UNKNOWN, raw_message="You have hit your limit")
+            except Exception as e:
+                raise Exception(f"AI processing failed: {e}") from e
+        except Exception as wrapped:
+            return wrapped
+    a = failure()
+    time.sleep(0.01)
+    b = failure()
+    assert str(a) != str(b)
+    assert workers_wx._failure_signature(a) == workers_wx._failure_signature(b)
+
+
+def test_signature_strips_timestamp_without_raw_message():
+    a = Exception("Error generating description: boom  - (2026-10-04 15:44:45,422)")
+    b = Exception("Error generating description: boom  - (2026-10-04 15:44:46,456)")
+    assert workers_wx._failure_signature(a) == workers_wx._failure_signature(b)
+
+
+def test_batch_images_carry_their_batch(monkeypatch):
+    posted = []
+    monkeypatch.setattr(workers_wx.wx, "PostEvent", lambda win, evt: posted.append(evt))
+    marker = object()
+    w = workers_wx.ProcessingWorker(None, "C:/p/a.jpg", "ollama", "m", "narrative",
+                                    "", None, batch=marker)
+
+    def bad(*a, **k):
+        raise ValueError("bad")
+    monkeypatch.setattr(w, "_process_with_ai", bad)
+    monkeypatch.setattr(w, "_inject_exif_context", lambda p: (p, ""), raising=False)
+    w.run()
+    failed = [e for e in posted if isinstance(e, workers_wx.ProcessingFailedEventData)]
+    assert failed[0].batch is marker

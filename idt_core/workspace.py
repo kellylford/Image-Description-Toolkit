@@ -75,7 +75,10 @@ def frames_relpath(video, subfolder: Optional[str] = None,
     video = Path(video)
     stem = video.stem
     if disambiguate:
-        stem = f"{stem}_{hashlib.sha1(str(video).encode('utf-8')).hexdigest()[:8]}"
+        # Hash the resolved path, so the name doesn't depend on how the source
+        # path happened to be typed.
+        digest = hashlib.sha1(_same_path_key(video).encode("utf-8")).hexdigest()[:8]
+        stem = f"{stem}_{digest}"
     parts = ["frames"]
     if subfolder and subfolder != ".":
         parts.append(Path(subfolder).as_posix())
@@ -83,14 +86,28 @@ def frames_relpath(video, subfolder: Optional[str] = None,
     return "/".join(parts)
 
 
+def _same_path_key(path) -> str:
+    """Comparable form of a path: resolved, and case-folded where file systems
+    are case-insensitive (Windows; macOS by default, where normcase does not)."""
+    import sys
+    key = os.path.normcase(os.path.realpath(str(path)))
+    return key.lower() if sys.platform == "darwin" else key
+
+
 def frames_dir_taken(frames_dir: Path, video) -> bool:
-    """True if ``frames_dir`` already belongs to a different video."""
+    """True if ``frames_dir`` already belongs to a different, existing video.
+
+    An owner that no longer exists (the source was moved or renamed) does not
+    hold the folder: otherwise moving a library would re-extract every video
+    into a second, hashed folder.
+    """
     try:
         owner = (Path(frames_dir) / FRAMES_OWNER_FILE).read_text(encoding="utf-8").strip()
     except OSError:
         return False
-    norm = lambda p: os.path.normcase(os.path.abspath(str(p)))
-    return bool(owner) and norm(owner) != norm(video)
+    if not owner or _same_path_key(owner) == _same_path_key(video):
+        return False
+    return Path(owner).exists()
 
 
 def claim_frames_dir(frames_dir: Path, video) -> None:

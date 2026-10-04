@@ -336,12 +336,15 @@ class ProviderError(Exception):
     """
 
     def __init__(self, message: str, status_code=None, provider: str = "",
-                 kind: Optional[str] = None):
+                 kind: Optional[str] = None, raw_message: Optional[str] = None):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
         self.provider = provider
         self.kind = kind or kind_for_status(status_code)
+        # The provider's own text, before formatting adds a timestamp. Two
+        # identical failures compare equal on this; on .message they never do.
+        self.raw_message = message if raw_message is None else raw_message
 
     @property
     def is_retryable(self) -> bool:
@@ -503,6 +506,7 @@ def raise_provider_error(provider: str, kind: str, status_code=None,
         status_code=status_code,
         provider=provider,
         kind=kind,
+        raw_message=message,
     )
 
 
@@ -515,6 +519,7 @@ def raise_provider_error_from_exception(exc: BaseException, provider: str,
         status_code=status_code,
         provider=provider,
         kind=kind,
+        raw_message=str(exc),
     ) from exc
 
 
