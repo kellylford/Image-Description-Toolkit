@@ -122,8 +122,11 @@ def _file_fingerprint(path) -> Optional[str]:
 
 
 def _path_gone(path) -> bool:
-    """True only if ``path`` definitely doesn't exist; an unreadable location
-    (access denied, offline share) is not "gone"."""
+    """True only if ``path`` definitely doesn't exist. Access denied or a
+    device that isn't ready is not "gone". (Windows reports an unreachable
+    share or unmapped drive as not found, so those count as gone; "moved"
+    also needs the name, size and content fingerprint to match, so that is
+    safe.)"""
     try:
         os.stat(path)
         return False

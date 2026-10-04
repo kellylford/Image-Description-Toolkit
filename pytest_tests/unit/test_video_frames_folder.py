@@ -280,3 +280,18 @@ def test_cli_finds_previous_folder_in_a_renamed_bundle(tmp_path):
     vwi.extra["extracted_frames"] = [
         str(tmp_path / "MyPhotos" / "derived" / "frames" / "IMG_0001" / "a.jpg")]
     assert _previous_frames_rel(ws, vwi, video) == "frames/IMG_0001"
+
+
+def test_cli_previous_folder_when_the_bundle_lives_under_derived_frames(tmp_path):
+    """A derived/frames pair in the bundle's own location must not hide the
+    real one inside the bundle (seventh review)."""
+    from cli.main import _previous_frames_rel
+    from idt_core.workspace import WorkspaceItem
+    ws = Workspace.create(tmp_path / "proj" / "derived" / "frames" / "w.idtw")
+    folder = ws.derived_dir("frames") / "IMG_0001"
+    folder.mkdir(parents=True)
+    video = tmp_path / "IMG_0001.mp4"
+    vwi = WorkspaceItem(image=video.name, source_path=str(video), storage="reference",
+                        item_type="video")
+    vwi.extra["extracted_frames"] = [str(folder / "a.jpg")]
+    assert _previous_frames_rel(ws, vwi, video) == "frames/IMG_0001"

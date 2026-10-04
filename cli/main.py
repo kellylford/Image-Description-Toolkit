@@ -651,21 +651,18 @@ def _previous_frames_rel(ws, video_wi, video: Path):
     # that has been moved still records its old location.
     parts = Path(recorded[0]).parent.parts
     lowered = [p.lower() for p in parts]
-    # The bundle's own derived/frames/, not a source folder that happens to
-    # be called "derived" (and not depending on the bundle folder's name,
-    # which a user may have renamed without the .idtw suffix).
-    start = next((i + 1 for i in range(len(lowered) - 1)
-                  if lowered[i] == "derived" and lowered[i + 1] == "frames"),
-                 None)
-    if start is None:
-        return None
-    rel_parts = parts[start:]
-    if not rel_parts:
-        return None
-    folder = ws.derived_dir().joinpath(*rel_parts)
-    if not folder.is_dir() or frames_dir_taken(folder, video):
-        return None
-    return Path(*rel_parts).as_posix()
+    # The bundle's own derived/frames/. A "derived/frames" pair can also
+    # appear in the bundle's location or in a source subfolder, and the
+    # bundle folder may have been renamed without its .idtw suffix, so try
+    # each pair and take the first that names a folder in this bundle.
+    for i in range(len(lowered) - 1):
+        if lowered[i] != "derived" or lowered[i + 1] != "frames":
+            continue
+        rel_parts = parts[i + 1:]
+        folder = ws.derived_dir().joinpath(*rel_parts)
+        if folder.is_dir() and not frames_dir_taken(folder, video):
+            return Path(*rel_parts).as_posix()
+    return None
 
 
 def _extract_videos_into_workspace(ws, source: Path, args) -> None:
