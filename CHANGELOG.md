@@ -6,6 +6,13 @@
 - Press **Enter** (or double-click) on a video in the image list, or choose **Process → Play Video**, to open it in the system's default video player.
 - If the video file has moved or been deleted, ImageDescriber says so instead of doing nothing.
 
+### 🐛 Bug Fixes
+
+**ImageDescriber saves each description as soon as it is written**
+- During a batch, descriptions were kept only in memory until the whole batch finished. Nothing reached the workspace on disk unless you pressed Save, so a crash, power loss or forced quit partway through a long run lost every description since the last save.
+- Each image's description is now written to the workspace as soon as that image finishes, on a background thread so the batch isn't slowed. The batch's progress is saved every 25 images or 30 seconds, and when you pause, so reopening the workspace after a crash offers to resume at the first image not yet described.
+- A manual Save during a batch can no longer overwrite a description that was saved after the Save began.
+
 ## [4.6.1] - 2026-09-25
 
 Maintenance release. The two providers added in 4.6.0 are unchanged; these are

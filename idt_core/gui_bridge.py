@@ -17,10 +17,16 @@ These are pure functions — no wx — so they are unit-testable headlessly.
 """
 from __future__ import annotations
 
+import logging
+import queue
+import threading
+import time
 from pathlib import Path
 from typing import Callable, Optional
 
 from .workspace import Workspace, WorkspaceItem, WorkspaceDescription
+
+logger = logging.getLogger(__name__)
 
 # GUI item_type marker for chat sessions
 _CHAT_TYPE = "chat"
@@ -358,3 +364,177 @@ def _reconstruct_video_frame_links(ws: Workspace, items: dict) -> None:
         for fp in frame_paths:
             items[fp]["item_type"] = "extracted_frame"
             items[fp]["parent_video"] = video_key
+
+
+# --------------------------------------------------------------------------- #
+# Writing one GUI item into an open bundle                                     #
+# --------------------------------------------------------------------------- #
+
+def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> WorkspaceItem:
+    """Merge one GUI item dict into the bundle's sidecar for it (not yet saved).
+
+    Updates the existing sidecar's descriptions and GUI extras when the bundle
+    already holds the image, otherwise builds a reference item. The caller
+    writes the result with ``ws.save_item``.
+    """
+    p = Path(file_path)
+    subfolder = gui_item.get("subfolder")
+    # Look in the item's own subfolder first: a name-only lookup globs the
+    # whole descriptions/ tree, which is slow on a large bundle and can match
+    # a same-named image in another folder.
+    existing = ws.get_item(p.name, subfolder) if subfolder else None
+    if existing is None:
+        existing = ws.get_item(p.name)
+    extra = {k: v for k, v in gui_item.items() if k not in _ITEM_CORE_GUI_KEYS}
+    descs = [_gui_desc_to_ws(d) for d in gui_item.get("descriptions", [])]
+
+    if existing is not None:
+        existing.item_type = gui_item.get("item_type", existing.item_type)
+        existing.parent_video = gui_item.get("parent_video", existing.parent_video)
+        existing.descriptions = descs
+        if existing.descriptions:
+            existing.active_description_id = existing.descriptions[-1].id
+        existing.is_missing = gui_item.get("is_missing", False)
+        existing.extra.update(extra)
+        return existing
+
+    wi = WorkspaceItem(
+        image=p.name,
+        source_path=str(p),
+        storage="reference",
+        subfolder=subfolder,
+    )
+    wi.item_type = gui_item.get("item_type", "image")
+    wi.download_url = gui_item.get("download_url")
+    wi.download_timestamp = gui_item.get("download_timestamp")
+    wi.alt_text = gui_item.get("alt_text")
+    wi.exif_datetime = gui_item.get("exif_datetime")
+    wi.file_mtime = gui_item.get("file_mtime")
+    wi.is_missing = gui_item.get("is_missing", False) or not p.exists()
+    wi.descriptions = descs
+    if wi.descriptions:
+        wi.active_description_id = wi.descriptions[-1].id
+    wi.extra = extra
+    return wi
+
+
+# --------------------------------------------------------------------------- #
+# Saving descriptions as a batch produces them                                 #
+# --------------------------------------------------------------------------- #
+
+class BundleCheckpointWriter:
+    """Writes each finished item to its bundle while a batch runs.
+
+    A batch used to keep every description in memory until the whole run ended,
+    so a crash hours into a 10,000-image run lost all of it. A full save
+    rewrites one sidecar per item and takes minutes on a large workspace, far
+    too slow to run per image. This writes only the item that just finished,
+    on one background thread, and refreshes the manifest (batch_state, which
+    resume reads) every ``manifest_every`` items or ``manifest_secs`` seconds.
+
+    Ordering against a full save: every snapshot of GUI state — a checkpoint or
+    a full save's ``to_dict()`` — takes a number from ``snapshot_seq()`` on the
+    main thread when it is taken. A sidecar is written only when its snapshot
+    is newer than the last one written for that item, checked under ``lock``,
+    so a slow full save cannot put back an older copy of an item the writer
+    has already saved, and the writer cannot overwrite a newer full save.
+    """
+
+    def __init__(self, manifest_every: int = 25, manifest_secs: float = 30.0):
+        self.lock = threading.Lock()
+        self.manifest_every = manifest_every
+        self.manifest_secs = manifest_secs
+        self._queue: queue.Queue = queue.Queue()
+        self._seq = 0
+        self._seq_lock = threading.Lock()
+        self._written: dict = {}
+        self._thread: Optional[threading.Thread] = None
+        self._since_manifest = 0
+        self._last_manifest = time.monotonic()
+        self.items_written = 0
+        self.last_error: Optional[str] = None
+
+    # ----- snapshot ordering ----- #
+    def snapshot_seq(self) -> int:
+        """Number a snapshot of GUI state. Strictly increasing."""
+        with self._seq_lock:
+            self._seq += 1
+            return self._seq
+
+    def claim(self, bundle_path, file_path: str, seq: int) -> bool:
+        """Call holding ``lock``: may a snapshot numbered ``seq`` write this item?
+
+        A True answer is recorded, so call it only right before writing.
+        """
+        key = (str(Path(bundle_path)), str(file_path))
+        if seq <= self._written.get(key, 0):
+            return False
+        self._written[key] = seq
+        return True
+
+    # ----- queueing ----- #
+    def enqueue_item(self, bundle_path, file_path: str, gui_item: dict,
+                     batch_state: Optional[dict], seq: int) -> None:
+        """Queue one item. ``gui_item`` and ``batch_state`` must be main-thread copies."""
+        self._queue.put(("item", Path(bundle_path), str(file_path), gui_item,
+                         batch_state, seq))
+        self._ensure_thread()
+
+    def enqueue_manifest(self, bundle_path, batch_state: Optional[dict]) -> None:
+        """Queue a manifest refresh so batch_state reaches disk now (pause)."""
+        self._queue.put(("manifest", Path(bundle_path), None, None, batch_state, 0))
+        self._ensure_thread()
+
+    def flush(self, timeout: Optional[float] = None) -> bool:
+        """Wait until every queued write has finished. False on timeout."""
+        deadline = None if timeout is None else time.monotonic() + timeout
+        while self._queue.unfinished_tasks:
+            if deadline is not None and time.monotonic() >= deadline:
+                return False
+            time.sleep(0.02)
+        return True
+
+    def _ensure_thread(self) -> None:
+        if self._thread is None or not self._thread.is_alive():
+            self._thread = threading.Thread(
+                target=self._run, name="BundleCheckpointWriter", daemon=True)
+            self._thread.start()
+
+    # ----- writer thread ----- #
+    def _run(self) -> None:
+        while True:
+            job = self._queue.get()
+            try:
+                self._handle(*job)
+            except Exception as exc:  # one bad item must not stop the writer
+                self.last_error = str(exc)
+                logger.error(f"Checkpoint write failed: {exc}", exc_info=True)
+            finally:
+                self._queue.task_done()
+
+    def _handle(self, kind, bundle_path: Path, file_path, gui_item,
+                batch_state, seq) -> None:
+        # Never recreate a bundle that was moved or deleted mid-run:
+        # Workspace.open() would silently make a fresh empty one.
+        if not Workspace.is_bundle(bundle_path):
+            return
+        described = False
+        with self.lock:
+            if kind == "item":
+                ws = Workspace(bundle_path)
+                if self.claim(bundle_path, file_path, seq):
+                    ws.save_item(gui_item_to_ws_item(ws, file_path, gui_item))
+                    self.items_written += 1
+                described = bool(gui_item.get("descriptions"))
+                self._since_manifest += 1
+                due = (self._since_manifest >= self.manifest_every
+                       or time.monotonic() - self._last_manifest >= self.manifest_secs)
+                if not due:
+                    return
+            # Re-read so settings a full save just wrote (defaults, models) survive.
+            ws = Workspace.open(bundle_path)
+            ws.batch_state = batch_state
+            ws.has_any_descriptions = ws.has_any_descriptions or described
+            ws.save_manifest()
+            self._since_manifest = 0
+            self._last_manifest = time.monotonic()
