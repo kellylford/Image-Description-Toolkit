@@ -83,12 +83,14 @@ SAME_FAILURE_STREAK = 10
 
 
 _TIMESTAMP_TAIL = re.compile(r"\s*-\s*\(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(,\d+)?\)\s*$")
-_HEX_ADDRESS = re.compile(r"0x[0-9a-fA-F]+")
+_HEX_ADDRESS = re.compile(r"\b0x[0-9a-fA-F]+\b")
 #: Per-request identifiers that API error bodies embed (Anthropic puts
 #: 'request_id': 'req_…' in str(exc)); with them, no two failures matched.
+#: A bare req_ only when id-length, so a file called req_0001.jpg in a
+#: "file not found" message stays distinct; "request ID" in any spelling.
 _REQUEST_ID = re.compile(
-    r"\breq_[A-Za-z0-9]+|"
-    r"""(request[_-]?id['"]?\s*[:=]\s*['"]?)[A-Za-z0-9_-]+""",
+    r"\breq_[A-Za-z0-9]{16,}|"
+    r"""(request[\s_-]?id['"]?\s*[:=]?\s*['"]?)[A-Za-z0-9_-]{6,}""",
     re.IGNORECASE)
 
 

@@ -18,7 +18,7 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from idt_core.workspace import (  # noqa: E402
-    Workspace, claim_frames_dir, frames_dir_taken, frames_relpath,
+    Workspace, choose_frames_relpath, claim_frames_dir, frames_dir_taken, frames_relpath,
 )
 
 
@@ -171,3 +171,53 @@ def test_cli_and_gui_agree_on_the_layout(tmp_path):
     video = src / "jan" / "IMG_0001.mp4"
     sub = source_relative_subfolder(video, src)
     assert frames_relpath(video, sub) == f"frames/{Path(sub).as_posix()}/IMG_0001"
+
+
+
+def test_three_cards_at_one_path_each_get_their_own_folder(tmp_path):
+    """The hashed folder is checked too (fifth review): a third file at the
+    same path used to land in the second one's hashed folder."""
+    v = tmp_path / "E" / "DCIM" / "IMG_0001.mp4"
+    v.parent.mkdir(parents=True)
+    derived = tmp_path / "derived"
+    seen = []
+    for size in (10, 20, 30):              # three different cards, same path
+        v.write_bytes(b"x" * size)
+        rel = choose_frames_relpath(derived, v, "DCIM")
+        claim_frames_dir(derived / rel, v)
+        seen.append(rel)
+    assert len(set(seen)) == 3, seen
+    # And each card again finds its own folder.
+    v.write_bytes(b"x" * 20)
+    assert choose_frames_relpath(derived, v, "DCIM") == seen[1]
+
+
+def test_moved_video_keeps_its_folder(tmp_path):
+    """Same name and size, old location gone: the same video, moved (a drive
+    letter change). Re-extracting and re-describing it was the cost of
+    protecting offline cards (fifth review)."""
+    old = tmp_path / "E" / "lib" / "IMG_0001.mp4"
+    new = tmp_path / "F" / "lib" / "IMG_0001.mp4"
+    new.parent.mkdir(parents=True)
+    new.write_bytes(b"x" * 10)
+    derived = tmp_path / "derived"
+    d = derived / frames_relpath(old, "lib")
+    claim_frames_dir(d, new)
+    # Rewrite the record as if made at the old location.
+    import json
+    (d / ".video").write_text(json.dumps({"path": str(old), "size": 10}), encoding="utf-8")
+    assert not frames_dir_taken(d, new)
+    assert choose_frames_relpath(derived, new, "lib") == frames_relpath(new, "lib")
+
+
+def test_source_folder_named_derived_does_not_confuse_the_cli(tmp_path):
+    from cli.main import _previous_frames_rel
+    from idt_core.workspace import WorkspaceItem
+    ws = Workspace.create(tmp_path / "w.idtw")
+    folder = ws.derived_dir("frames") / "derived" / "IMG_0001"   # source subfolder "derived"
+    folder.mkdir(parents=True)
+    video = tmp_path / "src" / "derived" / "IMG_0001.mp4"
+    vwi = WorkspaceItem(image=video.name, source_path=str(video), storage="reference",
+                        item_type="video", subfolder="derived")
+    vwi.extra["extracted_frames"] = [str(folder / "IMG_0001_0.00s.jpg")]
+    assert _previous_frames_rel(ws, vwi, video) == "frames/derived/IMG_0001"

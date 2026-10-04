@@ -665,3 +665,34 @@ def test_fatal_halt_count_excludes_nothing(frame, monkeypatch):
                                            halted_streak=False))
     dlg.Destroy()
     assert seen and "(2 failed)" in seen[0]
+
+
+
+def test_completion_during_a_plain_save_is_deferred_too(frame, monkeypatch):
+    """Ctrl+S / Save As run their own progress save; a batch finishing during
+    one used to complete nested, starting a second save alongside (fifth
+    review). Now it waits for the save to end."""
+    import workers_wx
+    f = frame
+    w = _FakeWorker()
+    f.batch_worker = w
+    f.workspace.batch_state = {"total_queued": 1}
+    real_save = f._save_bundle
+    depth = []
+    active = [0]
+
+    def save(*a, **k):
+        active[0] += 1
+        depth.append(active[0])
+        try:
+            if len(depth) == 1:
+                wx.PostEvent(f, workers_wx.WorkflowCompleteEventData(
+                    input_dir="1/1 images", output_dir="", worker=w))
+                time.sleep(0.3)
+            return real_save(*a, **k)
+        finally:
+            active[0] -= 1
+    monkeypatch.setattr(f, "_save_bundle", save)
+    f.on_save_workspace(None)          # File > Save, the real handler
+    assert _pump_until(lambda: f.batch_worker is None, 5), "completion lost"
+    assert max(depth) == 1, "a second save ran inside the first"

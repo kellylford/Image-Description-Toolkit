@@ -57,7 +57,7 @@ FRAMES_OWNER_FILE = ".video"
 
 
 def frames_relpath(video, subfolder: Optional[str] = None,
-                   disambiguate: bool = False) -> str:
+                   disambiguate: bool = False, salt: int = 0) -> str:
     """Where one video's frames go, relative to the bundle's derived/ folder.
 
     ``frames/<subfolder>/<stem>`` as a POSIX string, and also the subfolder of
@@ -69,7 +69,9 @@ def frames_relpath(video, subfolder: Optional[str] = None,
 
     ``disambiguate`` adds a short hash of the video's path, for the rare case
     of two videos that still collide (same folder and name, different
-    extension or letter case).
+    extension or letter case). ``salt`` varies the hash when even that folder
+    is taken (several cards mounted in turn at one drive letter); use
+    choose_frames_relpath rather than calling this directly.
     """
     import hashlib
     video = Path(video)
@@ -77,7 +79,8 @@ def frames_relpath(video, subfolder: Optional[str] = None,
     if disambiguate:
         # Hash the resolved path, so the name doesn't depend on how the source
         # path happened to be typed.
-        digest = hashlib.sha1(_same_path_key(video).encode("utf-8")).hexdigest()[:8]
+        key = _same_path_key(video) + (f"#{salt}" if salt else "")
+        digest = hashlib.sha1(key.encode("utf-8")).hexdigest()[:8]
         stem = f"{stem}_{digest}"
     parts = ["frames"]
     if subfolder and subfolder != ".":
@@ -123,10 +126,35 @@ def frames_dir_taken(frames_dir: Path, video) -> bool:
         record = {"path": text}          # first form: the path alone
     if not isinstance(record, dict) or not record.get("path"):
         return False
-    if _same_path_key(record["path"]) != _same_path_key(video):
-        return True
     size, recorded = _file_size(video), record.get("size")
+    if _same_path_key(record["path"]) != _same_path_key(video):
+        # The same video moved (a drive letter changed, a library was
+        # relocated): its old path is gone and the name and size match.
+        # Without this every moved video was re-extracted and re-described.
+        # An offline card's video with another card's same-named video still
+        # differs in size, so its frames stay protected.
+        moved = (not Path(record["path"]).exists()
+                 and Path(record["path"]).name.lower() == Path(video).name.lower()
+                 and size is not None and recorded is not None and size == recorded)
+        return not moved
     return size is not None and recorded is not None and size != recorded
+
+
+def choose_frames_relpath(derived_dir: Path, video, subfolder: Optional[str] = None,
+                          force_hash: bool = False) -> str:
+    """The frames folder (relative to derived/) for ``video``: the plain one if
+    free or already its own, else the first free hashed variant. Every
+    candidate is checked: a hashed folder can itself be taken by an earlier
+    file at the same path (three cards in turn on one drive letter)."""
+    if not force_hash:
+        rel = frames_relpath(video, subfolder)
+        if not frames_dir_taken(Path(derived_dir) / rel, video):
+            return rel
+    for salt in range(1000):
+        rel = frames_relpath(video, subfolder, disambiguate=True, salt=salt)
+        if not frames_dir_taken(Path(derived_dir) / rel, video):
+            return rel
+    raise RuntimeError(f"No free frames folder for {video}")
 
 
 def claim_frames_dir(frames_dir: Path, video) -> None:

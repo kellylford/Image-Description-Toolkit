@@ -748,7 +748,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._preparing_state = None
         # True while _save_bundle_with_progress pumps events, and the batch
         # completions that arrived meanwhile (see on_workflow_complete).
-        self._progress_save_active = False
+        self._progress_pump_depth = 0
         self._deferred_completions = []
         # Failed images in the current batch (see on_worker_failed).
         self._batch_failures = 0
@@ -1029,7 +1029,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         case-insensitively, like the file systems they live on), or a folder
         already claimed by a different video. The folder is claimed here.
         """
-        from idt_core.workspace import claim_frames_dir, frames_dir_taken, frames_relpath
+        from idt_core.workspace import choose_frames_relpath, claim_frames_dir
         vp = Path(video_path)
         item = self.workspace.items.get(str(video_path)) if self.workspace else None
         sub = getattr(item, 'subfolder', None) or None
@@ -1044,9 +1044,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 and (fold(Path(other_path).stem),
                      fold(getattr(other, 'subfolder', None) or "")) == mine
                 for other_path, other in self.workspace.items.items())
-        target = derived / frames_relpath(vp, sub, disambiguate=collides)
-        if not collides and frames_dir_taken(target, vp):
-            target = derived / frames_relpath(vp, sub, disambiguate=True)
+        target = derived / choose_frames_relpath(derived, vp, sub, force_hash=collides)
         claim_frames_dir(target, vp)
         return target
 
@@ -4422,6 +4420,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             finally:
                 state['done'] = True
 
+        # Every progress save (Save, Save As, a batch's own saves) pumps
+        # events here; a batch completion arriving meanwhile is queued and
+        # delivered once the outermost pump ends (see on_workflow_complete).
+        # A depth, not a flag: an inner pump must not end the guard early.
+        self._progress_pump_depth += 1
         threading.Thread(target=runner, daemon=True).start()
         try:
             while not state.get('done'):
@@ -4434,6 +4437,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     dlg.Destroy()
             elif owns_dialog:
                 self._close_progress_dialog()
+            self._progress_pump_depth -= 1
+            if self._progress_pump_depth == 0:
+                pending, self._deferred_completions = self._deferred_completions, []
+                for snapshot in pending:
+                    wx.CallAfter(self._deliver_completion, snapshot)
 
         if 'error' in state:
             raise state['error']
@@ -4495,19 +4503,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
         snap_seq = self._checkpointer.snapshot_seq()
         ws_dict = self.workspace.to_dict()
-        self._progress_save_active = True
-        try:
-            self._run_with_progress(
-                "Saving workspace", len(ws_dict.get("items") or {}),
-                lambda cb: self._save_bundle(progress=cb, ws_dict=ws_dict, snap_seq=snap_seq),
-            )
-        finally:
-            self._progress_save_active = False
-            # Batch completions that arrived during the save (see
-            # on_workflow_complete), handled now that it is done.
-            pending, self._deferred_completions = self._deferred_completions, []
-            for snapshot in pending:
-                wx.CallAfter(self._deliver_completion, snapshot)
+        self._run_with_progress(
+            "Saving workspace", len(ws_dict.get("items") or {}),
+            lambda cb: self._save_bundle(progress=cb, ws_dict=ws_dict, snap_seq=snap_seq),
+        )
 
     def _deliver_completion(self, snapshot) -> None:
         if self and not self.IsBeingDeleted():
@@ -6164,7 +6163,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # while the last image is still in flight). Running the whole
         # completion nested inside that save meant a second save, modals, and
         # the pause handler then labelling a finished batch "paused".
-        if is_batch and self._progress_save_active:
+        if is_batch and self._progress_pump_depth > 0:
             # Copy the event: wx deletes a posted event's C++ object once this
             # handler returns, so re-dispatching the event itself raised on its
             # first attribute access and the completion was lost (a finished

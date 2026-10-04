@@ -568,7 +568,7 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     """
     from idt_core.video import extract_frames_to_dir
     from idt_core.workspace import (
-        WorkspaceItem, claim_frames_dir, frames_dir_taken, frames_relpath,
+        WorkspaceItem, choose_frames_relpath, claim_frames_dir,
     )
 
     # Register the video as a reference-mode item (no copy — videos are large).
@@ -600,9 +600,7 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     # undescribed item and describe them all again.
     frames_rel = _previous_frames_rel(ws, video_wi, video)
     if frames_rel is None:
-        frames_rel = frames_relpath(video, video_subfolder)
-        if frames_dir_taken(ws.derived_dir() / frames_rel, video):
-            frames_rel = frames_relpath(video, video_subfolder, disambiguate=True)
+        frames_rel = choose_frames_relpath(ws.derived_dir(), video, video_subfolder)
     frames_dir = ws.derived_dir() / frames_rel
     claim_frames_dir(frames_dir, video)
     result = extract_frames_to_dir(video, frames_dir, opts)
@@ -653,9 +651,13 @@ def _previous_frames_rel(ws, video_wi, video: Path):
     # that has been moved still records its old location.
     parts = Path(recorded[0]).parent.parts
     lowered = [p.lower() for p in parts]
-    if "derived" not in lowered:
+    # The "derived" directly inside the bundle (<name>.idtw/derived), not a
+    # source folder that happens to be called "derived".
+    start = next((i + 1 for i in range(1, len(lowered))
+                  if lowered[i] == "derived" and lowered[i - 1].endswith(".idtw")),
+                 None)
+    if start is None:
         return None
-    start = len(lowered) - 1 - lowered[::-1].index("derived") + 1
     rel_parts = parts[start:]
     if not rel_parts:
         return None
