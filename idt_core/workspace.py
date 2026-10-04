@@ -574,7 +574,14 @@ class Workspace:
         """Absolute path to the item's image (bundle copy or original reference)."""
         if item.storage == "reference" and item.source_path:
             return Path(item.source_path)
-        return self._image_copy_path(item.image, item.subfolder)
+        copy_path = self._image_copy_path(item.image, item.subfolder)
+        # ImageDescriber up to 4.6.1 recorded extracted video frames as
+        # storage="copy" without copying them; they live at source_path under
+        # derived/frames/. Fall back to it rather than report the frame missing.
+        if (not copy_path.exists() and item.source_path
+                and Path(item.source_path).exists()):
+            return Path(item.source_path)
+        return copy_path
 
     # ----- chats ----- #
     def save_chat(self, chat: dict) -> None:

@@ -417,6 +417,8 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> Worksp
     if existing is not None:
         existing.item_type = gui_item.get("item_type", existing.item_type)
         existing.parent_video = gui_item.get("parent_video", existing.parent_video)
+        if gui_item.get("video_metadata") is not None:
+            existing.video_metadata = gui_item["video_metadata"]
         existing.descriptions = descs
         if existing.descriptions:
             existing.active_description_id = existing.descriptions[-1].id
@@ -431,6 +433,8 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> Worksp
         subfolder=subfolder,
     )
     wi.item_type = gui_item.get("item_type", "image")
+    wi.parent_video = gui_item.get("parent_video")
+    wi.video_metadata = gui_item.get("video_metadata")
     wi.download_url = gui_item.get("download_url")
     wi.download_timestamp = gui_item.get("download_timestamp")
     wi.alt_text = gui_item.get("alt_text")

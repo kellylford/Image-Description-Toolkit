@@ -1324,7 +1324,12 @@ class VideoProcessingWorker(threading.Thread):
         
         # Get workspace directory from parent window — must write inside the
         # bundle, never in the source directory (which may be a read-only share).
-        if hasattr(self.parent_window, 'get_workspace_directory'):
+        if self.extraction_config.get("frames_dir"):
+            # Chosen on the main thread by ImageDescriberFrame._frames_dir_for_video:
+            # unique per video, so two videos with the same name don't share
+            # (and clear) one folder.
+            video_dir = Path(self.extraction_config["frames_dir"])
+        elif hasattr(self.parent_window, 'get_workspace_directory'):
             workspace_dir = self.parent_window.get_workspace_directory()
             video_dir = workspace_dir / "derived" / "frames" / video_path_obj.stem
         else:
