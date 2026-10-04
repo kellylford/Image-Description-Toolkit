@@ -36,6 +36,16 @@ people want the installer, which puts all three on the Start menu.
 A maintenance release. 4.6.0's two new providers are unchanged; this fixes things
 found while using them.
 
+- **ImageDescriber saves each description as soon as it is written.** Before, a
+  batch kept every description in memory until the whole batch finished, so a crash
+  or power cut partway through a long run lost all of it unless you had pressed
+  Save. Now each image's description is written to the workspace when that image
+  finishes. If the run is interrupted, reopening the workspace offers to resume at
+  the first image not yet described.
+- **Play a video from ImageDescriber.** Press **Enter** (or double-click) on a
+  video in the image list, or choose **Process → Play Video**, to open it in your
+  usual video player.
+
 - **Apple Intelligence retries when its model manager drops a request.** Apple's
   on-device model occasionally fails to load for one image, with an error that
   looks like a server fault. It is momentary — every image that hit it described

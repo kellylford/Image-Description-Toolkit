@@ -17,7 +17,9 @@ These are pure functions — no wx — so they are unit-testable headlessly.
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 import queue
 import threading
 import time
@@ -370,6 +372,35 @@ def _reconstruct_video_frame_links(ws: Workspace, items: dict) -> None:
 # Writing one GUI item into an open bundle                                     #
 # --------------------------------------------------------------------------- #
 
+def _same_file(a, b) -> bool:
+    return os.path.normcase(os.path.abspath(str(a))) == os.path.normcase(os.path.abspath(str(b)))
+
+
+def _find_ws_item(ws: Workspace, p: Path, subfolder: Optional[str]) -> Optional[WorkspaceItem]:
+    """The bundle's sidecar for the GUI item at ``p``, or None if it has none yet.
+
+    The sidecar at the item's own (subfolder, name) is taken as is. Failing
+    that, the descriptions/ tree is searched by name, but a match is accepted
+    only if it is the same image: two folders can each hold an ``IMG_0001.jpg``,
+    and taking the first name match wrote one image's description into the
+    other's sidecar, replacing its description.
+    """
+    direct = ws._sidecar_path(p.name, subfolder)
+    if direct.exists():
+        return ws.get_item(p.name, subfolder)
+    if not ws.descriptions_dir.is_dir():
+        return None
+    for sidecar in ws.descriptions_dir.glob(f"**/{p.name}.json"):
+        try:
+            wi = WorkspaceItem.from_dict(json.loads(sidecar.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+        if _same_file(ws.image_path(wi), p) or (
+                wi.source_path and _same_file(wi.source_path, p)):
+            return wi
+    return None
+
+
 def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> WorkspaceItem:
     """Merge one GUI item dict into the bundle's sidecar for it (not yet saved).
 
@@ -379,12 +410,7 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict) -> Worksp
     """
     p = Path(file_path)
     subfolder = gui_item.get("subfolder")
-    # Look in the item's own subfolder first: a name-only lookup globs the
-    # whole descriptions/ tree, which is slow on a large bundle and can match
-    # a same-named image in another folder.
-    existing = ws.get_item(p.name, subfolder) if subfolder else None
-    if existing is None:
-        existing = ws.get_item(p.name)
+    existing = _find_ws_item(ws, p, subfolder)
     extra = {k: v for k, v in gui_item.items() if k not in _ITEM_CORE_GUI_KEYS}
     descs = [_gui_desc_to_ws(d) for d in gui_item.get("descriptions", [])]
 
@@ -476,13 +502,8 @@ class BundleCheckpointWriter:
     def enqueue_item(self, bundle_path, file_path: str, gui_item: dict,
                      batch_state: Optional[dict], seq: int) -> None:
         """Queue one item. ``gui_item`` and ``batch_state`` must be main-thread copies."""
-        self._queue.put(("item", Path(bundle_path), str(file_path), gui_item,
+        self._queue.put((Path(bundle_path), str(file_path), gui_item,
                          batch_state, seq))
-        self._ensure_thread()
-
-    def enqueue_manifest(self, bundle_path, batch_state: Optional[dict]) -> None:
-        """Queue a manifest refresh so batch_state reaches disk now (pause)."""
-        self._queue.put(("manifest", Path(bundle_path), None, None, batch_state, 0))
         self._ensure_thread()
 
     def flush(self, timeout: Optional[float] = None) -> bool:
@@ -512,29 +533,28 @@ class BundleCheckpointWriter:
             finally:
                 self._queue.task_done()
 
-    def _handle(self, kind, bundle_path: Path, file_path, gui_item,
+    def _handle(self, bundle_path: Path, file_path, gui_item,
                 batch_state, seq) -> None:
         # Never recreate a bundle that was moved or deleted mid-run:
         # Workspace.open() would silently make a fresh empty one.
         if not Workspace.is_bundle(bundle_path):
             return
-        described = False
         with self.lock:
-            if kind == "item":
-                ws = Workspace(bundle_path)
-                if self.claim(bundle_path, file_path, seq):
-                    ws.save_item(gui_item_to_ws_item(ws, file_path, gui_item))
-                    self.items_written += 1
-                described = bool(gui_item.get("descriptions"))
-                self._since_manifest += 1
-                due = (self._since_manifest >= self.manifest_every
-                       or time.monotonic() - self._last_manifest >= self.manifest_secs)
-                if not due:
-                    return
-            # Re-read so settings a full save just wrote (defaults, models) survive.
+            ws = Workspace(bundle_path)
+            if self.claim(bundle_path, file_path, seq):
+                ws.save_item(gui_item_to_ws_item(ws, file_path, gui_item))
+                self.items_written += 1
+            self._since_manifest += 1
+            due = (self._since_manifest >= self.manifest_every
+                   or time.monotonic() - self._last_manifest >= self.manifest_secs)
+            if not due:
+                return
+            # Re-read so settings a full save just wrote (defaults, models)
+            # survive; _save_bundle holds this lock for its manifest write too.
             ws = Workspace.open(bundle_path)
             ws.batch_state = batch_state
-            ws.has_any_descriptions = ws.has_any_descriptions or described
+            ws.has_any_descriptions = (ws.has_any_descriptions
+                                       or bool(gui_item.get("descriptions")))
             ws.save_manifest()
             self._since_manifest = 0
             self._last_manifest = time.monotonic()

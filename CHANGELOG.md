@@ -1,4 +1,7 @@
-## [Unreleased]
+## [4.6.1] - 2026-10-04
+
+Maintenance release. The two providers added in 4.6.0 are unchanged; these are
+fixes found while using them.
 
 ### ✨ New Features
 
@@ -11,14 +14,9 @@
 **ImageDescriber saves each description as soon as it is written**
 - During a batch, descriptions were kept only in memory until the whole batch finished. Nothing reached the workspace on disk unless you pressed Save, so a crash, power loss or forced quit partway through a long run lost every description since the last save.
 - Each image's description is now written to the workspace as soon as that image finishes, on a background thread so the batch isn't slowed. The batch's progress is saved every 25 images or 30 seconds, and when you pause, so reopening the workspace after a crash offers to resume at the first image not yet described.
-- A manual Save during a batch can no longer overwrite a description that was saved after the Save began.
-
-## [4.6.1] - 2026-09-25
-
-Maintenance release. The two providers added in 4.6.0 are unchanged; these are
-fixes found while using them.
-
-### 🐛 Bug Fixes
+- The same applies to Process Image and follow-up questions: their results are on disk straight away, so answering **Don't Save** when closing no longer discards them.
+- A manual Save or Save As during a batch can no longer overwrite, or leave out, a description that finished while it ran.
+- Fixed while reviewing this change: when two folders held images with the same filename, saving one could write its description into the other's file, replacing that image's description.
 
 **Apple Intelligence retries when its model manager drops a request (#334)**
 - Apple's on-device model occasionally fails to load for a single request, reporting `ModelManagerServices.ModelManagerError error 1001` as an HTTP 500 — indistinguishable in shape from a safety refusal, which is permanent. This one is not: measured twice in a 90-image run, and both images described fine on a retry.

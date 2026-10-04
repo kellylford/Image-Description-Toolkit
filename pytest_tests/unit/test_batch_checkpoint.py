@@ -73,12 +73,58 @@ class TestWriter:
         assert reopened.batch_state == state
         assert reopened.has_any_descriptions
 
-    def test_manifest_job_writes_now(self, bundle):
-        path, _ = bundle
-        w = BundleCheckpointWriter(manifest_every=1000, manifest_secs=3600)
-        w.enqueue_manifest(path, {"total_queued": 3})
+    def test_manifest_refresh_keeps_defaults_a_full_save_wrote(self, bundle):
+        path, src = bundle
+        ws = Workspace.open(path)
+        ws.defaults.model = "chosen-model"
+        ws.save_manifest()
+        w = BundleCheckpointWriter(manifest_every=1)
+        w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
+                       {"total_queued": 3}, w.snapshot_seq())
         assert w.flush(5)
-        assert Workspace.open(path).batch_state == {"total_queued": 3}
+        reopened = Workspace.open(path)
+        assert reopened.defaults.model == "chosen-model"
+        assert reopened.batch_state == {"total_queued": 3}
+
+    def test_same_name_in_another_folder_is_not_overwritten(self, tmp_path):
+        """Review finding: a new image whose name matches one already described
+        in another folder must get its own sidecar, not take over that one."""
+        src = tmp_path / "photos"
+        (src / "A").mkdir(parents=True)
+        (src / "A" / "x.jpg").write_bytes(b"x")
+        ws = Workspace.create(tmp_path / "run.idtw")
+        ws.add_source_folder(src)
+        a_sub = ws.items()[0].subfolder
+        w = BundleCheckpointWriter()
+        a = src / "A" / "x.jpg"
+        w.enqueue_item(ws.path, str(a), _gui_item(a, "A's desc", subfolder=a_sub),
+                       None, w.snapshot_seq())
+        # B arrives later (rescan) and has no sidecar yet.
+        (src / "B").mkdir()
+        b = src / "B" / "x.jpg"
+        b.write_bytes(b"x")
+        b_sub = str(Path("photos") / "B")
+        w.enqueue_item(ws.path, str(b), _gui_item(b, "B's desc", subfolder=b_sub),
+                       None, w.snapshot_seq())
+        # And once more with no subfolder at all (older GUI items).
+        c = src / "C" / "x.jpg"
+        c.parent.mkdir()
+        c.write_bytes(b"x")
+        w.enqueue_item(ws.path, str(c), _gui_item(c, "C's desc"),
+                       None, w.snapshot_seq())
+        assert w.flush(5)
+        by_source = {Path(i.source_path).parent.name: [d.text for d in i.descriptions]
+                     for i in ws.items()}
+        assert by_source == {"A": ["A's desc"], "B": ["B's desc"], "C": ["C's desc"]}
+
+    def test_name_only_lookup_still_finds_the_same_image(self, bundle):
+        """A GUI item with no subfolder still updates its own sidecar in a subfolder."""
+        path, src = bundle
+        w = BundleCheckpointWriter()
+        w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
+                       None, w.snapshot_seq())
+        assert w.flush(5)
+        assert len(Workspace(path).items()) == 3
 
     def test_older_snapshot_never_overwrites_newer(self, bundle):
         path, src = bundle
@@ -166,7 +212,10 @@ def _completion(path, text):
                            provider="ollama", metadata={})
 
 
-def test_worker_complete_saves_description_to_bundle(_frame, bundle, monkeypatch):
+@pytest.fixture
+def frame(_frame, bundle, monkeypatch):
+    """The frame mid-batch on `bundle`, with a fresh writer and no dialogs."""
+    import imagedescriber_wx
     from data_models import ImageItem, ImageWorkspace
     path, src = bundle
     f = _frame
@@ -179,6 +228,16 @@ def test_worker_complete_saves_description_to_bundle(_frame, bundle, monkeypatch
     monkeypatch.setattr(f, "workspace_file", path)
     monkeypatch.setattr(f, "_batch_active", True)
     monkeypatch.setattr(f, "_batch_embed", False)
+    monkeypatch.setattr(f, "_checkpointer", BundleCheckpointWriter())
+    monkeypatch.setattr(f, "_changed_seq", {})
+    for name in ("show_error", "show_warning", "show_info"):
+        monkeypatch.setattr(imagedescriber_wx, name, lambda *a, **k: None)
+    return f
+
+
+def test_worker_complete_saves_description_to_bundle(frame, bundle):
+    path, src = bundle
+    f = frame
 
     f.on_worker_complete(_completion(src / "a.jpg", "a red barn"))
     f.on_worker_complete(_completion(src / "b.jpg", "a blue boat"))
@@ -194,3 +253,43 @@ def test_worker_complete_saves_description_to_bundle(_frame, bundle, monkeypatch
     # A full save afterwards keeps them (the shared conversion path).
     f._save_bundle()
     assert [d.text for d in _sidecar(path, "a.jpg").descriptions] == ["a red barn"]
+
+
+def test_older_full_save_keeps_a_newer_checkpoint(frame, bundle):
+    """A Save that snapshotted before an image finished must not erase it."""
+    path, src = bundle
+    f = frame
+    old_seq = f._checkpointer.snapshot_seq()
+    old_dict = f.workspace.to_dict()           # snapshot without the description
+    f.on_worker_complete(_completion(src / "a.jpg", "finished during the save"))
+    f._flush_checkpoints(5)
+    f._save_bundle(ws_dict=old_dict, snap_seq=old_seq)
+    assert [d.text for d in _sidecar(path, "a.jpg").descriptions]         == ["finished during the save"]
+
+
+def test_stop_does_not_leave_batch_state_behind(frame, bundle, monkeypatch):
+    """A checkpoint queued just before Stop must not put batch_state back."""
+    path, src = bundle
+    f = frame
+    f._checkpointer.manifest_every = 1          # every checkpoint writes the manifest
+    monkeypatch.setattr(f, "batch_worker", SimpleNamespace(stop=lambda: None))
+    monkeypatch.setattr(f, "batch_progress_dialog", None)
+    f.on_worker_complete(_completion(src / "a.jpg", "a"))
+    f.on_stop_batch()
+    f._flush_checkpoints(5)
+    assert Workspace.open(path).batch_state is None
+    assert [d.text for d in _sidecar(path, "a.jpg").descriptions] == ["a"]
+
+
+def test_images_finished_during_save_as_reach_the_new_bundle(frame, bundle, monkeypatch):
+    """Review finding: Save As builds the new bundle from a snapshot while
+    images keep finishing; those must be checkpointed into the new bundle."""
+    path, src = bundle
+    f = frame
+    monkeypatch.setattr(f, "workspace_file", None)   # unsaved when Save As starts
+    snap = f._checkpointer.snapshot_seq()
+    f.on_worker_complete(_completion(src / "b.jpg", "finished mid Save As"))
+    f.workspace_file = path                           # Save As done
+    f._recheckpoint_since(snap)
+    f._flush_checkpoints(5)
+    assert [d.text for d in _sidecar(path, "b.jpg").descriptions] == ["finished mid Save As"]

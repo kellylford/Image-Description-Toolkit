@@ -54,3 +54,31 @@ sidecar per item, which takes minutes on a large workspace.
   hiddenimports and no new module was added.
 - macOS.
 - The user's in-progress 10,000-image run still uses the old code.
+
+## Independent review and fixes (second commit)
+An independent review of 0b37a06 found:
+1. **Confirmed, medium:** the name-only fallback lookup in
+   `gui_item_to_ws_item` could pick a same-named image's sidecar in another
+   folder and overwrite its description (e.g. after a rescan added `B/x.jpg`
+   next to an already-described `A/x.jpg`). Fixed with `_find_ws_item`, which
+   accepts a name match only if the sidecar is the same image (by
+   `image_path` or `source_path`).
+2. **Confirmed, low:** the writer's manifest refresh could interleave with
+   `_save_bundle`'s manifest read-modify-write and drop defaults or cached models.
+   `_save_bundle` now holds the checkpoint lock for its manifest write. The
+   pause-time manifest job was removed (pause already runs a full save) and so
+   was `enqueue_manifest`.
+3. **Plausible, low:** images that finished while Save As or the first
+   auto-save ran went to the old bundle, or nowhere. The frame now records each
+   item's last snapshot number, and `_recheckpoint_since` writes the items
+   that changed into the new bundle.
+4. **Plausible, low:** `_flush_checkpoints` could freeze the UI for up to 30 s.
+   It now waits 0.5 s silently, then shows "Saving descriptions…" and keeps the
+   window repainting (`SafeYield`, input disabled).
+
+New tests: duplicate filename without a sidecar (fails on the old lookup),
+name-only lookup still updating its own sidecar, a manifest refresh keeping
+defaults, an older full save keeping a newer checkpoint, Stop not leaving
+batch_state behind, Save As catching up. Full suite: 1859 passed, 47 skipped.
+A dev-mode end-to-end run to completion ended with all images described,
+batch_state cleared and the defaults kept.

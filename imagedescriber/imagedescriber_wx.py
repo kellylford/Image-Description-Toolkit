@@ -730,6 +730,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Writes each described image to the open bundle as it finishes, so a
         # crash mid-batch loses at most the images still in flight.
         self._checkpointer = BundleCheckpointWriter()
+        # file_path -> snapshot number of its last checkpoint (see _recheckpoint_since)
+        self._changed_seq = {}
         # Guard against EVT_TREE_SEL_CHANGED firing during programmatic SelectItem() calls
         # inside refresh_image_list().  wx.TreeCtrl.SelectItem() fires the event unlike
         # wx.ListBox.SetSelection() which does not - so without this flag every list
@@ -4856,35 +4858,39 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except ImportError:
             return
         try:
-            ws = Workspace.open(bundle_path)
-            self.workspace.cached_ollama_models = self.cached_ollama_models
-            self.workspace.modified = datetime.now().isoformat()
-            ws.batch_state = self.workspace.batch_state
-            ws.cached_ollama_models = self.cached_ollama_models
-            ws.modified = self.workspace.modified
+            # Hold the checkpoint lock across this read-modify-write of the
+            # manifest: the batch writer refreshes the same file, and an
+            # interleaving would put back its stale defaults over ours.
+            with self._checkpointer.lock:
+                ws = Workspace.open(bundle_path)
+                self.workspace.cached_ollama_models = self.cached_ollama_models
+                self.workspace.modified = datetime.now().isoformat()
+                ws.batch_state = self.workspace.batch_state
+                ws.cached_ollama_models = self.cached_ollama_models
+                ws.modified = self.workspace.modified
 
-            # Reflect whether any item in the workspace has a description.
-            ws.has_any_descriptions = any(
-                item.descriptions
-                for item in self.workspace.items.values()
-                if not getattr(item, 'file_path', '').startswith("chat:")
-            )
+                # Reflect whether any item in the workspace has a description.
+                ws.has_any_descriptions = any(
+                    item.descriptions
+                    for item in self.workspace.items.values()
+                    if not getattr(item, 'file_path', '').startswith("chat:")
+                )
 
-            # Keep manifest defaults in sync with what was actually used in the
-            # most recent batch run (stored in batch_state).
-            batch_state = self.workspace.batch_state
-            if batch_state and batch_state.get("provider"):
-                try:
-                    from idt_core.workspace import WorkspaceDefaults
-                    ws.defaults = WorkspaceDefaults(
-                        provider=batch_state.get("provider", ws.defaults.provider),
-                        model=batch_state.get("model", ws.defaults.model),
-                        prompt_name=batch_state.get("prompt_style", ws.defaults.prompt_name),
-                    )
-                except Exception:
-                    pass
+                # Keep manifest defaults in sync with what was actually used in the
+                # most recent batch run (stored in batch_state).
+                batch_state = self.workspace.batch_state
+                if batch_state and batch_state.get("provider"):
+                    try:
+                        from idt_core.workspace import WorkspaceDefaults
+                        ws.defaults = WorkspaceDefaults(
+                            provider=batch_state.get("provider", ws.defaults.provider),
+                            model=batch_state.get("model", ws.defaults.model),
+                            prompt_name=batch_state.get("prompt_style", ws.defaults.prompt_name),
+                        )
+                    except Exception:
+                        pass
 
-            ws.save_manifest()
+                ws.save_manifest()
 
             if ws_dict is None:
                 snap_seq = self._checkpointer.snapshot_seq()
@@ -5044,6 +5050,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         workspace_root.mkdir(parents=True, exist_ok=True)
         bundle_path = workspace_root / source.name
         try:
+            snap_seq = self._checkpointer.snapshot_seq()
             ws_dict = self.workspace.to_dict()
             copy_images = self._resolve_copy_originals()
             bundle = self._run_with_progress(
@@ -5053,6 +5060,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 ),
             )
             self.workspace_file = bundle.path
+            self._recheckpoint_since(snap_seq)
             self.update_window_title("ImageDescriber", bundle.path.name)
             self.clear_modified()
             self.SetStatusText(f"Saved to {bundle.path}", 0)
@@ -5120,6 +5128,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         bundle_path = Path(parent_dir) / name
         try:
             # Snapshot the GUI model on the main thread before handing off.
+            snap_seq = self._checkpointer.snapshot_seq()
             ws_dict = self.workspace.to_dict()
             copy_images = self._resolve_copy_originals()
             bundle = self._run_with_progress(
@@ -5129,6 +5138,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 ),
             )
             self.workspace_file = bundle.path
+            self._recheckpoint_since(snap_seq)
             self.update_window_title("ImageDescriber", bundle.path.name)
             self.clear_modified()
             self.SetStatusText(f"Saved to bundle: {bundle.path}", 0)
@@ -5936,13 +5946,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         snapshot is taken here, on the main thread, because the batch keeps
         mutating the workspace.
         """
-        if not self.workspace_file or not self.workspace:
+        if not self.workspace:
             return
         item = self.workspace.items.get(file_path)
         if item is None:
             return
+        seq = self._checkpointer.snapshot_seq()
+        # Recorded even with no bundle open, so a Save As that is running
+        # right now can write this item once it knows the new bundle.
+        self._changed_seq[file_path] = seq
+        if not self.workspace_file:
+            return
         try:
-            seq = self._checkpointer.snapshot_seq()
             batch_state = (dict(self.workspace.batch_state)
                            if self.workspace.batch_state else None)
             self._checkpointer.enqueue_item(
@@ -5952,11 +5967,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.error(f"Could not queue checkpoint for {file_path}: {exc}",
                          exc_info=True)
 
+    def _recheckpoint_since(self, snap_seq: int) -> None:
+        """Checkpoint items that changed after a Save As took its snapshot.
+
+        Save As pumps the event loop while it copies, so images keep finishing;
+        those checkpoints went to the old bundle (or nowhere), and the new
+        bundle was built from a snapshot without them.
+        """
+        for file_path, seq in list(self._changed_seq.items()):
+            if seq > snap_seq:
+                self._checkpoint_item(file_path)
+
     def _flush_checkpoints(self, timeout: float = 30.0) -> None:
         """Wait for queued checkpoint writes, so nothing is lost on exit."""
-        if not self._checkpointer.flush(timeout):
-            logger.warning("Checkpoint writes still pending after "
-                           f"{timeout:.0f}s; continuing")
+        if self._checkpointer.flush(0.5):
+            return
+        # Behind (slow share): keep the window painting and say why we wait,
+        # rather than freezing silently for up to `timeout`.
+        self.SetStatusText("Saving descriptions…", 0)
+        deadline = time.monotonic() + timeout
+        while not self._checkpointer.flush(0.1):
+            if time.monotonic() >= deadline:
+                logger.warning("Checkpoint writes still pending after "
+                               f"{timeout:.0f}s; continuing")
+                return
+            wx.SafeYield(None, True)   # repaint; all input stays disabled
 
     def on_worker_failed(self, event):
         """Handle processing failures"""
@@ -6598,11 +6633,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 item = self.workspace.items[file_path]
                 if item.processing_state == "pending":
                     item.processing_state = "paused"
-
-        # Put batch_state on disk now, so quitting while paused can resume.
-        if self.workspace_file and self.workspace.batch_state:
-            self._checkpointer.enqueue_manifest(
-                Path(self.workspace_file), dict(self.workspace.batch_state))
 
         # Save workspace (preserves paused state)
         if self.workspace_file:
