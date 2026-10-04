@@ -560,17 +560,16 @@ def cmd_describe(args):
 def _extract_one_video_into_workspace(ws, video: Path, opts,
                                       source_root: Path = None) -> list:
     """
-    Extract one video's frames into ws.derived_dir("frames")/<stem>/ and register
-    the video (reference item) plus each frame (extracted_frame item) in the
-    workspace. Returns the list of frame WorkspaceItems (for describing).
+    Extract one video's frames into ws.derived_dir()/frames_relpath(...) and
+    register the video (reference item) plus each frame (extracted_frame item)
+    in the workspace. Returns the list of frame WorkspaceItems (for describing).
 
     Raises ImportError if opencv-python is not installed.
     """
     from idt_core.video import extract_frames_to_dir
-    from idt_core.workspace import WorkspaceItem
-
-    frames_dir = ws.derived_dir("frames") / video.stem
-    result = extract_frames_to_dir(video, frames_dir, opts)
+    from idt_core.workspace import (
+        WorkspaceItem, claim_frames_dir, frames_dir_taken, frames_relpath,
+    )
 
     # Register the video as a reference-mode item (no copy — videos are large).
     #
@@ -591,6 +590,16 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     video_subfolder = (
         source_relative_subfolder(video, source_root) if source_root else None
     )
+
+    # One folder per video (see frames_relpath): keyed by name alone, two
+    # same-named videos in different folders overwrote each other's frames.
+    frames_rel = frames_relpath(video, video_subfolder)
+    if frames_dir_taken(ws.derived_dir() / frames_rel, video):
+        frames_rel = frames_relpath(video, video_subfolder, disambiguate=True)
+    frames_dir = ws.derived_dir() / frames_rel
+    claim_frames_dir(frames_dir, video)
+    result = extract_frames_to_dir(video, frames_dir, opts)
+
     video_wi = ws.get_item(video.name, video_subfolder)
     if video_wi is None:
         video_wi = WorkspaceItem(
@@ -609,7 +618,7 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     for frame_path in result.frame_paths:
         # Frames already live in derived/frames/ — reference them there rather
         # than copying into images/ (that would duplicate every frame).
-        frame_wi = ws.add_image(frame_path, subfolder=f"frames/{video.stem}", copy=False)
+        frame_wi = ws.add_image(frame_path, subfolder=frames_rel, copy=False)
         frame_wi.item_type = "extracted_frame"
         frame_wi.parent_video = video_gui_path
         ws.save_item(frame_wi)
@@ -981,7 +990,9 @@ def cmd_video(args):
             frame_items = _extract_one_video_into_workspace(ws, video, opts, source)
             all_frame_items.extend(frame_items)
             if not args.quiet:
-                print(f"    {len(frame_items)} frames -> {ws.derived_dir('frames') / video.stem}")
+                where = (Path(frame_items[0].source_path).parent if frame_items
+                         else ws.derived_dir("frames"))
+                print(f"    {len(frame_items)} frames -> {where}")
         except ImportError as e:
             print(f"Error: {e}", file=sys.stderr)
             print("Install with: pip install opencv-python", file=sys.stderr)

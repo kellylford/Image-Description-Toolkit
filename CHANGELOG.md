@@ -1,4 +1,4 @@
-## [4.6.2] - 2026-10-04
+## [Unreleased]
 
 ### 🐛 Bug Fixes
 
@@ -7,11 +7,17 @@
 - **Stop works at every stage.** While frames were being extracted or the workspace saved, there was no way to stop a batch: the progress window's Stop button was disabled and Stop All Processing ignored that stage, so the batch went on to describe. Stop is now available while frames are extracted, and Stop All Processing works at every stage. Stopping ends extraction at the next frame and keeps videos that were fully extracted. A video stopped partway through is extracted again next time.
 - **One batch at a time.** Starting a second batch while one was still extracting began a second extraction of the same video, which deleted the frames the first was about to describe. Process, Extract Video Frames and the other batch commands now say a batch is already running instead. After Stop, they wait until the image in progress is finished.
 - **Extracted frames are found after reopening a workspace.** Frames were recorded as copied into the workspace's `images` folder when they weren't, so after reopening every frame was "not found". New frames are recorded correctly, and workspaces saved with the old record still find their frames.
-- **Videos with the same name no longer share frames.** Two videos called, for example, `IMG_0001.MOV` in different folders were extracted into the same folder, so one video's frames were deleted or replaced with the other's pictures and given the wrong descriptions. Each video now has its own frames folder.
+- **Videos with the same name no longer share frames.** Two videos called, for example, `IMG_0001.MOV` in different folders were extracted into the same folder, so one video's frames were deleted or replaced with the other's pictures and given the wrong descriptions. Each video now has its own frames folder, in ImageDescriber and in `idt describe` / `idt video`, laid out the same way by both.
+- **The open workspace can't be replaced while a batch is using it.** Opening another workspace, starting a new one, loading a folder into a new one, or importing while a batch ran sent the batch's descriptions nowhere. ImageDescriber now says a batch is running instead.
+
+**Failed images in a batch no longer open an error window each**
+- Every image that failed during a batch opened its own error window, so a batch with many failures buried the screen in them, one after another. Failures are now counted in the progress window, with the latest error shown there, and the batch's end reports them once: how many failed, the first error, and that **Process → Describe All Undescribed** retries them.
+- The save at the end of a batch, and when pausing, now shows its progress instead of freezing ImageDescriber, which on a large workspace could take minutes.
 
 **A batch stops when the AI provider can't be used**
 - When Claude Code's sign-in expired partway through a large batch, ImageDescriber kept going and failed every remaining image the same way: 533 images in 17 minutes, with thousands more queued.
 - If the provider is signed out, rejects your API key, or isn't set up, the batch now stops at the first such failure. It shows the provider's own message and offers to resume: fix the problem (for Claude Code, run `claude auth login`), then choose **Yes** to carry on with the same images, provider and prompt. Choose **No** to resume later; reopening the workspace offers it. Other failures, such as a single unreadable image or a temporary server error, don't stop the batch.
+- A batch also stops when 10 images in a row fail with exactly the same error, which catches a used-up Claude Code plan or Ollama not running. Ten genuinely problem images in a row with an identical error, such as ten too large for the provider, stop it the same way; choosing **Yes** resumes with them still queued.
 - For Claude Code, a failed image triggers a check of `claude auth status`, so an expired sign-in is recognised even when Claude Code's message is unclear. Claude Code's own sign-in messages still count too. Apple Intelligence stops a batch only on setup problems it detects itself (wrong Mac, licence not accepted, model switched off), not on a server error that a retry recovers from.
 
 ## [4.6.1] - 2026-10-04

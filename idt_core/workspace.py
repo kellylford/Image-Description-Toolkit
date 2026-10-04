@@ -50,6 +50,57 @@ def _atomic_write_text(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
+#: Written into each video's frames folder: the source path of the video that
+#: owns it. Lets a second video that maps to the same folder notice and use
+#: its own, instead of clearing or overwriting the first one's frames.
+FRAMES_OWNER_FILE = ".video"
+
+
+def frames_relpath(video, subfolder: Optional[str] = None,
+                   disambiguate: bool = False) -> str:
+    """Where one video's frames go, relative to the bundle's derived/ folder.
+
+    ``frames/<subfolder>/<stem>`` as a POSIX string, and also the subfolder of
+    those frames' sidecars. Shared by the CLI and ImageDescriber so both lay a
+    bundle out the same way. It used to be ``frames/<stem>`` alone, so two
+    videos with the same name in different folders (IMG_0001.MOV from two
+    months) shared one folder and one set of sidecars: one video's frames were
+    deleted, or overwritten with the other's pictures and described as its own.
+
+    ``disambiguate`` adds a short hash of the video's path, for the rare case
+    of two videos that still collide (same folder and name, different
+    extension or letter case).
+    """
+    import hashlib
+    video = Path(video)
+    stem = video.stem
+    if disambiguate:
+        stem = f"{stem}_{hashlib.sha1(str(video).encode('utf-8')).hexdigest()[:8]}"
+    parts = ["frames"]
+    if subfolder and subfolder != ".":
+        parts.append(Path(subfolder).as_posix())
+    parts.append(stem)
+    return "/".join(parts)
+
+
+def frames_dir_taken(frames_dir: Path, video) -> bool:
+    """True if ``frames_dir`` already belongs to a different video."""
+    try:
+        owner = (Path(frames_dir) / FRAMES_OWNER_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    norm = lambda p: os.path.normcase(os.path.abspath(str(p)))
+    return bool(owner) and norm(owner) != norm(video)
+
+
+def claim_frames_dir(frames_dir: Path, video) -> None:
+    """Create ``frames_dir`` and record ``video`` as its owner."""
+    frames_dir = Path(frames_dir)
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    (frames_dir / FRAMES_OWNER_FILE).write_text(
+        os.path.abspath(str(video)), encoding="utf-8")
+
+
 def source_relative_subfolder(file_path, source_root) -> Optional[str]:
     """The `subfolder` key for a file discovered under `source_root`.
 

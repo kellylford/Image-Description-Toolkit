@@ -242,3 +242,34 @@ def test_apple_setup_flag_halts_but_server_crash_does_not(monkeypatch, tmp_path)
     setup = apple.AppleFMError("Run sudo fm license", setup=True)
     assert run_with(setup) == ErrorKind.UNAVAILABLE
     assert run_with(crash) not in workers_wx.RUN_FATAL_KINDS
+
+
+# --------------------------------------------------------------------------- #
+# Identical failures in a row (no run-fatal kind: used-up plan, Ollama down)   #
+# --------------------------------------------------------------------------- #
+
+def test_ten_identical_failures_in_a_row_halt(monkeypatch):
+    names = [f"{i}.jpg" for i in range(15)]
+    script = {n: "plain" for n in names}   # same error text every time
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert len(_FakeImageWorker.seen) == workers_wx.SAME_FAILURE_STREAK
+    assert done.halted == "failed: plain"
+    # The whole streak goes back in the queue, not just the last image.
+    assert len(done.halted_files) == workers_wx.SAME_FAILURE_STREAK
+
+
+def test_different_failures_do_not_halt(monkeypatch):
+    names = [f"{i}.jpg" for i in range(15)]
+    script = {n: f"plain-{i}" for i, n in enumerate(names)}   # all differ
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert _FakeImageWorker.seen == names
+    assert done.halted is None
+
+
+def test_a_success_resets_the_streak(monkeypatch):
+    names = [f"{i}.jpg" for i in range(19)]
+    script = {n: "plain" for n in names}
+    script["9.jpg"] = "ok"                 # 9 failures, a success, 9 failures
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert _FakeImageWorker.seen == names
+    assert done.halted is None

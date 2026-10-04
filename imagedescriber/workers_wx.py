@@ -75,6 +75,11 @@ except ImportError:
 #: (an expired Claude Code sign-in failed 533 images in 17 minutes).
 RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 
+#: Consecutive images failing with the identical error that also halt a batch,
+#: for failures that carry no run-fatal kind: a used-up Claude Code plan,
+#: Ollama not running. Large enough that a few bad files in a row don't trip it.
+SAME_FAILURE_STREAK = 10
+
 
 def _provider_error_kind(exc: BaseException):
     """The ErrorKind carried by `exc` or anything it was raised from, else None."""
@@ -202,17 +207,18 @@ class WorkflowCompleteEventData(WorkflowCompleteEvent):
         stopped batch's late completion from the current batch's.
     halted: set when the batch stopped itself on a failure every remaining
         image would hit (see RUN_FATAL_KINDS); the provider's message.
-    halted_file: the image that failed that way. It was not really tried, so
-        it goes back in the resume queue.
+    halted_files: the images that failed that way (one for a run-fatal kind,
+        the whole streak for repeated identical failures). They were not
+        really tried, so they go back in the resume queue.
     """
     def __init__(self, input_dir, output_dir, worker=None, halted=None,
-                 halted_file=None):
+                 halted_files=None):
         WorkflowCompleteEvent.__init__(self)
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.worker = worker
         self.halted = halted
-        self.halted_file = halted_file   # the image whose failure halted it
+        self.halted_files = list(halted_files or [])
 
 
 class WorkflowFailedEventData(WorkflowFailedEvent):
@@ -1102,7 +1108,8 @@ class BatchProcessingWorker(threading.Thread):
                 wx.PostEvent(self.parent_window, evt)
 
             halted = None
-            halted_file = None
+            halted_files = []
+            streak, streak_key = [], None
             for i, file_path in enumerate(self.file_paths, 1):
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
@@ -1160,15 +1167,32 @@ class BatchProcessingWorker(threading.Thread):
 
                 completed += 1
 
+                # Track a run of identical failures (same kind, same message).
+                if worker.result_ok:
+                    streak = []
+                else:
+                    key = (worker.result_kind, worker.result_error)
+                    if streak and streak_key != key:
+                        streak = []
+                    streak_key = key
+                    streak.append(file_path)
+
                 # Signed out / credentials refused / provider not set up: every
-                # remaining image would fail identically, so stop here.
-                if not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS:
+                # remaining image would fail identically, so stop here. The
+                # streak rule catches the same situation for failures with no
+                # such kind (a used-up plan, Ollama not running). Ten problem
+                # images in a row with an identical error halt it too; that
+                # costs a resume, not the images.
+                fatal = not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS
+                if fatal or len(streak) >= SAME_FAILURE_STREAK:
                     halted = worker.result_error or "The provider refused the request."
-                    halted_file = file_path
+                    halted_files = list(streak) if streak else [file_path]
                     if run_log:
+                        why = (f"({worker.result_kind})" if fatal else
+                               f"({len(streak)} images in a row failed identically)")
                         run_log.warning(
                             f"run halted after {completed} images: every remaining "
-                            f"image would fail the same way ({worker.result_kind})")
+                            f"image would fail the same way {why}")
                     break
 
             elapsed = time.time() - start_time
@@ -1184,7 +1208,7 @@ class BatchProcessingWorker(threading.Thread):
                 output_dir="",
                 worker=self,
                 halted=halted,
-                halted_file=halted_file,
+                halted_files=halted_files,
             )
             wx.PostEvent(self.parent_window, evt)
 

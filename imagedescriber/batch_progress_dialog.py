@@ -54,6 +54,11 @@ class BatchProgressDialog(wx.Dialog):
         self.batch_model = batch_model
         self.batch_prompt = batch_prompt
         self._is_complete = False  # Set by mark_complete(); changes Stop→Close
+        # Images that failed in this batch. Shown here rather than as one
+        # modal error box per image, which a large failing batch stacked by the
+        # hundred over the dialog.
+        self.failed_count = 0
+        self.last_failure = ''
 
         # Stage tracking — a run moves through Extracting → Saving → Describing,
         # each with its own item count.  begin_stage() resets the counter and bar
@@ -187,6 +192,11 @@ class BatchProgressDialog(wx.Dialog):
 
         self.update_progress(0, total)
 
+    def note_failure(self, image_name: str, error: str) -> None:
+        """Count a failed image; shown on the next progress update."""
+        self.failed_count += 1
+        self.last_failure = f"{image_name}: {error}"
+
     def update_progress(self, current: int, total: int,
                        file_path: str = None, avg_time: float = 0.0,
                        image_name: str = None, provider: str = None, model: str = None,
@@ -251,6 +261,10 @@ class BatchProgressDialog(wx.Dialog):
             # total == 0 means "unknown length" (e.g. consuming a generator);
             # show a running count rather than a meaningless "N / 0".
             self.stats_list.Append(f"Items Processed:            {current}")
+
+        if self.failed_count:
+            self.stats_list.Append(f"Failed:                     {self.failed_count}")
+            self.stats_list.Append(f"Last Failure:               {self.last_failure}")
 
         if avg_time > 0:
             self.stats_list.Append(f"Average Processing Time:    {avg_time:.1f} seconds")

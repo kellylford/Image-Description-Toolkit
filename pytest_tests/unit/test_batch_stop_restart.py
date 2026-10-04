@@ -541,7 +541,7 @@ def test_halting_image_requeued_and_yes_resumes(frame, monkeypatch):
     f.answer = True
     f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
                                            worker=w, halted="signed out",
-                                           halted_file=img))
+                                           halted_files=[img]))
     assert f.workspace.items[img].processing_state == "pending"
     assert f.workspace.items[img].processing_error is None
     assert resumed == [1]
@@ -553,12 +553,22 @@ def test_run_fatal_failure_in_batch_shows_no_per_image_box(frame):
     w.start()
     f.batch_worker = w
     img = str(f.src / "a.jpg")
+    f._batch_failures, f._batch_first_failure = 0, None
     f.on_worker_failed(SimpleNamespace(file_path=img, error="signed out",
                                        kind="unavailable", run_fatal=True))
     assert f.infos == []
+    assert f._batch_failures == 0, "the halt explains a run-fatal failure"
+    # Ordinary batch failures are counted for the end-of-batch summary, not
+    # shown one box per image.
     f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
                                        kind=None, run_fatal=False))
-    assert f.infos, "ordinary failures still report"
+    assert f.infos == []
+    assert f._batch_failures == 1 and "bad image" in f._batch_first_failure
+    # A single image processed on its own still reports its failure.
+    f.processing_items[img] = {"single": True}
+    f.on_worker_failed(SimpleNamespace(file_path=img, error="bad image",
+                                       kind=None, run_fatal=False))
+    assert f.infos, "single-image failures still report"
     f.batch_worker = None
 
 

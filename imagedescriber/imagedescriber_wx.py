@@ -745,6 +745,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # exactly that (see _abort_run).
         self._preparing_queue = None
         self._preparing_state = None
+        # Failed images in the current batch (see on_worker_failed).
+        self._batch_failures = 0
+        self._batch_first_failure = None
         # Guard against EVT_TREE_SEL_CHANGED firing during programmatic SelectItem() calls
         # inside refresh_image_list().  wx.TreeCtrl.SelectItem() fires the event unlike
         # wx.ListBox.SetSelection() which does not - so without this flag every list
@@ -770,8 +773,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.last_completed_image: Optional[str] = None  # Last image described (for progress dialog)
         self.last_completed_description: Optional[str] = None  # Last description (for progress dialog)
 
-        # Batch video extraction state
-        self._batch_video_extraction = False  # Flag for batch video extraction mode
 
         # Embed-after-process flag: set from ProcessingOptionsDialog each run; checked
         # in on_worker_complete to embed each image's description as it completes.
@@ -1011,31 +1012,37 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def _frames_dir_for_video(self, video_path: str) -> Path:
         """The folder one video's extracted frames go in. Main thread only.
 
-        Unique per video. It used to be derived/frames/<name>, so two videos
+        Unique per video, laid out by idt_core.workspace.frames_relpath exactly
+        as the CLI does. It used to be derived/frames/<name>, so two videos
         with the same name in different folders (IMG_0001.MOV from two months)
         shared one folder: extracting the second cleared it, so the first's
         frames vanished ("file not found") or were overwritten with the second
-        video's pictures and described as the first's. Mirrors the video's
-        subfolder, and adds a short hash only if two videos would still collide.
+        video's pictures and described as the first's.
+
+        A short hash is added when the folder would still be shared: another
+        video in this workspace with the same name and subfolder (compared
+        case-insensitively, like the file systems they live on), or a folder
+        already claimed by a different video. The folder is claimed here.
         """
-        import hashlib
+        from idt_core.workspace import claim_frames_dir, frames_dir_taken, frames_relpath
         vp = Path(video_path)
         item = self.workspace.items.get(str(video_path)) if self.workspace else None
-        sub = getattr(item, 'subfolder', None) or ""
-        base = self._derived_dir("frames")
-        target = (base / sub / vp.stem) if sub and sub != "." else (base / vp.stem)
+        sub = getattr(item, 'subfolder', None) or None
+        derived = self._derived_dir()
+
+        collides = False
         if self.workspace:
-            # Case-insensitive, like the Windows and macOS file systems the
-            # folders live on: IMG_0001.MOV and img_0001.mov share a folder.
             fold = os.path.normcase if sys.platform != "darwin" else str.lower
-            mine = (fold(vp.stem), fold(sub))
-            for other_path, other in self.workspace.items.items():
-                if (other.item_type == "video" and other_path != str(video_path)
-                        and (fold(Path(other_path).stem),
-                             fold(getattr(other, 'subfolder', None) or "")) == mine):
-                    digest = hashlib.sha1(str(vp).encode("utf-8")).hexdigest()[:8]
-                    target = target.with_name(f"{vp.stem}_{digest}")
-                    break
+            mine = (fold(vp.stem), fold(sub or ""))
+            collides = any(
+                other.item_type == "video" and other_path != str(video_path)
+                and (fold(Path(other_path).stem),
+                     fold(getattr(other, 'subfolder', None) or "")) == mine
+                for other_path, other in self.workspace.items.items())
+        target = derived / frames_relpath(vp, sub, disambiguate=collides)
+        if not collides and frames_dir_taken(target, vp):
+            target = derived / frames_relpath(vp, sub, disambiguate=True)
+        claim_frames_dir(target, vp)
         return target
 
     def _frame_subfolder(self, frames_dir: Path) -> Optional[str]:
@@ -1045,7 +1052,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         without a subfolder their sidecars collided at the bundle's top level.
         """
         try:
-            # Forward slashes, matching the CLI's subfolder="frames/<stem>".
+            # Forward slashes, as frames_relpath (and so the CLI) writes it.
             return Path(frames_dir).relative_to(self._derived_dir()).as_posix()
         except ValueError:
             return None
@@ -2586,6 +2593,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_import_workflow(self, event):
         """Import descriptions from a completed workflow directory."""
+        if self._refuse_workspace_change():
+            return
         progress_dlg = None
         try:
             workflow_dir = select_directory_dialog(
@@ -2748,6 +2757,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         Lets the user open images that were described via 'idt describe' into the
         GUI for viewing, browsing, and chat.
         """
+        if self._refuse_workspace_change():
+            return
         try:
             from idt_core.project import Project
             from idt_core.image_item import ImageItem as IdtImageItem
@@ -2886,6 +2897,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     selection = dlg.get_selection()
                     dlg.Destroy()
 
+                    if (not selection['add_to_existing']
+                            and self._refuse_workspace_change()):
+                        return
                     if selection['add_to_existing'] and not self.workspace:
                         self.workspace = ImageWorkspace(new_workspace=True)
                     elif not selection['add_to_existing']:
@@ -2901,7 +2915,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     dlg.Destroy()
             else:
                 dir_path = select_directory_dialog(self, "Select Image Directory")
-                if dir_path:
+                if dir_path and not self._refuse_workspace_change():
                     self.workspace = ImageWorkspace(new_workspace=True)
                     self.load_directory(dir_path)
         except Exception as e:
@@ -2989,6 +3003,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             recursive: If True, search subdirectories
             append: If True, add to existing workspace. If False, create new workspace.
         """
+        if not append and self._refuse_workspace_change():
+            return
         try:
             dir_path = Path(dir_path)
             if not dir_path.exists():
@@ -3635,6 +3651,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             'provider': options['provider'],
             'model': options['model'],
             'embed_after_process': options.get('embed_after_process', False),
+            'single': True,   # not part of a batch (see on_worker_failed)
         }
         self.refresh_image_list()
 
@@ -4129,241 +4146,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._ensure_progress_dialog(options, 2)
         self._launch_batch(to_process, options, True)
 
-    def _extract_next_video_in_batch(self):
-        """Extract next video in batch processing queue"""
-        if self._extracted_video_count >= len(self._videos_to_extract):
-            logger.info("All videos extracted, proceeding to image processing")
-            self._start_batch_image_processing()
-            return
-
-        # Get next video
-        video_path = self._videos_to_extract[self._extracted_video_count]
-        video_name = Path(video_path).name
-        logger.info(f"Extracting video {self._extracted_video_count + 1}/{len(self._videos_to_extract)}: {video_name}")
-
-        # Update progress
-        video_num = self._extracted_video_count + 1
-        total_videos = len(self._videos_to_extract)
-        if self.batch_progress_dialog:
-            self.batch_progress_dialog.update_progress(
-                current=video_num,
-                total=len(self._videos_to_extract) + len(self._pending_batch_queue),
-                image_name=f"Extracting video {video_name} ({video_num}/{total_videos})",
-                provider="System",
-                model="Video Extraction"
-            )
-
-        self.SetStatusText(f"Extracting frames from {video_name} ({video_num}/{total_videos})...", 0)
-
-        # Load extraction config
-        try:
-            from idt_core.config_loader import load_json_config
-            video_config, _, _ = load_json_config('video_frame_extractor_config.json')
-            if video_config:
-                extraction_config = {
-                    "extraction_mode": video_config.get("extraction_mode", "time_interval"),
-                    "time_interval_seconds": video_config.get("time_interval_seconds", 5.0),
-                    "scene_change_threshold": video_config.get("scene_change_threshold", 30.0),
-                    "min_scene_duration_seconds": video_config.get("min_scene_duration_seconds", 1.0),
-                    "start_time_seconds": video_config.get("start_time_seconds", 0),
-                    "end_time_seconds": video_config.get("end_time_seconds")
-                }
-            else:
-                raise Exception("Config not loaded")
-        except Exception:
-            extraction_config = {
-                "extraction_mode": "time_interval",
-                "time_interval_seconds": 5.0,
-                "scene_change_threshold": 30.0,
-                "min_scene_duration_seconds": 1.0,
-                "start_time_seconds": 0,
-                "end_time_seconds": None
-            }
-
-        # Check if cv2 is available before starting extraction
-        if not cv2:
-            error_msg = ("OpenCV (cv2) is not installed.\n\n"
-                        "Video frame extraction requires OpenCV.\n"
-                        "Please install it with: pip install opencv-python")
-            logger.error("cv2 not available for video extraction")
-            show_error(self, error_msg)
-            # Clean up batch state
-            self._batch_video_extraction = False
-            if self.batch_progress_dialog:
-                self.batch_progress_dialog.Close()
-                self.batch_progress_dialog = None
-            return
-
-        # Mark this as a batch video extraction
-        self._batch_video_extraction = True
-        logger.debug(f"Set _batch_video_extraction=True, starting VideoProcessingWorker for {video_path}")
-        logger.debug(f"Extraction config: {extraction_config}")
-
-        # Start video extraction worker
-        from workers_wx import VideoProcessingWorker
-        self.video_worker = VideoProcessingWorker(self, video_path, extraction_config)
-        logger.debug("Starting VideoProcessingWorker thread...")
-        self.video_worker.start()
-        logger.debug("VideoProcessingWorker thread started (non-blocking)")
-
-    def _complete_batch_video_extraction(self, video_path, extracted_frames, video_metadata):
-        """Handle completion of one video in batch extraction"""
-        # Update video item
-        if video_path in self.workspace.items:
-            video_item = self.workspace.items[video_path]
-            video_item.extracted_frames = extracted_frames
-            if video_metadata:
-                video_item.video_metadata = video_metadata
-
-        # Accumulate extraction totals for the run log preamble
-        self._extracted_video_total = getattr(self, '_extracted_video_total', 0) + 1
-        self._extracted_frame_total = getattr(self, '_extracted_frame_total', 0) + len(extracted_frames)
-
-        # Add extracted frames as items to workspace
-        # Sort by timestamp to maintain chronological order
-        def get_frame_timestamp(frame_path):
-            try:
-                import re
-                match = re.search(r'_(\d+\.?\d*)s\.', Path(frame_path).name)
-                if match:
-                    return float(match.group(1))
-            except Exception:
-                pass
-            return 0
-        
-        sorted_frames = sorted(extracted_frames, key=get_frame_timestamp)
-        for frame_path in sorted_frames:
-            if frame_path not in self.workspace.items:
-                frame_item = ImageItem(frame_path, "extracted_frame")
-                frame_item.parent_video = video_path
-                self.workspace.add_item(frame_item)
-
-                # Add to processing queue if needed
-                if self._pending_batch_skip_existing and not frame_item.descriptions:
-                    self._pending_batch_queue.append(frame_path)
-                elif not self._pending_batch_skip_existing:
-                    self._pending_batch_queue.append(frame_path)
-
-        # Move to next video
-        self._extracted_video_count += 1
-        self._extract_next_video_in_batch()
-
-    def _start_batch_image_processing(self):
-        """Start batch image processing after video extraction completes"""
-        # Clean up video extraction state
-        self._batch_video_extraction = False
-        del self._videos_to_extract
-        del self._extracted_video_count
-
-        # Persist extracted frames to the bundle immediately so that if the user
-        # pauses and exits before saving, the extraction isn't re-run on resume.
-        self._persist_extracted_frames_to_bundle()
-
-        # Refresh UI
-        self.refresh_image_list()
-        self.mark_modified()
-
-        # Get final processing queue
-        to_process = self._pending_batch_queue
-        options = self._pending_batch_options
-        skip_existing = self._pending_batch_skip_existing
-
-        # Clean up pending state
-        del self._pending_batch_queue
-        del self._pending_batch_options
-        del self._pending_batch_skip_existing
-
-        if not to_process:
-            # Close progress dialog
-            if self.batch_progress_dialog:
-                self.batch_progress_dialog.Close()
-                self.batch_progress_dialog = None
-            show_info(self, "Video frames extracted.\nAll images already have descriptions.")
-            return
-
-        # Mark items as pending
-        queue_position = 0
-        for file_path in to_process:
-            if file_path in self.workspace.items:
-                item = self.workspace.items[file_path]
-                item.processing_state = "pending"
-                item.batch_queue_position = queue_position
-                queue_position += 1
-
-        # Store batch parameters
-        self.workspace.batch_state = {
-            "provider": options['provider'],
-            "model": options['model'],
-            "prompt_style": options.get('prompt_style', 'default'),
-            "custom_prompt": options.get('custom_prompt'),
-            "geocode_enabled": options.get('geocode_enabled', False),
-            "total_queued": len(to_process),
-            "started": datetime.now().isoformat()
-        }
-
-        # Calculate progress offset (number of videos already extracted)
-        progress_offset = len(self._videos_to_extract) if hasattr(self, '_videos_to_extract') else 0
-
-        # Build run-log preamble summarising the preceding video extraction phase
-        video_preamble = None
-        _vid_count = getattr(self, '_extracted_video_total', 0)
-        _frame_count = getattr(self, '_extracted_frame_total', 0)
-        if _vid_count:
-            video_preamble = (
-                f"Video extraction: {_vid_count} video(s) → {_frame_count} frame(s) extracted"
-            )
-        try:
-            del self._extracted_video_total
-            del self._extracted_frame_total
-        except AttributeError:
-            pass
-
-        # Start batch processing worker with offset
-        self.batch_worker = BatchProcessingWorker(
-            self,
-            to_process,
-            options['provider'],
-            options['model'],
-            options['prompt_style'],
-            options.get('custom_prompt', ''),
-            None,  # prompt_config_path
-            skip_existing,
-            progress_offset=progress_offset,
-            geocode=options.get('geocode_enabled', False),
-            logs_dir=self._workspace_logs_dir(),
-            video_preamble=video_preamble,
-        )
-        self.batch_worker.start()
-
-        # Update progress dialog for image processing (continue from where videos left off)
-        if self.batch_progress_dialog:
-            # Update stored batch settings in the dialog for the image-processing phase
-            self._token_records = []
-            self._batch_provider = options['provider']
-            self._batch_model = options['model']
-            self._batch_prompt = options.get('prompt_style', '')
-            total_items = len(to_process) + progress_offset
-            self.batch_progress_dialog.update_progress(
-                current=progress_offset,
-                total=total_items,
-                image_name="Starting image processing...",
-                provider=options['provider'],
-                model=options['model'],
-                batch_provider=self._batch_provider,
-                batch_model=self._batch_model,
-                batch_prompt=self._batch_prompt
-            )
-
-        # Initialize timing
-        self.batch_start_time = time.time()
-        self.batch_processing_times = []
-
-        # Save workspace
-        if self.workspace_file:
-            self._save_bundle()
-
-        self.SetStatusText(f"Processing {len(to_process)} images...", 0)
-
     def _load_video_extraction_config(self) -> dict:
         """Return video extraction config from file, or safe defaults."""
         try:
@@ -4409,6 +4191,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._stage_no = 0
         self._batch_active = True
         self._token_records = []
+        self._batch_failures = 0
+        self._batch_first_failure = None
         self._batch_provider = options.get('provider', '')
         self._batch_model = options.get('model', '')
         self._batch_prompt = options.get('prompt_style', '')
@@ -4486,6 +4270,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if message:
             logger.info(f"New run refused: {message}")
             show_info(self, message)
+            return True
+        return False
+
+    def _refuse_workspace_change(self) -> bool:
+        """True (and says why) if a batch is active.
+
+        Its results are matched to this workspace's images as they finish;
+        replacing the workspace under it sent them nowhere.
+        """
+        message = self._batch_busy_message()
+        if message:
+            logger.info(f"Workspace change refused: {message}")
+            show_info(self, "The open workspace can't be replaced while a batch "
+                            "is using it.\n\n" + message)
             return True
         return False
 
@@ -4881,6 +4679,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_new_workspace(self, event):
         """Create new workspace"""
+        if self._refuse_workspace_change():
+            return
         if not self.confirm_unsaved_changes():
             return
 
@@ -4939,6 +4739,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def load_workspace(self, file_path):
         """Load a .idtw workspace bundle."""
+        if self._refuse_workspace_change():
+            return
         try:
             logger.info(f"Loading workspace bundle: {file_path}")
             from idt_core.workspace import Workspace
@@ -6226,8 +6028,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_worker_failed(self, event):
         """Handle processing failures"""
-        # Remove from processing items
-        self.processing_items.pop(event.file_path, None)
+        # Remove from processing items; single-image runs mark their entry so
+        # their failure is still reported on its own (batch images are not).
+        single = bool((self.processing_items.pop(event.file_path, None) or {}).get('single'))
 
         # Phase 3: Set processing state to failed and store error
         if event.file_path in self.workspace.items:
@@ -6246,10 +6049,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.followup_worker and not self.followup_worker.is_alive():
             self.followup_worker = None
 
-        # In a batch, a failure every remaining image would hit (signed out,
-        # key refused, provider not set up) ends the batch, and the batch's
-        # completion explains it once. A box here as well stacked two modals.
-        if self._batch_worker_running() and getattr(event, 'run_fatal', False):
+        # In a batch, never one modal box per image: a failing batch of
+        # thousands stacked them by the hundred. Count it in the progress
+        # window; the batch's completion reports failures once. A failure every
+        # remaining image would hit (signed out, key refused, provider not set
+        # up) ends the batch, and its completion explains that instead.
+        if not single and self._batch_worker_running():
+            if not getattr(event, 'run_fatal', False):
+                name = Path(event.file_path).name
+                self._batch_failures += 1
+                if self._batch_first_failure is None:
+                    self._batch_first_failure = f"{name}: {event.error}"
+                dlg = self.batch_progress_dialog
+                if dlg:
+                    dlg.note_failure(name, event.error)
             return
 
         # Enhanced error message for provider unavailability
@@ -6307,7 +6120,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
     def on_workflow_complete(self, event):
         """Handle workflow completion (including video extraction and downloads)"""
         logger.debug(f"on_workflow_complete called: input_dir={event.input_dir}, output_dir={event.output_dir}")
-        logger.debug(f"_batch_video_extraction={getattr(self, '_batch_video_extraction', False)}")
 
         # A describe batch names its worker. Route on it before anything else:
         # - the worker Stop left finishing its last image: Stop already reset
@@ -6449,25 +6261,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.SetStatusText(f"Download complete: {len(downloaded_images)} images added", 0)
             return
 
-        # Check if this is part of batch video extraction
-        if not is_batch and getattr(self, '_batch_video_extraction', False):
-            logger.info("Detected batch video extraction completion")
-            # Get extracted frames from output directory
-            output_dir = Path(event.output_dir)
-            extracted_frames = sorted([str(f) for f in output_dir.glob("*.jpg")])
-            logger.debug(f"Found {len(extracted_frames)} extracted frames in {output_dir}")
-
-            # Get video metadata from event if available
-            video_metadata = event.video_metadata if hasattr(event, 'video_metadata') else None
-
-            # Get the video path from input_dir (parent directory name)
-            video_path = event.input_dir
-
-            # Complete this video and move to next
-            logger.debug(f"Calling _complete_batch_video_extraction for {video_path}")
-            self._complete_batch_video_extraction(video_path, extracted_frames, video_metadata)
-            return
-
         # Check if this was a manual video extraction
         if not is_batch and getattr(self, 'last_extraction_settings', None):
             settings = self.last_extraction_settings
@@ -6523,13 +6316,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # say why plainly instead of leaving thousands of failed images.
         halted = getattr(event, 'halted', None)
         if halted:
-            # The image whose failure halted the batch was never really tried:
-            # put it back in the queue so resuming describes it.
-            halted_file = getattr(event, 'halted_file', None)
-            item = self.workspace.items.get(halted_file) if halted_file else None
-            if item is not None:
-                item.processing_state = "pending"
-                item.processing_error = None
+            # The images whose failures halted the batch were never really
+            # tried: put them back in the queue so resuming describes them.
+            for halted_file in getattr(event, 'halted_files', None) or ():
+                item = self.workspace.items.get(halted_file)
+                if item is not None:
+                    item.processing_state = "pending"
+                    item.processing_error = None
 
         # Phase 3: Clear batch state on successful completion
         if self.workspace.batch_state and not halted:
@@ -6545,6 +6338,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.batch_progress_dialog:
             summary = (f"Stopped after {event.input_dir}: {halted}" if halted
                        else event.input_dir)
+            if self._batch_failures:
+                summary += f" ({self._batch_failures} failed)"
             self.batch_progress_dialog.mark_complete(summary, stopped=bool(halted))
             self.batch_progress_dialog = None  # detach ref; dialog stays visible until user closes it
 
@@ -6569,7 +6364,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # back into the manifest and offer to resume a finished batch.
         self._flush_checkpoints()
         if self.workspace_file:
-            self._save_bundle()
+            # With a progress window: inline, the final save of a large batch
+            # froze the app for minutes with nothing for a screen reader to say.
+            self._save_bundle_with_progress()
         else:
             self._auto_save_bundle()
 
@@ -6581,6 +6378,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._batch_active = False
         self._batch_embed = False
         self.refresh_image_list()
+
+        if self._batch_failures and not halted:
+            show_warning(
+                self,
+                f"{self._batch_failures} image(s) in this batch could not be "
+                "described. They are marked X in the image list, and "
+                "Process > Describe All Undescribed tries them again.\n\n"
+                f"First failure: {self._batch_first_failure}")
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         if halted:
             # Offer to resume exactly this batch (same images, provider and
@@ -6598,16 +6405,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_workflow_failed(self, event):
         """Handle workflow failures"""
-        # If we're in the middle of batch video extraction, log and skip this
-        # video rather than halting the entire batch — one bad video shouldn't
-        # prevent all the others (and the still images) from being processed.
-        if getattr(self, '_batch_video_extraction', False):
-            video_path = self._videos_to_extract[self._extracted_video_count] if hasattr(self, '_videos_to_extract') else "unknown"
-            logger.warning(f"Video extraction failed for {Path(video_path).name}: {event.error} — skipping")
-            self._extracted_video_count = getattr(self, '_extracted_video_count', 0) + 1
-            self._extract_next_video_in_batch()
-            return
-
         # Ensure main window has focus before showing error dialog
         self.Raise()
         self.SetFocus()
@@ -6931,9 +6728,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if item.processing_state == "pending":
                     item.processing_state = "paused"
 
-        # Save workspace (preserves paused state)
-        if self.workspace_file:
-            self._save_bundle()
+        # Save workspace (preserves paused state), with a progress window
+        # rather than freezing the app on a large workspace.
+        self._save_bundle_with_progress()
 
         self.SetStatusText("Batch processing paused", 0)
 
@@ -7241,6 +7038,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Reset items to pending (from paused)
         for item in to_process_items:
             item.processing_state = "pending"
+        self._batch_failures = 0
+        self._batch_first_failure = None
 
         # Start worker - STORE REFERENCE
         self.batch_worker = BatchProcessingWorker(
