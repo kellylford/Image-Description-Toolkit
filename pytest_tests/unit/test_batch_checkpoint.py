@@ -135,13 +135,15 @@ class TestWriter:
                        {"total_queued": 1, "provider": "old"}, stale_seq)
         flushed = w.flush(5)
         assert flushed
-        assert Workspace.open(path).batch_state["provider"] == "new"
+        on_disk = Workspace.open(path).batch_state
+        assert on_disk["provider"] == "new"
         # A job snapshotted after the save still refreshes it.
         w.enqueue_item(path, str(src / "b.jpg"), _gui_item(src / "b.jpg", "b"),
                        {"total_queued": 9, "provider": "newer"}, w.snapshot_seq())
         flushed = w.flush(5)
         assert flushed
-        assert Workspace.open(path).batch_state["provider"] == "newer"
+        on_disk = Workspace.open(path).batch_state
+        assert on_disk["provider"] == "newer"
 
     def test_name_index_built_once_and_kept_current(self, bundle, monkeypatch):
         """#345 review: each new item (every extracted frame) used to walk
