@@ -281,7 +281,8 @@ def test_stop_during_save_stage_never_starts_describing(frame, monkeypatch):
     assert _pump_until(lambda: f._run_cancel is None)
     assert not _FakeWorker.instances[0].started
     assert f.workspace.batch_state is None
-    assert Workspace.open(Path(f.workspace_file)).batch_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
     item = Workspace.open(Path(f.workspace_file)).get_item("a.jpg")
     assert item.extra.get("processing_state") is None
 
@@ -996,7 +997,8 @@ def test_cancelled_close_during_the_save_stage_is_a_full_stop(frame, monkeypatch
     assert _pump_until(lambda: f._run_cancel is None)
     assert f.workspace.batch_state is None
     assert f.workspace.items[str(f.src / "a.jpg")].processing_state is None
-    assert Workspace.open(Path(f.workspace_file)).batch_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
     assert any("stopped before describing" in m for m in f.infos)
     assert not _FakeWorker.instances[-1].started
 
@@ -1119,5 +1121,6 @@ def test_cancelled_close_after_the_run_ended_is_still_a_full_stop(frame, monkeyp
     assert vetoed
     assert f.workspace.batch_state is None
     assert f.workspace.items[str(f.src / "a.jpg")].processing_state is None
-    assert Workspace.open(Path(f.workspace_file)).batch_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
     assert any("stopped before describing" in m for m in f.infos)
