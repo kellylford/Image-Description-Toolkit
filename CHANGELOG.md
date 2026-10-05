@@ -11,6 +11,11 @@ fixes found while using them.
 
 ### 🐛 Bug Fixes
 
+**A batch with many videos starts straight away on a Mac (#342)**
+- On a Mac with videos on a network share, ImageDescriber froze for up to two minutes when a batch started, before its progress window appeared; VoiceOver reported that ImageDescriber had no windows. Choosing each video's frames folder read every source video over the network, on the window's own thread: 1,340 videos took about 100 seconds over macOS's SMB client. That work now happens during extraction, one video at a time, so the progress window and its "Extracting frames" stage appear immediately and Stop works throughout.
+- The frames saved at the start of describing are now written with everything else in the "Saving workspace" stage, off the window's thread, instead of first on it.
+- If frames can't be extracted from any of the videos, ImageDescriber now says so instead of "All images already have descriptions."
+
 **Stopping and restarting a batch with videos in ImageDescriber**
 - Stopping a batch, then choosing **Process → Describe All Undescribed**, could extract a video's frames a second time and then fail on frames with "file not found". Four separate faults combined to cause this, and all four are fixed.
 - **Stop works at every stage.** While frames were being extracted or the workspace saved, there was no way to stop a batch: the progress window's Stop button was disabled and Stop All Processing ignored that stage, so the batch went on to describe. Stop is now available while frames are extracted, and Stop All Processing works at every stage. Stopping ends extraction at the next frame and keeps videos that were fully extracted. A video stopped partway through is extracted again next time.

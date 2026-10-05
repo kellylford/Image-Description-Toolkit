@@ -327,7 +327,7 @@ def test_same_named_videos_without_subfolder_still_separate(frame):
     assert da == f._frames_dir_for_video(a.file_path), "must be stable across calls"
 
 
-def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch, tmp_path):
+def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch):
     """Issue #342: claiming reads each source video (fingerprint). On a macOS
     network share that took ~60 ms a video, all on the main thread before the
     progress window appeared: 1,340 videos froze the app for ~2 minutes."""
@@ -366,7 +366,7 @@ def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch, tmp_path)
         assert f.workspace.items[frame_path].subfolder == f._frame_subfolder(dirs[vp])
 
 
-def test_video_whose_folder_cannot_be_claimed_is_skipped(frame, monkeypatch, tmp_path):
+def test_video_whose_folder_cannot_be_claimed_is_skipped(frame, monkeypatch):
     import imagedescriber_wx
     from data_models import ImageItem
     f = frame
@@ -412,15 +412,20 @@ def test_persisted_frames_resolve_after_reopen(frame, tmp_path):
         frames.append(str(p))
         fi = ImageItem(str(p), "extracted_frame")
         fi.parent_video = vid
+        fi.subfolder = "frames/clip"
         f.workspace.add_item(fi)
     f.workspace.items[vid].extracted_frames = frames
 
-    f._persist_extracted_frames_to_bundle()
+    # The save a batch runs before describing ("Saving workspace" stage); it
+    # replaced a separate main-thread frame save, so it must record frames
+    # the same way: storage "reference", parent_video and subfolder kept.
+    f._save_bundle()
 
     ws = Workspace.open(Path(f.workspace_file))
     # Recorded truthfully (they are not in images/), not rescued by the
     # image_path fallback that exists for bundles the old code wrote.
     assert {ws.get_item(Path(p).name).storage for p in frames} == {"reference"}
+    assert {ws.get_item(Path(p).name, "frames/clip").subfolder for p in frames}         == {"frames/clip"}
     gui = bundle_to_gui_workspace_dict(ws)
     for p in frames:
         assert p in gui["items"], "frame no longer at its real path after reopen"
@@ -662,9 +667,9 @@ def test_failed_start_keeps_a_halted_batchs_resume_state(frame, monkeypatch):
     f.workspace.items[other].processing_state = "pending"
 
     def boom(*a, **k):
-        raise RuntimeError("persist exploded")
+        raise RuntimeError("refresh exploded")
     # Fails before the new run sets batch_state or marks anything pending.
-    monkeypatch.setattr(f, "_persist_extracted_frames_to_bundle", boom)
+    monkeypatch.setattr(f, "refresh_image_list", boom)
     f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
     assert f.workspace.batch_state is halted_state
     assert f.workspace.items[other].processing_state == "pending"
@@ -782,3 +787,20 @@ def test_pump_depth_recovers_when_closing_the_dialog_raises(frame, monkeypatch):
     with pytest.raises(RuntimeError):
         f._run_with_progress("Saving workspace", 1, lambda cb: None)
     assert f._progress_pump_depth == 0
+
+
+
+def test_all_videos_failing_says_so(frame, monkeypatch):
+    """Every video's extraction failing used to end with "All images already
+    have descriptions." (third reviewer of PR 343)."""
+    f = frame
+    f.workspace.items[str(f.src / "a.jpg")].descriptions.append(
+        __import__("data_models").ImageDescription(text="done"))
+
+    def fail(vp, cfg, cancel=None, frames_dir=None):
+        raise OSError("share went read-only")
+    monkeypatch.setattr(f, "_extract_video_frames_sync", fail)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("could not be extracted" in m and "read-only" in m for m in f.infos)
+    assert not any("All images already have descriptions" in m for m in f.infos)

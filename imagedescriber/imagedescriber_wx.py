@@ -22,8 +22,8 @@ import json
 import logging
 import re
 import subprocess
-import threading
 import collections
+import threading
 from types import SimpleNamespace
 import time
 import base64
@@ -143,6 +143,7 @@ def _claim_frames_dir_for(derived: Path, video_path: str, subfolder: Optional[st
     target = derived / choose_frames_relpath(derived, vp, subfolder, force_hash=collides)
     claim_frames_dir(target, vp)
     return target
+
 
 try:
     import openai
@@ -3948,6 +3949,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # _plan_frames_dirs) and recorded in frame_dirs as each is claimed.
             derived, frame_plans = self._plan_frames_dirs(videos_to_extract)
             frame_dirs = {}
+            failed_videos = []   # (name, reason); filled on the thread
 
             # Three stages when there are videos: extract → save → describe.
             self._ensure_progress_dialog(options, 3)
@@ -3980,6 +3982,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     except Exception as exc:
                         logger.warning(f"Frame extraction failed for {Path(vp).name}: {exc}")
                         results.append((vp, [], {}))
+                        failed_videos.append((Path(vp).name, str(exc)))
                     # Report after each video — extraction of a single long video
                     # can take minutes, so this is the only feedback available.
                     self._stage_progress(idx, total_vids, Path(vp).name)
@@ -3994,6 +3997,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self._abort_run(cancel, exc)
 
         def _finish_extraction(results):
+            # The progress window counts failed videos like failed images,
+            # rather than them vanishing into the log.
+            dlg = self.batch_progress_dialog
+            for name, reason in failed_videos:
+                if dlg:
+                    dlg.note_failure(name, reason)
             to_process = list(images)
             vid_count = 0
             frame_count = 0
@@ -4022,18 +4031,38 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             if cancel.is_set():
                 # Stopped: keep the videos that finished, describe nothing.
+                # Saved off the main thread with a progress window; writing
+                # every frame's record here froze the app on a large library.
                 logger.info(f"Run stopped during extraction; kept frames of {vid_count} video(s)")
-                if results:
-                    self.mark_modified()
-                    self._persist_extracted_frames_to_bundle()
-                self._end_run(cancel)
+                try:
+                    if results:
+                        self.mark_modified()
+                        self._save_bundle_with_progress()
+                finally:
+                    self._end_run(cancel)
                 self.refresh_image_list()
+                return
+
+            if failed_videos and not to_process:
+                # Every video failed and nothing else is queued. Without this
+                # the run ended with "All images already have descriptions."
+                self._end_run(cancel)
+                self._close_progress_dialog()
+                name, reason = failed_videos[0]
+                show_warning(
+                    self,
+                    f"Frames could not be extracted from {len(failed_videos)} "
+                    f"video(s), so there was nothing to describe.\n\n"
+                    f"First failure: {name}: {reason}")
                 return
 
             preamble = (
                 f"Video extraction: {vid_count} video(s) → {frame_count} frame(s)"
                 if frame_count else None
             )
+            if failed_videos:
+                note = f"{len(failed_videos)} video(s) could not be extracted (see the log)"
+                preamble = f"{preamble}; {note}" if preamble else f"Video extraction: {note}"
             self._launch_batch(to_process, options, skip_existing, video_preamble=preamble)
 
         threading.Thread(target=_do_all_extractions, daemon=True).start()
@@ -4572,8 +4601,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_info(self, "All images already have descriptions.")
             return
 
-        # Persist extracted frames / refresh the file list
-        self._persist_extracted_frames_to_bundle()
+        # Extracted frames reach the bundle in the "Saving workspace" stage
+        # below, off the main thread with every other item. Writing them here
+        # first, on the main thread, took seconds on a large library and froze
+        # the window.
         self.refresh_image_list()
         self.mark_modified()
 
@@ -4865,40 +4896,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         except Exception as e:
             logger.error(f"Error loading workspace: {e}", exc_info=True)
             show_error(self, f"Error loading workspace:\n{e}")
-
-    def _persist_extracted_frames_to_bundle(self) -> None:
-        """Write extracted frame items and their parent video items to the open bundle.
-
-        Called after batch video extraction completes so that the extraction state
-        survives a pause-and-exit without requiring an explicit File > Save.
-        No-op when no bundle is open.
-        """
-        if not self.workspace_file or not self.workspace or not self.workspace.items:
-            return
-        try:
-            from idt_core.workspace import Workspace
-            from idt_core.gui_bridge import gui_item_to_ws_item, sidecar_name_index
-        except ImportError:
-            return
-        # Same conversion and ordering as a full save. This used to build its
-        # own sidecars with storage="copy" for frames without copying anything,
-        # so after reopening the workspace every frame resolved to images/<name>,
-        # which does not exist, and describing failed with "file not found".
-        bundle_path = Path(self.workspace_file)
-        try:
-            ws = Workspace.open(bundle_path)
-            seq = self._checkpointer.snapshot_seq()
-            index = sidecar_name_index(ws)
-            for file_path, item in self.workspace.items.items():
-                if item.item_type not in ("video", "extracted_frame"):
-                    continue
-                gui_item = item.to_dict()
-                with self._checkpointer.lock:
-                    if self._checkpointer.claim(bundle_path, file_path, seq):
-                        ws.save_item(gui_item_to_ws_item(ws, file_path, gui_item, index))
-            logger.info("Persisted extracted frame items to bundle")
-        except Exception as exc:
-            logger.warning(f"Could not persist frames to bundle: {exc}")
 
     def on_save_workspace_as(self, event):
         """Save workspace to a new bundle location."""
