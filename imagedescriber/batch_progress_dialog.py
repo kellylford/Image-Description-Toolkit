@@ -377,6 +377,19 @@ class BatchProgressDialog(wx.Dialog):
             if hasattr(self.parent_window, 'on_stop_batch'):
                 self.parent_window.on_stop_batch()
 
+    def mark_stopping(self):
+        """Stop was pressed while frames were extracting or the workspace was
+        saving: that work finishes its current step first. Say so in the window
+        (and its title, which a screen reader announces) instead of closing it,
+        so the wait isn't silent; Stop and Pause no longer apply."""
+        self.pause_button.Enable(False)
+        self.stop_button.Enable(False)
+        self.stats_list.Append(SEP_LINE)
+        self.separator_indices.add(self.stats_list.GetCount() - 1)
+        self.stats_list.Append("Stopping: finishing the current video or save…")
+        self.stats_list.EnsureVisible(self.stats_list.GetCount() - 1)
+        self.SetTitle("Stopping  —  Batch Processing")
+
     def mark_complete(self, summary: str = "", stopped: bool = False):
         """
         Called when batch processing finishes naturally — keeps dialog open
