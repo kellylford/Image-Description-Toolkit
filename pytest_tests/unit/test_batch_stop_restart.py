@@ -1048,6 +1048,30 @@ def test_video_finishing_after_destroy_is_written(frame, monkeypatch):
     assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
 
 
+def test_quit_waits_for_a_video_finishing_as_the_app_closes(frame, monkeypatch):
+    """#347 Windows probe: MainLoop exits ~0.4 s after Close, and a video's
+    hand-back queued later never runs, so the video was lost. on_close now
+    waits for the cancelled extraction thread and runs its hand-back before
+    the last flush. Checked with no event pumping after on_close returns,
+    as at a real exit."""
+    f = frame
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    gate = threading.Event()
+    monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f.batch_progress_dialog is not None)
+
+    monkeypatch.setattr(f, "confirm_unsaved_changes",
+                        lambda: (threading.Timer(0.3, gate.set).start(), True)[1])
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert str(done_frame) in f.workspace.items, "finished video never recorded"
+    assert f._checkpointer._queue.unfinished_tasks == 0
+    gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
+    assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
+
+
 def test_reapplying_a_recorded_video_adds_nothing_twice(frame, monkeypatch):
     """_record_video and then _finish_extraction both apply each video."""
     f = frame
