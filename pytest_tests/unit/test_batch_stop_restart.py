@@ -425,7 +425,8 @@ def test_persisted_frames_resolve_after_reopen(frame, tmp_path):
     # Recorded truthfully (they are not in images/), not rescued by the
     # image_path fallback that exists for bundles the old code wrote.
     assert {ws.get_item(Path(p).name).storage for p in frames} == {"reference"}
-    assert {ws.get_item(Path(p).name, "frames/clip").subfolder for p in frames}         == {"frames/clip"}
+    subfolders = {ws.get_item(Path(p).name, "frames/clip").subfolder for p in frames}
+    assert subfolders == {"frames/clip"}
     gui = bundle_to_gui_workspace_dict(ws)
     for p in frames:
         assert p in gui["items"], "frame no longer at its real path after reopen"
@@ -659,6 +660,7 @@ def test_end_of_batch_reports_failures_once(frame):
                                            worker=w, halted=None, halted_files=[]))
     assert any("could not be described" in m and "bad image" in m for m in f.infos)
 
+
 def test_failed_start_keeps_a_halted_batchs_resume_state(frame, monkeypatch):
     f = frame
     halted_state = {"total_queued": 9, "provider": "claude-code"}
@@ -789,18 +791,111 @@ def test_pump_depth_recovers_when_closing_the_dialog_raises(frame, monkeypatch):
     assert f._progress_pump_depth == 0
 
 
-
 def test_all_videos_failing_says_so(frame, monkeypatch):
     """Every video's extraction failing used to end with "All images already
     have descriptions." (third reviewer of PR 343)."""
+    from data_models import ImageDescription
     f = frame
     f.workspace.items[str(f.src / "a.jpg")].descriptions.append(
-        __import__("data_models").ImageDescription(text="done"))
+        ImageDescription(text="done"))
 
     def fail(vp, cfg, cancel=None, frames_dir=None):
         raise OSError("share went read-only")
     monkeypatch.setattr(f, "_extract_video_frames_sync", fail)
     f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
     assert _pump_until(lambda: f._run_cancel is None)
-    assert any("could not be extracted" in m and "read-only" in m for m in f.infos)
+    assert any("No frames could be extracted" in m and "read-only" in m for m in f.infos)
     assert not any("All images already have descriptions" in m for m in f.infos)
+    assert f.batch_progress_dialog is None
+    assert f._batch_active is False
+    assert _FakeWorker.instances == []
+
+
+def test_some_videos_failing_are_reported_at_the_end(frame, monkeypatch, tmp_path):
+    """A failed video was counted in the progress window but missing from the
+    end-of-batch summary (fourth reviewer of PR 343)."""
+    from data_models import ImageItem
+    f = frame
+    good = f.src / "good.mp4"
+    good.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(good), "video"))
+    frame_file = tmp_path / "good_0.00s.jpg"
+    frame_file.write_bytes(b"x")
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            raise OSError("not a video")
+        return [str(frame_file)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    launched = []
+    monkeypatch.setattr(f, "_launch_batch",
+                        lambda to_process, options, skip, video_preamble=None,
+                        video_failures=None: launched.append(
+                            (to_process, video_preamble, video_failures)))
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(good)], [], OPTIONS, True)
+    assert _pump_until(lambda: launched)
+    to_process, preamble, video_failures = launched[0]
+    assert to_process == [str(frame_file)]
+    # The run-log line counts only the video that produced frames.
+    assert preamble.startswith("Video extraction: 1 video(s)")
+    assert "1 video(s) could not be extracted" in preamble
+    assert video_failures == [("clip.mp4", "not a video")]
+    f._end_run(f._run_cancel) if f._run_cancel else None
+
+    # And the end of the batch reports it.
+    w = _FakeWorker()
+    f.batch_worker = w
+    f._reset_batch_failures()
+    f._batch_video_failures = list(video_failures)
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
+                                           worker=w, halted=None, halted_files=[]))
+    assert any("could not be extracted from 1 video" in m and "not a video" in m
+               for m in f.infos)
+
+
+def test_stop_during_extraction_announces_after_the_save(frame, monkeypatch):
+    """The "stopped" message used to appear at once; the save's progress window
+    then took focus from it while a screen reader was reading it."""
+    f = frame
+    order = []
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: order.append("save"))
+    import imagedescriber_wx
+    monkeypatch.setattr(imagedescriber_wx, "show_info",
+                        lambda _p, msg, *a, **k: order.append("message"))
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    f.on_stop_batch()
+    assert order == [], "announced before the run had wound down"
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert order[-1] == "message"
+
+
+def test_closing_during_extraction_saves_nothing_and_says_nothing(frame, monkeypatch):
+    """Closing used to run a full save inside the "save changes?" question."""
+    from data_models import ImageItem
+    f = frame
+    saves, extracted = [], []
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: saves.append(1))
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    import imagedescriber_wx
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(done_frame)], {}
+        extracted.append(vp)
+        while not cancel.is_set():
+            time.sleep(0.01)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(lambda: extracted)
+    monkeypatch.setattr(f, "_closing", True)
+    f._run_cancel.set()                  # what on_close does
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert saves == []
+    assert f.infos == []
