@@ -1,5 +1,14 @@
 ## [Unreleased]
 
+### ✨ Improvements
+
+**A batch with videos describes while it extracts (#344)**
+- A batch with many videos used to describe nothing until every video's frames were extracted: over half an hour for a large iPhone library. ImageDescriber now describes the photos straight away and adds each video's frames to the batch as soon as that video is extracted.
+- The progress window shows the describing progress, whose total grows as videos finish, and a separate **Extracting Frames** line counting the videos. Its title changes once, when extraction finishes, not on every update.
+- **Stop** stops describing and extraction together. Fully extracted videos keep their frames; a video stopped partway is extracted again next time.
+- If the batch stops because the provider refused the request (for example, a sign-out), resuming it extracts the videos it never reached, then describes them.
+- **Pause** pauses describing; extraction carries on.
+
 ### 🐛 Bug Fixes
 
 **"Embed description after processing" follows each batch in ImageDescriber (#346)**

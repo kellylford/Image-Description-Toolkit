@@ -80,6 +80,12 @@ class BatchProgressDialog(wx.Dialog):
         self.stage_index = 0
         self.stage_count = 0
         self.separator_indices = set()
+        # Frame extraction running alongside describing (#344): its own row,
+        # so the describe counts never overwrite it. None when not extracting.
+        self._extraction = None
+        # The last update_progress arguments, so an extraction tick can
+        # rebuild the list without losing the describe progress.
+        self._last_progress = None
 
         # Create UI
         self._create_ui()
@@ -196,17 +202,48 @@ class BatchProgressDialog(wx.Dialog):
         self.pause_button.Enable(can_interrupt)
         self.stop_button.Enable(can_interrupt if can_stop is None else can_stop)
 
-        # Title carries the stage so screen readers announce the transition
-        # when the dialog is the active window. While stopping, the save that
-        # finishes the stop must not read as the batch's next step.
+        self._set_stage_title()
+        self.update_progress(0, total)
+
+    def _set_stage_title(self):
+        """Title carries the stage so screen readers announce the transition
+        when the dialog is the active window. While stopping, the save that
+        finishes the stop must not read as the batch's next step."""
+        name = self.stage_name
         if self._stopping:
             self.SetTitle(f"{STOPPING_PREFIX} {name.lower()} — Batch Processing")
-        elif stage_index and stage_count:
-            self.SetTitle(f"{name} (step {stage_index} of {stage_count}) — Batch Processing")
+        elif self.stage_index and self.stage_count:
+            self.SetTitle(f"{name} (step {self.stage_index} of {self.stage_count}) — Batch Processing")
         else:
             self.SetTitle(f"{name} — Batch Processing")
 
-        self.update_progress(0, total)
+    # ----- frame extraction alongside describing (#344) ----- #
+
+    def begin_extraction(self, total_videos: int) -> None:
+        """Videos are being extracted while describing runs: show a row for it."""
+        self._extraction = {"done": 0, "total": total_videos, "name": ""}
+        self._rebuild()
+
+    def set_extraction(self, done: int, total: int, name: str = "") -> None:
+        """One more video extracted. Ignored once extraction has ended."""
+        if self._extraction is None:
+            return
+        self._extraction = {"done": done, "total": total, "name": name}
+        self._rebuild()
+
+    def end_extraction(self, stage_name: str = "Describing") -> None:
+        """Extraction finished: drop its row and say so in the title, once,
+        rather than on every tick (each title change is spoken)."""
+        if self._extraction is None:
+            return
+        self._extraction = None
+        self.stage_name = stage_name
+        self._set_stage_title()
+        self._rebuild()
+
+    def _rebuild(self) -> None:
+        if self._last_progress is not None:
+            self.update_progress(**self._last_progress)
 
     def note_failure(self, image_name: str, error: str) -> None:
         """Count a failed image; shown on the next progress update."""
@@ -241,6 +278,11 @@ class BatchProgressDialog(wx.Dialog):
             status_message: Optional status line shown at the top of the list
                 (e.g. "Loading MLX model…"). Cleared automatically when None.
         """
+        self._last_progress = dict(
+            current=current, total=total, file_path=file_path, avg_time=avg_time,
+            image_name=image_name, provider=provider, model=model,
+            last_image=last_image, last_description=last_description,
+            token_stats=token_stats, status_message=status_message)
         # Allow callers to update stored batch settings
         if batch_provider is not None:
             self.batch_provider = batch_provider
@@ -283,12 +325,21 @@ class BatchProgressDialog(wx.Dialog):
             else:
                 stage_label = self.stage_name
             self.stats_list.Append(f"Stage:                      {stage_label}")
+        # While videos are still being extracted the total grows as each one
+        # finishes; say so rather than let it read as the whole batch.
+        more = "  (more as videos finish)" if self._extraction is not None else ""
         if total > 0:
-            self.stats_list.Append(f"Items Processed:            {current} / {total}")
+            self.stats_list.Append(f"Items Processed:            {current} / {total}{more}")
         else:
             # total == 0 means "unknown length" (e.g. consuming a generator);
             # show a running count rather than a meaningless "N / 0".
-            self.stats_list.Append(f"Items Processed:            {current}")
+            self.stats_list.Append(f"Items Processed:            {current}{more}")
+        if self._extraction is not None:
+            ex = self._extraction
+            self.stats_list.Append(
+                f"Extracting Frames:          {ex['done']:,} of {ex['total']:,} videos")
+            if ex["name"]:
+                self.stats_list.Append(f"Last Video Extracted:       {ex['name']}")
 
         if self.failed_count:
             self.stats_list.Append(f"Failed:                     {self.failed_count}")
