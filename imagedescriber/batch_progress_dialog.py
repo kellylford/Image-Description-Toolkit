@@ -240,6 +240,11 @@ class BatchProgressDialog(wx.Dialog):
 
         # Save selection before clearing so we can restore it after rebuild
         saved_selection = self.stats_list.GetSelection()
+        # The stopping line moves (mark_stopping appends it at the end; the
+        # rebuild puts it at the top), so follow it by text, not by row.
+        on_stopping_line = (
+            self._stopping and saved_selection != wx.NOT_FOUND
+            and "Stopping:" in self.stats_list.GetString(saved_selection))
 
         # Track separator row indices for keyboard navigation skip logic
         self.separator_indices = set()
@@ -260,7 +265,7 @@ class BatchProgressDialog(wx.Dialog):
 
         # ── Processing Progress section ──────────────────────────────────────
         if self.stage_name:
-            if self.stage_index and self.stage_count:
+            if self.stage_index and self.stage_count and not self._stopping:
                 stage_label = f"{self.stage_name} (step {self.stage_index} of {self.stage_count})"
             else:
                 stage_label = self.stage_name
@@ -340,7 +345,10 @@ class BatchProgressDialog(wx.Dialog):
 
         # Restore the previously selected row (skip separators if needed)
         count = self.stats_list.GetCount()
-        if saved_selection != wx.NOT_FOUND and count > 0:
+        if on_stopping_line and count > 0:
+            self.stats_list.SetSelection(0)     # the "Status: Stopping..." row
+            self.stats_list.EnsureVisible(0)
+        elif saved_selection != wx.NOT_FOUND and count > 0:
             idx = min(saved_selection, count - 1)
             # Scan forward past any separator, then backward if still on one
             while idx < count - 1 and idx in self.separator_indices:
@@ -393,8 +401,13 @@ class BatchProgressDialog(wx.Dialog):
         (and its title, which a screen reader announces) instead of closing it,
         so the wait isn't silent; Stop and Pause no longer apply."""
         self._stopping = True
-        # Focus first: disabling the focused Stop button moves focus to Close,
-        # where a second Enter or Escape hid the window mid-save.
+        # Its Close button only hides it. Focus moved into a hidden window
+        # went nowhere for the whole save, so bring it back first.
+        if not self.IsShown():
+            self.Show()
+        self.Raise()
+        # Focus before disabling: disabling the focused Stop button moves
+        # focus to Close, where a second Enter or Escape hid the window.
         self.stats_list.SetFocus()
         self.pause_button.Enable(False)
         self.stop_button.Enable(False)

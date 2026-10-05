@@ -1055,3 +1055,69 @@ def test_frames_all_already_described_is_not_called_a_failure(frame, monkeypatch
     assert _pump_until(lambda: f._run_cancel is None)
     assert not any("No frames could be extracted" in m for m in f.infos)
     assert any("All images already have descriptions" in m for m in f.infos)
+
+
+def test_stopping_line_stays_selected_through_rebuilds(_frame):
+    """mark_stopping appends the line at the end and selects it; the next
+    rebuild moves it to the top. Restoring the selection by row number landed
+    a screen reader on "Prompt Style" instead of "Stopping". (From the Mac
+    session, which found it independently.)"""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 10, batch_provider="ollama",
+                              batch_model="m", batch_prompt="detailed")
+    try:
+        dlg.begin_stage("Extracting frames", 10, stage_index=1, stage_count=3)
+        dlg.update_progress(3, 10, image_name="clip.mp4")
+        dlg.mark_stopping()
+        dlg.begin_stage("Saving workspace", 10, stage_index=2, stage_count=3)
+        for _ in range(2):
+            dlg.update_progress(4, 10, image_name="clip2.mp4")
+            sel = dlg.stats_list.GetSelection()
+            assert sel != wx.NOT_FOUND
+            assert "Stopping:" in dlg.stats_list.GetString(sel)
+            rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+            assert not any("step" in r for r in rows), rows
+    finally:
+        dlg.Destroy()
+
+
+def test_mark_stopping_shows_a_hidden_window_before_focusing_it(_frame):
+    """Focus moved into a hidden progress window went nowhere for the save."""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 10)
+    try:
+        dlg.Show()
+        dlg.Hide()                     # what its Close button does
+        dlg.mark_stopping()
+        assert dlg.IsShown()
+    finally:
+        dlg.Destroy()
+
+
+def test_cancelled_close_after_the_run_ended_is_still_a_full_stop(frame, monkeypatch):
+    """The save stage ended while "save changes?" was open, then Cancel: the
+    user was told "stopped" but the batch was saved as resumable (seventh
+    reviewer of PR 343)."""
+    f = frame
+    gate = threading.Event()
+    real_save = f._save_bundle
+
+    def slow_save(*a, **k):
+        if k.get("progress") is not None and not gate.is_set():
+            gate.wait(10)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", slow_save)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+
+    def question():
+        gate.set()                     # the save finishes during the question
+        assert _pump_until(lambda: f._run_cancel is None)
+        return False                   # Cancel
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    vetoed = []
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: vetoed.append(1)))
+    assert vetoed
+    assert f.workspace.batch_state is None
+    assert f.workspace.items[str(f.src / "a.jpg")].processing_state is None
+    assert Workspace.open(Path(f.workspace_file)).batch_state is None
+    assert any("stopped before describing" in m for m in f.infos)

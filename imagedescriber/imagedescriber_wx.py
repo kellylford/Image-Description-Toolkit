@@ -4054,7 +4054,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 finally:
                     self._end_run(cancel)
                 if not _closing(cancel):
-                    self.refresh_image_list()
                     self._announce_stopped_before_describing()
                 return
 
@@ -4383,6 +4382,21 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._batch_first_failure = None
         self._batch_video_failures = []
 
+    def _reset_stopped_run_state(self) -> None:
+        """What stopping a run before describing resets: no batch to resume,
+        no pending items, no unstarted worker, no embed choice."""
+        if self.workspace:
+            self.workspace.batch_state = None
+            for item in self.workspace.items.values():
+                if item.processing_state in ["pending", "paused"]:
+                    item.processing_state = None
+                    item.batch_queue_position = None
+        self.batch_worker = None   # created for the save stage but never started
+        self._batch_embed = False
+        self.processing_items.clear()
+        doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+        self.update_window_title("ImageDescriber", doc_name)
+
     def _stop_preparing_run(self) -> None:
         """Stop a run that is still extracting frames or saving, before describing.
 
@@ -4392,16 +4406,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         """
         logger.info("Stop requested before describing started")
         self._run_cancel.set()
-        self.workspace.batch_state = None
-        for item in self.workspace.items.values():
-            if item.processing_state in ["pending", "paused"]:
-                item.processing_state = None
-                item.batch_queue_position = None
-        self.batch_worker = None   # created for the save stage but never started
-        self._batch_embed = False
-        self.processing_items.clear()
-        doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
-        self.update_window_title("ImageDescriber", doc_name)
+        self._reset_stopped_run_state()
         # The progress window stays open, saying it is stopping, until the
         # extraction or save thread has wound down and its save has finished:
         # one window with a spoken state, progress still landing in it. Closing
@@ -6286,7 +6291,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if source is self._stopping_worker:
                 logger.info(f"Stopped batch finished its last image ({event.input_dir})")
                 self._stopping_worker = None
-                self._batch_embed = False   # the stopped run's choice ends with it
                 self._flush_checkpoints()
                 self.refresh_image_list()
                 return
@@ -7089,6 +7093,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # completion event; until then new runs are refused (_batch_busy_message).
         self.batch_worker.stop()
         self._stopping_worker = self.batch_worker
+        self._batch_embed = False   # the stopped run's choice ends with it
         self._reset_batch_failures()
 
         # Clear batch state (won't resume automatically)
@@ -9532,13 +9537,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if closing_run is not None:
                 closing_run.closing = False
                 if self._run_cancel is closing_run:
-                    # Still winding down: reset what a Stop resets (batch_state
-                    # and pending flags, else reopening offered to resume a
-                    # batch the user was told had stopped); it saves and
+                    # Still winding down: a full Stop, in a window that says
+                    # so (the close hid the batch's window); it saves and
                     # announces when it ends.
+                    self._ensure_progress_dialog({}, 0)
                     self._stop_preparing_run()
                 else:
-                    # Ended silently while "save changes?" was open.
+                    # Ended silently while "save changes?" was open, skipping
+                    # its save as a closing run does. Reset what a Stop resets
+                    # (else reopening offered to resume a batch the user was
+                    # told had stopped), save that, then say so.
+                    self._reset_stopped_run_state()
+                    self._flush_checkpoints()
+                    self._save_bundle_with_progress()
                     self._announce_stopped_before_describing()
             if event.CanVeto():
                 event.Veto()
