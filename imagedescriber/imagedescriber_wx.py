@@ -4673,6 +4673,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
             "geocode_enabled": options.get('geocode_enabled', False),
+            # Resume reads it back, so a resumed batch embeds as this one did.
+            "embed_after_process": options.get('embed_after_process', False),
             "total_queued": len(to_process),
             "started": datetime.now().isoformat(),
         }
@@ -7222,6 +7224,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing=True,  # Always skip completed
             geocode=batch_state.get('geocode_enabled', False),
             logs_dir=self._workspace_logs_dir(),
+            embed_after_process=batch_state.get('embed_after_process', False),
         )
         self.batch_worker.start()
 
@@ -7461,6 +7464,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "model": options['model'],
             "prompt_style": options['prompt_style'],
             "custom_prompt": options.get('custom_prompt'),
+            "geocode_enabled": options.get('geocode_enabled', False),
+            "embed_after_process": options.get('embed_after_process', False),
             "total_queued": len(image_paths),
             "started": datetime.now().isoformat()
         }
@@ -7562,6 +7567,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "model": options['model'],
             "prompt_style": options.get('prompt_style', 'default'),
             "custom_prompt": options.get('custom_prompt'),
+            "geocode_enabled": options.get('geocode_enabled', False),
+            "embed_after_process": options.get('embed_after_process', False),
             "total_queued": len(frame_paths),
             "started": datetime.now().isoformat()
         }

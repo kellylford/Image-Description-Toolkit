@@ -26,6 +26,13 @@ STOPPING_PREFIX = "Stopping:"
 STOPPING_LINE = f"{STOPPING_PREFIX} finishing the current video or save…"
 
 
+def _is_stopping_row(row: str) -> bool:
+    """The Stopping row, as mark_stopping appends it or a rebuild shows it.
+    Matched on the whole line, not "Stopping:" anywhere, so a file name or a
+    description containing that word is never mistaken for it."""
+    return row.endswith(STOPPING_LINE)
+
+
 # "claude-code" -> "Claude Code". idt_core imports the same way in dev and
 # frozen builds, so no try/except fallback is needed.
 from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
@@ -248,7 +255,7 @@ class BatchProgressDialog(wx.Dialog):
         # rebuild puts it at the top), so follow it by text, not by row.
         on_stopping_line = (
             self._stopping and saved_selection != wx.NOT_FOUND
-            and STOPPING_PREFIX in self.stats_list.GetString(saved_selection))
+            and _is_stopping_row(self.stats_list.GetString(saved_selection)))
 
         # Track separator row indices for keyboard navigation skip logic
         self.separator_indices = set()
@@ -353,10 +360,10 @@ class BatchProgressDialog(wx.Dialog):
         count = self.stats_list.GetCount()
         stopping_row = wx.NOT_FOUND
         if on_stopping_line:
-            # Found by its text, not assumed to be row 0: a caller passing its
-            # own status_message would otherwise move the selection elsewhere.
+            # Found by its text rather than assumed to be row 0, so the
+            # selection follows it if the rows above it ever change.
             stopping_row = next((i for i in range(count)
-                                 if STOPPING_PREFIX in self.stats_list.GetString(i)),
+                                 if _is_stopping_row(self.stats_list.GetString(i))),
                                 wx.NOT_FOUND)
         if stopping_row != wx.NOT_FOUND:
             self.stats_list.SetSelection(stopping_row)
@@ -424,12 +431,17 @@ class BatchProgressDialog(wx.Dialog):
         self.stats_list.SetFocus()
         self.pause_button.Enable(False)
         self.stop_button.Enable(False)
-        self.stats_list.Append(SEP_LINE)
-        self.separator_indices.add(self.stats_list.GetCount() - 1)
-        self.stats_list.Append(STOPPING_LINE)
-        last = self.stats_list.GetCount() - 1
-        self.stats_list.SetSelection(last)
-        self.stats_list.EnsureVisible(last)
+        # Called again (Stop, then a cancelled close): go back to the line
+        # already there rather than adding a second one.
+        row = next((i for i in range(self.stats_list.GetCount())
+                    if _is_stopping_row(self.stats_list.GetString(i))), wx.NOT_FOUND)
+        if row == wx.NOT_FOUND:
+            self.stats_list.Append(SEP_LINE)
+            self.separator_indices.add(self.stats_list.GetCount() - 1)
+            self.stats_list.Append(STOPPING_LINE)
+            row = self.stats_list.GetCount() - 1
+        self.stats_list.SetSelection(row)
+        self.stats_list.EnsureVisible(row)
         self.SetTitle("Stopping  —  Batch Processing")
 
     def mark_complete(self, summary: str = "", stopped: bool = False):
