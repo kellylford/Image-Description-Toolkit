@@ -59,6 +59,8 @@ class BatchProgressDialog(wx.Dialog):
         # hundred over the dialog.
         self.failed_count = 0
         self.last_failure = ''
+        # Set by mark_stopping: later stages and progress keep saying so.
+        self._stopping = False
 
         # Stage tracking — a run moves through Extracting → Saving → Describing,
         # each with its own item count.  begin_stage() resets the counter and bar
@@ -184,8 +186,11 @@ class BatchProgressDialog(wx.Dialog):
         self.stop_button.Enable(can_interrupt if can_stop is None else can_stop)
 
         # Title carries the stage so screen readers announce the transition
-        # when the dialog is the active window.
-        if stage_index and stage_count:
+        # when the dialog is the active window. While stopping, the save that
+        # finishes the stop must not read as the batch's next step.
+        if self._stopping:
+            self.SetTitle(f"Stopping: {name.lower()} — Batch Processing")
+        elif stage_index and stage_count:
             self.SetTitle(f"{name} (step {stage_index} of {stage_count}) — Batch Processing")
         else:
             self.SetTitle(f"{name} — Batch Processing")
@@ -241,6 +246,11 @@ class BatchProgressDialog(wx.Dialog):
 
         # Rebuild stats list
         self.stats_list.Clear()
+
+        # While stopping, every rebuild keeps saying so (it used to be wiped by
+        # the first progress tick after Stop).
+        if self._stopping and not status_message:
+            status_message = "Stopping: finishing the current video or save…"
 
         # ── Optional status message (e.g. MLX model loading / download) ─────
         if status_message:
@@ -382,12 +392,18 @@ class BatchProgressDialog(wx.Dialog):
         saving: that work finishes its current step first. Say so in the window
         (and its title, which a screen reader announces) instead of closing it,
         so the wait isn't silent; Stop and Pause no longer apply."""
+        self._stopping = True
+        # Focus first: disabling the focused Stop button moves focus to Close,
+        # where a second Enter or Escape hid the window mid-save.
+        self.stats_list.SetFocus()
         self.pause_button.Enable(False)
         self.stop_button.Enable(False)
         self.stats_list.Append(SEP_LINE)
         self.separator_indices.add(self.stats_list.GetCount() - 1)
         self.stats_list.Append("Stopping: finishing the current video or save…")
-        self.stats_list.EnsureVisible(self.stats_list.GetCount() - 1)
+        last = self.stats_list.GetCount() - 1
+        self.stats_list.SetSelection(last)
+        self.stats_list.EnsureVisible(last)
         self.SetTitle("Stopping  —  Batch Processing")
 
     def mark_complete(self, summary: str = "", stopped: bool = False):

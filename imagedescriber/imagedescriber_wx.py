@@ -4412,11 +4412,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             dlg.mark_stopping()
         else:
             self.SetStatusText("Stopping…", 0)
-        self.refresh_image_list()
+        # No list refresh here: it moved focus to the image list, behind the
+        # Stopping window, so its title changes went unspoken. The run's end
+        # refreshes (_announce_stopped_before_describing).
 
     def _announce_stopped_before_describing(self) -> None:
         """Tell the user a batch stopped before describing, once it really has."""
         self._close_progress_dialog()
+        self.refresh_image_list()
         self.SetStatusText("Batch processing stopped", 0)
         show_info(self, "Batch processing stopped before describing started.\n\n"
                         "Videos whose frames were fully extracted keep them; any "
@@ -4512,6 +4515,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # part of a multi-stage run.
             owns_dialog = self.batch_progress_dialog is None
             dlg = self._ensure_progress_dialog({}, 0)
+            # Its Close button only hides it; a save pumping events against a
+            # hidden dialog disables every window with nothing shown.
+            if dlg and not dlg.IsShown():
+                dlg.Show()
             self._begin_stage(stage_name, total)
 
         # Progress is bound to *this* dialog rather than going through
@@ -6279,6 +6286,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if source is self._stopping_worker:
                 logger.info(f"Stopped batch finished its last image ({event.input_dir})")
                 self._stopping_worker = None
+                self._batch_embed = False   # the stopped run's choice ends with it
                 self._flush_checkpoints()
                 self.refresh_image_list()
                 return
@@ -6631,7 +6639,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Mirror into the progress dialog — the status bar alone is silent to a
         # screen reader. Unknown total, so this shows a running count. Skipped
         # while a batch is describing, so a scan cannot overwrite its progress.
-        if not self._batch_worker_running():
+        if not self._batch_worker_running() and self._run_cancel is None:
             self._stage_progress(event.files_found, 0, event.message)
 
     def on_scan_complete(self, event):
@@ -6641,7 +6649,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Land the scan stage on its final count before the dialog goes away, so
         # the last thing announced is the real total rather than a stale figure.
-        if self.batch_progress_dialog and not self._batch_worker_running():
+        if (self.batch_progress_dialog and not self._batch_worker_running()
+                and self._run_cancel is None):
             self._stage_last_paint = 0.0
             self.batch_progress_dialog.update_progress(
                 total_files, total_files,
@@ -9481,10 +9490,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.info(f"Stopped workers: {', '.join(workers_stopped)}")
         # A run still extracting frames has no worker to stop; tell its thread.
         # The video in progress is then not recorded and is re-extracted next time.
-        if self._run_cancel is not None:
+        closing_run = self._run_cancel
+        if closing_run is not None:
             # Marked on the run itself, so it can't outlive that run.
-            self._run_cancel.closing = True
-            self._run_cancel.set()
+            closing_run.closing = True
+            closing_run.set()
         # Descriptions already finished must reach disk whatever the user
         # answers to "save changes?" below.
         self._flush_checkpoints()
@@ -9516,11 +9526,20 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logger.info("Destroy() completed")
         else:
             logger.info("User cancelled close")
-            # Staying after all: the run cancelled above winds down like a
-            # normal Stop (saves what finished, says it stopped). A flag left
-            # set here silenced every later Stop for the rest of the session.
-            if self._run_cancel is not None:
-                self._run_cancel.closing = False
+            # Staying after all: the run cancelled above becomes a normal
+            # Stop. A flag left set here silenced every later Stop for the rest
+            # of the session.
+            if closing_run is not None:
+                closing_run.closing = False
+                if self._run_cancel is closing_run:
+                    # Still winding down: reset what a Stop resets (batch_state
+                    # and pending flags, else reopening offered to resume a
+                    # batch the user was told had stopped); it saves and
+                    # announces when it ends.
+                    self._stop_preparing_run()
+                else:
+                    # Ended silently while "save changes?" was open.
+                    self._announce_stopped_before_describing()
             if event.CanVeto():
                 event.Veto()
             else:

@@ -843,7 +843,8 @@ def test_some_videos_failing_are_reported_at_the_end(frame, monkeypatch, tmp_pat
 def test_stop_during_extraction_announces_after_the_save(frame, monkeypatch):
     """The "stopped" message used to appear at once; the save's progress window
     then took focus from it while a screen reader was reading it. The progress
-    window now says it is stopping until the save is done."""
+    window now says it is stopping until the (real) save is done, and the save
+    never reads as the batch's next step."""
     import imagedescriber_wx
     from data_models import ImageItem
     f = frame
@@ -863,17 +864,35 @@ def test_stop_during_extraction_announces_after_the_save(frame, monkeypatch):
             time.sleep(0.01)
         raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
     monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
-    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: order.append("save"))
+    real_save = f._save_bundle
+    monkeypatch.setattr(f, "_save_bundle",
+                        lambda *a, **k: (order.append("save"), real_save(*a, **k))[1])
     monkeypatch.setattr(imagedescriber_wx, "show_info",
                         lambda _p, msg, *a, **k: order.append("message"))
     f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
     assert _pump_until(lambda: second)
     dlg = f.batch_progress_dialog
+    titles, lists = [], []
+    real_set_title = dlg.SetTitle
+
+    def set_title(t):
+        titles.append(t)
+        real_set_title(t)
+    monkeypatch.setattr(dlg, "SetTitle", set_title)
+    real_update = dlg.update_progress
+
+    def update(*a, **k):
+        real_update(*a, **k)
+        lists.append([dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())])
+    monkeypatch.setattr(dlg, "update_progress", update)
+
     f.on_stop_batch()
     assert order == [], "announced before the run had wound down"
-    assert f.batch_progress_dialog is dlg and "Stopping" in dlg.GetTitle()
     assert _pump_until(lambda: f._run_cancel is None)
-    assert order == ["save", "message"]
+    assert order[0] == "save" and order[-1] == "message"
+    assert titles and all("Stopping" in t for t in titles), titles
+    assert not any("step" in t for t in titles), titles
+    assert lists and all(any("Stopping" in line for line in rows) for rows in lists)
     assert f.batch_progress_dialog is None
 
 
@@ -955,3 +974,84 @@ def test_scan_finishing_mid_run_keeps_the_runs_window_and_embed_choice(frame, mo
     assert f._batch_embed is True
     f._run_cancel.set()
     assert _pump_until(lambda: f._run_cancel is None)
+
+
+def test_cancelled_close_during_the_save_stage_is_a_full_stop(frame, monkeypatch):
+    """Closing then choosing Cancel during "Saving workspace" left batch_state
+    and pending flags set, so reopening offered to resume a batch the user was
+    told had stopped (sixth reviewer of PR 343)."""
+    f = frame
+    gate = threading.Event()
+    real_save = f._save_bundle
+
+    def slow_save(*a, **k):
+        if k.get("progress") is not None and not gate.is_set():
+            gate.wait(10)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", slow_save)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert f._run_cancel is not None
+    _veto_close(f, monkeypatch)
+    gate.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f.workspace.batch_state is None
+    assert f.workspace.items[str(f.src / "a.jpg")].processing_state is None
+    assert Workspace.open(Path(f.workspace_file)).batch_state is None
+    assert any("stopped before describing" in m for m in f.infos)
+    assert not _FakeWorker.instances[-1].started
+
+
+def test_scan_progress_does_not_paint_into_a_runs_window(frame, monkeypatch):
+    f = frame
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    dlg = f.batch_progress_dialog
+    painted = []
+    monkeypatch.setattr(dlg, "update_progress", lambda *a, **k: painted.append(a))
+    f.on_scan_progress(SimpleNamespace(files_found=812, message="scanning"))
+    f.on_scan_complete(SimpleNamespace(total_files=812, elapsed_time=3.1))
+    wx.SafeYield()
+    assert painted == []
+    f._run_cancel.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+
+
+def test_halted_question_mentions_failed_videos(frame, monkeypatch):
+    f = frame
+    monkeypatch.setattr(f, "_save_bundle", lambda *a, **k: None)
+    w = _FakeWorker()
+    f.batch_worker = w
+    f._reset_batch_failures()
+    f._batch_video_failures = [("clip.mp4", "not a video")]
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/2 images", output_dir="",
+                                           worker=w, halted="signed out",
+                                           halted_files=[], halted_streak=False))
+    assert any("could not be extracted from 1 video" in q for q in f.questions)
+
+
+def test_frames_all_already_described_is_not_called_a_failure(frame, monkeypatch, tmp_path):
+    """One video fails, another gives frames that are all already described:
+    nothing to do, but frames *were* extracted, so the message must not say
+    none could be."""
+    from data_models import ImageItem, ImageDescription
+    f = frame
+    f.workspace.items[str(f.src / "a.jpg")].descriptions.append(ImageDescription(text="d"))
+    good = f.src / "good.mp4"
+    good.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(good), "video"))
+    fr = tmp_path / "good_0.00s.jpg"
+    fr.write_bytes(b"x")
+    done = ImageItem(str(fr), "extracted_frame")
+    done.descriptions.append(ImageDescription(text="already"))
+    f.workspace.add_item(done)
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            raise OSError("not a video")
+        return [str(fr)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(good)], [], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert not any("No frames could be extracted" in m for m in f.infos)
+    assert any("All images already have descriptions" in m for m in f.infos)
