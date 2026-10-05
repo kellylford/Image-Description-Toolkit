@@ -936,6 +936,91 @@ def test_closing_during_extraction_saves_nothing_and_says_nothing(frame, monkeyp
     assert f.infos == []
 
 
+def test_quitting_during_extraction_keeps_finished_videos(frame, monkeypatch):
+    """#345: quitting mid-extraction (answering Don't Save) lost every video
+    already extracted, because they were only recorded when the whole
+    extraction handed back, which never happens once the window is gone. The
+    next run extracted all of them again: 20+ minutes for 1,000 videos on a
+    network share."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    second_started = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(done_frame)], {"fps": 30}
+        second_started.set()
+        while not cancel.is_set():
+            time.sleep(0.01)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(second_started.is_set)
+    wx.SafeYield()                    # let the first video's record run
+
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: True)  # Don't Save
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+
+    gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
+    frame_item = gui["items"].get(str(done_frame))
+    assert frame_item is not None, "finished video's frame was not saved"
+    assert frame_item["parent_video"] == str(f.src / "clip.mp4")
+    assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
+    # The video being extracted when the app quit is extracted again.
+    assert not gui["items"].get(str(v2), {}).get("extracted_frames")
+
+
+def _extraction_waiting_for_cancel(f, monkeypatch):
+    """Start a run whose only video extracts until the run is cancelled."""
+    _, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    return calls
+
+
+def test_cancelled_close_shows_the_batchs_own_window(frame, monkeypatch):
+    """#346: the cancelled close built a new progress window with no Stage
+    row; the batch's window was only hidden and still has it."""
+    f = frame
+    _extraction_waiting_for_cancel(f, monkeypatch)
+    original = f.batch_progress_dialog
+    assert original is not None
+    _veto_close(f, monkeypatch)
+    assert f.batch_progress_dialog is original
+    assert original.IsShown()
+    rows = [original.stats_list.GetString(i)
+            for i in range(original.stats_list.GetCount())]
+    assert any(r.startswith("Stage:") for r in rows), rows
+    assert any("Stopping" in r for r in rows), rows
+    assert _pump_until(lambda: f._run_cancel is None)
+
+
+def test_close_that_cannot_be_vetoed_does_not_become_a_stop(frame, monkeypatch):
+    """#346: at shutdown Cancel can't keep the app open. Converting the run
+    into a Stop opened a window and a save, then destroyed the frame under
+    them."""
+    f = frame
+    _extraction_waiting_for_cancel(f, monkeypatch)
+    destroyed, saves, stops = [], [], []
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: False)
+    monkeypatch.setattr(f, "Destroy", lambda: destroyed.append(1))
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: saves.append(1))
+    monkeypatch.setattr(f, "_stop_preparing_run", lambda: stops.append(1))
+    f.on_close(SimpleNamespace(CanVeto=lambda: False, Veto=lambda: None))
+    assert destroyed == [1]
+    assert stops == [] and saves == []
+    assert f.batch_progress_dialog is None
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f.infos == []
+
+
 def test_cancelling_the_close_leaves_later_stops_working(frame, monkeypatch):
     """A closing flag that outlived the cancelled close silenced every later
     Stop for the rest of the session (fifth reviewer of PR 343)."""
