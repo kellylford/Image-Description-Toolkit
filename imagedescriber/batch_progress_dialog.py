@@ -26,6 +26,13 @@ STOPPING_PREFIX = "Stopping:"
 STOPPING_LINE = f"{STOPPING_PREFIX} finishing the current video or save…"
 
 
+def _row_label(row: str) -> str:
+    """A stats row's label ("Items Processed" in "Items Processed:   3 / 9"),
+    or the whole row when it has none (separators, "Token Usage")."""
+    label, sep, _ = row.partition(":")
+    return label.strip() if sep else row
+
+
 def _is_stopping_row(row: str) -> bool:
     """The Stopping row, as mark_stopping appends it or a rebuild shows it.
     Matched on the whole line, not "Stopping:" anywhere, so a file name or a
@@ -80,6 +87,12 @@ class BatchProgressDialog(wx.Dialog):
         self.stage_index = 0
         self.stage_count = 0
         self.separator_indices = set()
+        # Frame extraction running alongside describing (#344): its own row,
+        # so the describe counts never overwrite it. None when not extracting.
+        self._extraction = None
+        # The last update_progress arguments, so an extraction tick can
+        # rebuild the list without losing the describe progress.
+        self._last_progress = None
 
         # Create UI
         self._create_ui()
@@ -196,17 +209,57 @@ class BatchProgressDialog(wx.Dialog):
         self.pause_button.Enable(can_interrupt)
         self.stop_button.Enable(can_interrupt if can_stop is None else can_stop)
 
-        # Title carries the stage so screen readers announce the transition
-        # when the dialog is the active window. While stopping, the save that
-        # finishes the stop must not read as the batch's next step.
+        self._set_stage_title()
+        self.update_progress(0, total)
+
+    def _set_stage_title(self):
+        """Title carries the stage so screen readers announce the transition
+        when the dialog is the active window. While stopping, the save that
+        finishes the stop must not read as the batch's next step."""
+        name = self.stage_name
         if self._stopping:
             self.SetTitle(f"{STOPPING_PREFIX} {name.lower()} — Batch Processing")
-        elif stage_index and stage_count:
-            self.SetTitle(f"{name} (step {stage_index} of {stage_count}) — Batch Processing")
+        elif self.stage_index and self.stage_count:
+            self.SetTitle(f"{name} (step {self.stage_index} of {self.stage_count}) — Batch Processing")
         else:
             self.SetTitle(f"{name} — Batch Processing")
 
-        self.update_progress(0, total)
+    # ----- frame extraction alongside describing (#344) ----- #
+
+    def begin_extraction(self, total_videos: int) -> None:
+        """Videos are being extracted while describing runs: show a row for it."""
+        self._extraction = {"done": 0, "total": total_videos, "name": ""}
+        self._rebuild()
+
+    def set_extraction(self, done: int, total: int, name: str = "") -> None:
+        """One more video extracted. Ignored once extraction has ended."""
+        if self._extraction is None:
+            return
+        self._extraction = {"done": done, "total": total, "name": name}
+        self._rebuild()
+
+    def stop_extraction(self) -> None:
+        """Extraction was stopped (Stop, a halt): drop its row so the final
+        stats don't still say videos are being extracted. No title change:
+        whatever ends the batch sets that."""
+        if self._extraction is None:
+            return
+        self._extraction = None
+        self._rebuild()
+
+    def end_extraction(self, stage_name: str = "Describing") -> None:
+        """Extraction finished: drop its row and say so in the title, once,
+        rather than on every tick (each title change is spoken)."""
+        if self._extraction is None:
+            return
+        self._extraction = None
+        self.stage_name = stage_name
+        self._set_stage_title()
+        self._rebuild()
+
+    def _rebuild(self) -> None:
+        if self._last_progress is not None:
+            self.update_progress(**self._last_progress)
 
     def note_failure(self, image_name: str, error: str) -> None:
         """Count a failed image; shown on the next progress update."""
@@ -241,6 +294,11 @@ class BatchProgressDialog(wx.Dialog):
             status_message: Optional status line shown at the top of the list
                 (e.g. "Loading MLX model…"). Cleared automatically when None.
         """
+        self._last_progress = dict(
+            current=current, total=total, file_path=file_path, avg_time=avg_time,
+            image_name=image_name, provider=provider, model=model,
+            last_image=last_image, last_description=last_description,
+            token_stats=token_stats, status_message=status_message)
         # Allow callers to update stored batch settings
         if batch_provider is not None:
             self.batch_provider = batch_provider
@@ -251,6 +309,11 @@ class BatchProgressDialog(wx.Dialog):
 
         # Save selection before clearing so we can restore it after rebuild
         saved_selection = self.stats_list.GetSelection()
+        # Restored by the row's label, not its number: rows come and go above
+        # it (a video finishing, extraction ending, a first failure), and an
+        # index left a screen reader user on a different row (#344 review).
+        saved_label = (_row_label(self.stats_list.GetString(saved_selection))
+                       if saved_selection != wx.NOT_FOUND else None)
         # The stopping line moves (mark_stopping appends it at the end; the
         # rebuild puts it at the top), so follow it by text, not by row.
         on_stopping_line = (
@@ -283,12 +346,21 @@ class BatchProgressDialog(wx.Dialog):
             else:
                 stage_label = self.stage_name
             self.stats_list.Append(f"Stage:                      {stage_label}")
+        # While videos are still being extracted the total grows as each one
+        # finishes; say so rather than let it read as the whole batch.
+        more = "  (more as videos finish)" if self._extraction is not None else ""
         if total > 0:
-            self.stats_list.Append(f"Items Processed:            {current} / {total}")
+            self.stats_list.Append(f"Items Processed:            {current} / {total}{more}")
         else:
             # total == 0 means "unknown length" (e.g. consuming a generator);
             # show a running count rather than a meaningless "N / 0".
-            self.stats_list.Append(f"Items Processed:            {current}")
+            self.stats_list.Append(f"Items Processed:            {current}{more}")
+        if self._extraction is not None:
+            ex = self._extraction
+            self.stats_list.Append(
+                f"Extracting Frames:          {ex['done']:,} of {ex['total']:,} videos")
+            if ex["name"]:
+                self.stats_list.Append(f"Last Video Extracted:       {ex['name']}")
 
         if self.failed_count:
             self.stats_list.Append(f"Failed:                     {self.failed_count}")
@@ -365,9 +437,22 @@ class BatchProgressDialog(wx.Dialog):
             stopping_row = next((i for i in range(count)
                                  if _is_stopping_row(self.stats_list.GetString(i))),
                                 wx.NOT_FOUND)
+        label_row = wx.NOT_FOUND
+        if (stopping_row == wx.NOT_FOUND and saved_label
+                and saved_selection not in self.separator_indices):
+            same = [i for i in range(count)
+                    if i not in self.separator_indices
+                    and _row_label(self.stats_list.GetString(i)) == saved_label]
+            if same:
+                # Rows can share a label (two status lines); take the one
+                # nearest where the reader was.
+                label_row = min(same, key=lambda i: abs(i - saved_selection))
         if stopping_row != wx.NOT_FOUND:
             self.stats_list.SetSelection(stopping_row)
             self.stats_list.EnsureVisible(stopping_row)
+        elif label_row != wx.NOT_FOUND:
+            self.stats_list.SetSelection(label_row)
+            self.stats_list.EnsureVisible(label_row)
         elif saved_selection != wx.NOT_FOUND and count > 0:
             idx = min(saved_selection, count - 1)
             # Scan forward past any separator, then backward if still on one
@@ -455,6 +540,9 @@ class BatchProgressDialog(wx.Dialog):
         Changes Pause→disabled, Stop→Close, updates title to show completion.
         """
         self._is_complete = True
+        # Late extraction ticks must not rebuild the list over the summary.
+        self._extraction = None
+        self._last_progress = None
 
         # Append completion notice to the live stats list
         self.stats_list.Append(SEP_LINE)

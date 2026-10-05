@@ -3929,21 +3929,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _extract_then_launch(self, videos_to_extract: list, images: list,
                              options: dict, skip_existing: bool):
-        """Extract frames from videos on a worker thread, then describe everything.
+        """Describe the images while frames are extracted from the videos (#344).
 
-        Shared by Process All and the folder batch. Extracting first and then
-        handing one queue to the describe batch mirrors the CLI (scan → extract →
-        describe) and avoids the old VideoProcessingWorker event chain that
-        silently skipped frames.
+        Shared by Process All, the folder batch and resuming a halted batch.
+        The run saves the workspace, then starts describing the images straight
+        away while a thread extracts the videos one at a time. Each video's
+        frames join the describe queue as soon as it finishes, so a library
+        with a thousand videos no longer describes nothing for half an hour.
 
-        Stop during extraction sets the run's cancel event: the thread stops at
-        the next frame, videos already finished keep their frames, the one in
-        progress is discarded so the next run extracts it again, and describing
-        never starts. Until the thread has actually ended the run still counts as
-        busy (see _batch_busy_message), so a new run cannot start a second
-        extraction into the same folder — extraction clears a video's folder
-        first, which deleted frames the first run was about to describe.
+        Stop at any point sets the run's cancel event: extraction stops at the
+        next frame, videos already finished keep their frames (each one was
+        checkpointed as it finished), the one in progress is extracted again
+        next time. Until the extraction thread has ended the run counts as busy
+        (see _batch_busy_message), so a new run cannot start a second
+        extraction into the same folders, which deleted frames under the first.
         """
+        # Frames left from an earlier, interrupted extraction of one of these
+        # videos (frame items, but the video has no extracted_frames): its
+        # extraction clears that folder, so describing them alongside would
+        # hit "file not found". They come back with the new extraction.
+        reextracting = set(videos_to_extract)
+        images = [p for p in images
+                  if getattr(self.workspace.items.get(p), 'parent_video', None)
+                  not in reextracting]
         cancel = self._begin_run()
         try:
             extraction_config = self._load_video_extraction_config()
@@ -3953,15 +3961,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             derived, frame_plans = self._plan_frames_dirs(videos_to_extract)
             frame_dirs = {}
             failed_videos = []   # (name, reason); filled on the thread
-
-            # Three stages when there are videos: extract → save → describe.
-            self._ensure_progress_dialog(options, 3)
-            # Stop (not Pause) applies: it cancels the run before describing.
-            self._begin_stage("Extracting frames", len(videos_to_extract), can_stop=True)
+            # What this run has put in the describe queue (main thread only).
+            queued = set(images)
+            # Two stages: save, then describe with extraction alongside.
+            self._ensure_progress_dialog(options, 2)
         except Exception as exc:
             self._abort_run(cancel, exc)
             return
-        logger.info(f"Starting sync video extraction: {len(videos_to_extract)} videos")
+        logger.info(f"Starting pipelined batch: {len(images)} image(s) to describe, "
+                    f"{len(videos_to_extract)} video(s) to extract")
 
         def _do_all_extractions():
             results = []
@@ -3979,9 +3987,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         logger.info(f"Extracted {len(frames)} frame(s) from {Path(vp).name}")
                         results.append((vp, frames, meta or {}))
                         if frames:
-                            # Recorded and checkpointed now, not when the whole
-                            # extraction ends: quitting partway used to lose
-                            # every finished video (#345).
+                            # Recorded, checkpointed and queued for describing
+                            # now, not when the whole extraction ends (#344,
+                            # #345).
                             wx.CallAfter(_record_video, vp, frames, meta or {})
                     except ExtractionCancelled:
                         logger.info(f"Extraction of {Path(vp).name} stopped partway; "
@@ -3990,10 +3998,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     except Exception as exc:
                         logger.warning(f"Frame extraction failed for {Path(vp).name}: {exc}")
                         results.append((vp, [], {}))
-                        failed_videos.append((Path(vp).name, str(exc) or type(exc).__name__))
-                    # Report after each video — extraction of a single long video
-                    # can take minutes, so this is the only feedback available.
-                    self._stage_progress(idx, total_vids, Path(vp).name)
+                        reason = str(exc) or type(exc).__name__
+                        failed_videos.append((Path(vp).name, reason))
+                        wx.CallAfter(_video_failed, Path(vp).name, reason)
+                    # Report after each video: extracting a single long video
+                    # can take minutes.
+                    self._extraction_progress(idx, total_vids, Path(vp).name)
             finally:
                 # Always hand back, or the run would stay "busy" for good.
                 wx.CallAfter(_after_extraction, results)
@@ -4013,6 +4023,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     fi.subfolder = frame_sub
                     self.workspace.add_item(fi)
 
+        def _queue_frames(frames):
+            """Mark a video's frames pending in this run's batch. Returns them.
+
+            Only while the batch_state is still this run's: Stop and a finished
+            batch clear it, and their frames must not come back as a batch to
+            resume. A halted batch keeps it, so a video finishing as it halted
+            is described when the batch is resumed.
+            """
+            state = getattr(cancel, 'state', None)
+            if state is None or self.workspace.batch_state is not state:
+                return []
+            new = []
+            for fp in frames:
+                fi = self.workspace.items.get(fp)
+                if fp in queued or fi is None:
+                    continue
+                if skip_existing and fi.descriptions:
+                    continue
+                fi.processing_state = "pending"
+                fi.batch_queue_position = state.get('total_queued', 0) + len(new)
+                queued.add(fp)
+                new.append(fp)
+            state['total_queued'] = state.get('total_queued', 0) + len(new)
+            return new
+
         def _record_video(vp, frames, meta):
             # Main thread, one video at a time while extraction carries on.
             # The checkpoint writer saves the frames, then the video (whose
@@ -4029,15 +4064,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 return
             try:
                 _apply_video(vp, frames, meta)
+                new = [] if closing else _queue_frames(frames)
                 for fp in frames:
                     self._checkpoint_item(fp)
                 self._checkpoint_item(vp)
                 if closing:
                     self._checkpointer.flush(10)
-                else:
-                    self.mark_modified()
+                    return
+                self.mark_modified()
+                worker = getattr(cancel, 'worker', None)
+                if new and worker is not None and not cancel.is_set():
+                    worker.add_files(new)
             except Exception as exc:
                 logger.warning(f"Could not record frames of {Path(vp).name}: {exc}")
+
+        def _video_failed(name, reason):
+            # Counted in the progress window as it happens, like a failed
+            # image, and reported with the image failures at the end.
+            if self._run_cancel is not cancel:
+                return
+            self._batch_video_failures.append((name, reason))
+            dlg = self.batch_progress_dialog
+            if dlg:
+                dlg.note_failure(name, reason)
 
         def _after_extraction(results):
             if self._window_closing or not self or self.IsBeingDeleted():
@@ -4045,16 +4094,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             try:
                 _finish_extraction(results)
             except Exception as exc:
-                self._abort_run(cancel, exc)
+                worker = getattr(cancel, 'worker', None)
+                if worker is None or not getattr(cancel, 'describing', False):
+                    self._abort_run(cancel, exc)
+                    return
+                # Describing is running: it was not a failed start. Let it
+                # finish what it has, in its own window, and say what failed.
+                logger.error(f"Finishing frame extraction failed: {exc}", exc_info=exc)
+                self._end_run(cancel)
+                worker.close_queue()
+                dlg = self.batch_progress_dialog
+                if dlg:
+                    dlg.stop_extraction()
+                if cancel.is_set() or not worker.is_alive():
+                    show_warning(self, f"Frame extraction could not finish.\n\n{exc}")
+                else:
+                    show_warning(self, "Frame extraction could not finish; describing "
+                                       f"continues with the frames already extracted.\n\n{exc}")
 
         def _finish_extraction(results):
-            # The progress window counts failed videos like failed images,
-            # rather than them vanishing into the log.
-            dlg = self.batch_progress_dialog
-            for name, reason in failed_videos:
-                if dlg:
-                    dlg.note_failure(name, reason)
-            to_process = list(images)
+            worker = getattr(cancel, 'worker', None)
             vid_count = 0
             frame_count = 0
             for vp, frames, meta in results:
@@ -4067,10 +4126,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Already done by _record_video (queued before this hand-back);
                 # repeated so a frame is never left out of the describe queue.
                 _apply_video(vp, frames, meta)
-                for fp in frames:
-                    fi = self.workspace.items.get(fp)
-                    if fi and (not skip_existing or not fi.descriptions):
-                        to_process.append(fp)
+                new = _queue_frames(frames)
+                if new and worker is not None and not cancel.is_set():
+                    worker.add_files(new)
 
             if results:
                 # The frames are checkpointed, but the tree and other state
@@ -4078,40 +4136,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self.mark_modified()
 
             if cancel.is_set():
-                # Stopped: keep the videos that finished, describe nothing.
-                logger.info(f"Run stopped during extraction; kept frames of {vid_count} video(s)")
+                # Stopped, halted, or the batch ended some other way. Whoever
+                # stopped it has said so (cancel.announced) unless the run was
+                # stopped from its progress window before describing started.
+                logger.info(f"Extraction stopped; kept frames of {vid_count} video(s)")
+                if self.batch_progress_dialog:
+                    self.batch_progress_dialog.stop_extraction()
+                announced = getattr(cancel, 'announced', False)
                 try:
-                    # Saved off the main thread with a progress window. Not
-                    # while the app is closing: that save would run inside the
-                    # "save changes?" question and write edits the user may be
-                    # about to discard. The finished videos are kept anyway:
+                    # Not while the app is closing: that save would run inside
+                    # the "save changes?" question and write edits the user may
+                    # be about to discard. The finished videos are kept anyway:
                     # _record_video checkpointed each one as it finished, and
                     # on_close waits for those writes.
-                    if results and not _closing(cancel):
+                    if results and not announced and not _closing(cancel):
                         self._save_bundle_with_progress()
                 finally:
                     self._end_run(cancel)
-                if not _closing(cancel):
-                    self._announce_stopped_before_describing()
+                if not announced and not _closing(cancel):
+                    self._announce_stopped_before_describing(
+                        described=getattr(cancel, 'describing', False))
                 return
 
-            if not to_process and frame_count == 0 and (failed_videos or results):
-                # Nothing to describe because no video gave frames. Without
-                # this the run ended with "All images already have descriptions."
-                self._end_run(cancel)
-                self._close_progress_dialog()
-                if failed_videos:
-                    name, reason = failed_videos[0]
-                    detail = f"\n\nFirst failure: {name}: {reason}"
-                else:
-                    detail = ""
-                show_warning(
-                    self,
-                    f"No frames could be extracted from {len(results)} video(s), "
-                    f"so there was nothing to describe.{detail}")
-                self.image_list.SetFocus()
-                return
-
+            self._end_run(cancel)
             preamble = (
                 f"Video extraction: {vid_count} video(s) → {frame_count} frame(s)"
                 if frame_count else None
@@ -4119,12 +4166,65 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if failed_videos:
                 note = f"{len(failed_videos)} video(s) could not be extracted (see the log)"
                 preamble = f"{preamble}; {note}" if preamble else f"Video extraction: {note}"
-            self._launch_batch(to_process, options, skip_existing, video_preamble=preamble,
-                               video_failures=failed_videos)
+            dlg = self.batch_progress_dialog
+            if dlg:
+                dlg.end_extraction("Describing")
 
-        # Kept on the run so on_close can wait for it (_wait_for_extraction).
-        cancel.thread = threading.Thread(target=_do_all_extractions, daemon=True)
-        cancel.thread.start()
+            if worker is not None and worker.queued_count() == 0:
+                # Nothing to describe: no images, and no video gave new frames.
+                # The idle worker is let go quietly (its completion takes the
+                # stopped-worker branch) and the run says why instead of
+                # "Batch complete" for nothing.
+                self._stopping_worker = worker
+                self.batch_worker = None
+                worker.close_queue()
+                self._reset_stopped_run_state()
+                self._close_progress_dialog()
+                # The save stage and the frame checkpoints wrote this batch's
+                # batch_state; without a save it stays on disk and reopening
+                # offers to resume a batch that had nothing to describe.
+                self._flush_checkpoints()
+                self._save_bundle_with_progress()
+                self.refresh_image_list()
+                if frame_count == 0 and failed_videos:
+                    name, reason = failed_videos[0]
+                    show_warning(
+                        self,
+                        f"No frames could be extracted from {len(results)} video(s), "
+                        f"so there was nothing to describe.\n\nFirst failure: "
+                        f"{name}: {reason}")
+                else:
+                    show_info(self, "All images already have descriptions.")
+                self.image_list.SetFocus()
+                return
+
+            if worker is not None:
+                worker.close_queue(note=preamble)
+
+        def _start_extraction():
+            # Called once describing has started (after the save stage).
+            dlg = self.batch_progress_dialog
+            if dlg:
+                dlg.begin_extraction(len(videos_to_extract))
+            # Kept on the run so on_close can wait for it (_wait_for_extraction).
+            cancel.thread = threading.Thread(target=_do_all_extractions, daemon=True)
+            cancel.thread.start()
+
+        self._launch_batch(images, options, skip_existing,
+                           extraction=_start_extraction,
+                           extraction_videos=list(videos_to_extract))
+
+    def _extraction_progress(self, done: int, total: int, name: str = "") -> None:
+        """Extraction progress, alongside describing. Safe from any thread;
+        repaints at most ~8 times a second, always on the last video."""
+        now = time.time()
+        is_final = total > 0 and done >= total
+        if not is_final and (now - getattr(self, '_extraction_last_paint', 0.0)) < 0.125:
+            return
+        self._extraction_last_paint = now
+        dlg = self.batch_progress_dialog
+        if dlg:
+            wx.CallAfter(dlg.set_extraction, done, total, name)
 
     def _check_mlx_model_ready(self, provider: str, model: str) -> bool:
         """Check if an MLX model is ready to use; warn the user if not yet downloaded.
@@ -4457,14 +4557,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Stopping window, so its title changes went unspoken. The run's end
         # refreshes (_announce_stopped_before_describing).
 
-    def _announce_stopped_before_describing(self) -> None:
-        """Tell the user a batch stopped before describing, once it really has."""
+    def _announce_stopped_before_describing(self, described: bool = False) -> None:
+        """Tell the user a batch stopped, once it really has."""
         self._close_progress_dialog()
         self.refresh_image_list()
         self.SetStatusText("Batch processing stopped", 0)
-        show_info(self, "Batch processing stopped before describing started.\n\n"
-                        "Videos whose frames were fully extracted keep them; any "
-                        "video still being extracted will be extracted again next time.")
+        first = ("Batch processing stopped.\n\nCompleted descriptions have been saved. "
+                 if described else
+                 "Batch processing stopped before describing started.\n\n")
+        show_info(self, first + "Videos whose frames were fully extracted keep them; "
+                        "any video still being extracted will be extracted again next time.")
         self.image_list.SetFocus()
 
     def _close_progress_dialog(self):
@@ -4612,11 +4714,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         return state.get('value')
 
     def _launch_batch(self, to_process: list, options: dict, skip_existing: bool,
-                      video_preamble: str = None, video_failures: list = None):
+                      video_preamble: str = None, video_failures: list = None,
+                      extraction=None, extraction_videos: Optional[list] = None):
         """Start a batch image-processing run.
 
-        Single entry point for all batch starts — called from on_process_all
-        for both the no-video path and after synchronous video extraction finishes.
+        Single entry point for all batch starts. With `extraction` (from
+        _extract_then_launch), describing starts with `to_process` and its
+        queue stays open: extraction() is called once describing has started,
+        and adds each video's frames as it finishes.
         """
         # Continues the run extraction began, or starts one. The run stays
         # "preparing" (Stop cancels it, new runs are refused) until the describe
@@ -4625,7 +4730,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         cancel = self._begin_run()
         try:
             self._launch_batch_impl(cancel, to_process, options, skip_existing,
-                                    video_preamble, video_failures)
+                                    video_preamble, video_failures,
+                                    extraction, extraction_videos)
         except Exception as exc:
             self._abort_run(cancel, exc)
 
@@ -4678,9 +4784,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _launch_batch_impl(self, cancel: threading.Event, to_process: list,
                            options: dict, skip_existing: bool, video_preamble,
-                           video_failures=None):
+                           video_failures=None, extraction=None,
+                           extraction_videos=None):
         """Body of _launch_batch; see there."""
-        if not to_process:
+        if not to_process and extraction is None:
             self._end_run(cancel)
             # The progress dialog may already be open from an earlier stage
             # (e.g. video extraction produced no new frames) — close it before
@@ -4724,6 +4831,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             "total_queued": len(to_process),
             "started": datetime.now().isoformat(),
         }
+        if extraction_videos:
+            # Resume extracts whichever of these still have no frames.
+            self.workspace.batch_state["videos"] = list(extraction_videos)
+        # The run's own batch_state: frames are queued into it only while it
+        # is still the workspace's (Stop and completion clear it).
+        cancel.state = self.workspace.batch_state
 
         worker = BatchProcessingWorker(
             self,
@@ -4739,8 +4852,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             logs_dir=self._workspace_logs_dir(),
             video_preamble=video_preamble,
             embed_after_process=options.get('embed_after_process', False),
+            queue_open=extraction is not None,
         )
         self.batch_worker = worker
+        cancel.worker = worker
         self.batch_start_time = time.time()
         self.batch_processing_times = []
 
@@ -4769,13 +4884,32 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if not _closing(cancel):
                         self._announce_stopped_before_describing()
                     return
-                self._end_run(cancel)
                 self._preparing_queue = self._preparing_state = None
-                self._begin_stage("Describing", len(to_process), can_interrupt=True)
+                if extraction is None:
+                    self._end_run(cancel)
+                    self._begin_stage("Describing", len(to_process), can_interrupt=True)
+                else:
+                    # The run stays busy until extraction ends; Stop stops both.
+                    self._begin_stage("Describing and extracting frames",
+                                      len(to_process), can_interrupt=True)
                 worker.start()
-                self.SetStatusText(f"Processing {len(to_process)} images…", 0)
+                cancel.describing = True
+                if extraction is not None:
+                    extraction()
+                    self.SetStatusText(
+                        f"Describing {len(to_process)} images while extracting frames "
+                        f"from {len(extraction_videos or ())} videos…", 0)
+                else:
+                    self.SetStatusText(f"Processing {len(to_process)} images…", 0)
             except Exception as exc:
+                # Started but its extraction couldn't: an open queue would
+                # wait for frames forever and keep every later run refused.
+                if worker.is_alive():
+                    worker.stop()
+                    self._stopping_worker = worker
                 self._abort_run(cancel, exc)
+                if self.batch_worker is worker:
+                    self.batch_worker = None
 
         # Save the workspace before describing starts. This writes a sidecar per
         # item, so it is done on a worker thread reporting into the progress
@@ -5999,7 +6133,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Update title bar to show progress
             progress_percent = int(event.current * 100 / event.total) if event.total > 0 else 0
             doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
-            self.SetTitle(f"{progress_percent}%, {event.current} of {event.total} - ImageDescriber - {doc_name}")
+            if getattr(event, 'more_coming', False):
+                # The total grows as videos finish extracting (#344); a
+                # percentage of it would read 100% with hundreds to come.
+                self.SetTitle(f"{event.current} of {event.total} so far, extracting videos"
+                              f" - ImageDescriber - {doc_name}")
+            else:
+                self.SetTitle(f"{progress_percent}%, {event.current} of {event.total}"
+                              f" - ImageDescriber - {doc_name}")
 
             # DIAGNOSTIC: Log every 10th image for performance monitoring
             if event.current % 10 == 0:
@@ -6022,7 +6163,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # Phase 3: Track processing time for this image
             if self.batch_start_time:
-                elapsed = time.time() - self.batch_start_time
+                elapsed = max(0.0, time.time() - self.batch_start_time
+                              - getattr(event, 'waited', 0.0))
                 self.batch_processing_times.append(elapsed)
                 self.batch_start_time = time.time()  # Reset for next image
 
@@ -6353,6 +6495,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if source is not self.batch_worker:
                 logger.warning(f"Ignoring completion from a batch that is no longer current ({event.input_dir})")
                 return
+            # Still extracting frames for it (#344): it halted, or was stopped
+            # from outside (Stop All Processing, closing). Extraction can't
+            # feed a finished batch, so stop it and wait for the thread, so a
+            # video finishing just now is recorded (and, for a halted batch,
+            # queued for the resume) before the resume question below.
+            run = self._pipeline_run_of(source)
+            if run is not None and getattr(run, 'closing', False):
+                # The close stopped it (its last image just finished while
+                # "save changes?" is open). Not "Batch complete", and no save
+                # inside the question: quitting writes what's done, and a
+                # cancelled close turns this into a Stop that says so.
+                logger.info(f"Batch stopped by closing finished its last image ({event.input_dir})")
+                run.set()
+                self._flush_checkpoints()
+                return
+            if run is not None:
+                run.announced = True
+                run.set()
+                # Usually a frame; longer if a network share is slow to let
+                # go of a video. Say so rather than wait in silence.
+                self.SetStatusText("Stopping frame extraction…", 0)
+                dlg = self.batch_progress_dialog
+                if dlg:
+                    dlg.stop_extraction()
+                self._wait_for_extraction(run, timeout=30.0)
 
         # Check if this is a download completion
         if not is_batch and hasattr(event, 'step_name') and event.step_name == "download":
@@ -6949,9 +7116,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.batch_progress:
             current = self.batch_progress['current']
             total = self.batch_progress['total']
-            percentage = int((current / total) * 100)
             doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
-            self.SetTitle(f"(Paused) {percentage}%, {current} of {total} - ImageDescriber - {doc_name}")
+            if getattr(self.batch_worker, 'queue_open', False):
+                self.SetTitle(f"(Paused) {current} of {total} so far, extracting videos"
+                              f" - ImageDescriber - {doc_name}")
+            else:
+                percentage = int((current / total) * 100) if total else 0
+                self.SetTitle(f"(Paused) {percentage}%, {current} of {total}"
+                              f" - ImageDescriber - {doc_name}")
 
         # Mark current item as paused
         if self.batch_progress and self.batch_progress.get('file_path'):
@@ -7144,6 +7316,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if not self.batch_worker:
             return
 
+        # Describing alongside frame extraction (#344): stop that too. This
+        # Stop says the batch stopped, so the run's end doesn't say it again.
+        extracting = self._pipeline_run_of(self.batch_worker) is not None
+        if extracting:
+            run = self._run_cancel
+            run.announced = True
+            run.set()
+
         # Call worker stop. It finishes the image in flight and then posts a
         # completion event; until then new runs are refused (_batch_busy_message).
         self.batch_worker.stop()
@@ -7187,11 +7367,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.update_window_title("ImageDescriber", doc_name)
 
         self.SetStatusText("Batch processing stopped", 0)
-        show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved.")
+        show_info(self, "Batch processing stopped.\n\nCompleted descriptions have been saved."
+                  + (" Videos whose frames were fully extracted keep them; any video "
+                     "still being extracted will be extracted again next time."
+                     if extracting else ""))
         # Restore focus to image list after dialog
         self._batch_active = False
         self.refresh_image_list()
         self.image_list.SetFocus()
+
+    def _pipeline_run_of(self, worker):
+        """The run still extracting frames for this describe worker, or None."""
+        run = self._run_cancel
+        if run is not None and worker is not None and getattr(run, 'worker', None) is worker:
+            return run
+        return None
+
+    def _unextracted_batch_videos(self, batch_state) -> list:
+        """The batch's videos that still have no frames (#344): a halted
+        batch's resume extracts them."""
+        videos = []
+        for vp in (batch_state or {}).get('videos') or ():
+            item = self.workspace.items.get(vp)
+            if item is not None and item.item_type == "video" and not item.extracted_frames:
+                videos.append(vp)
+        return videos
 
     # Phase 4: Resume functionality
     def prompt_resume_batch(self):
@@ -7204,18 +7404,27 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if item.processing_state in ["pending", "paused"]
         ]
 
-        if not pending_items:
+        videos = self._unextracted_batch_videos(batch_state)
+        if not pending_items and not videos:
             # No items to resume - clear stale batch state
             self.workspace.batch_state = None
             return
 
         total = batch_state.get('total_queued', len(pending_items))
-        completed = total - len(pending_items)
+        completed = max(0, total - len(pending_items))
+
+        def count(n, word):
+            return f"{n} {word}" + ("" if n == 1 else "s")
+        remaining = count(len(pending_items), "image")
+        if videos:
+            remaining += f", and {count(len(videos), 'video')} to extract frames from"
+        progress = (f"Progress: {completed} of {count(total, 'image')} completed\n"
+                    if total else "")
 
         message = (
             f"Resume batch processing?\n\n"
-            f"Progress: {completed} of {total} images completed\n"
-            f"Remaining: {len(pending_items)} images\n\n"
+            f"{progress}"
+            f"Remaining: {remaining}\n\n"
             f"Provider: {batch_state.get('provider', 'Unknown')}\n"
             f"Model: {batch_state.get('model', 'Unknown')}\n"
             f"Prompt: {batch_state.get('prompt_style', 'Unknown')}"
@@ -7255,10 +7464,26 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Extract file paths
         file_paths = [item.file_path for item in to_process_items]
+        videos = self._unextracted_batch_videos(batch_state)
 
-        if not file_paths:
+        if not file_paths and not videos:
             show_info(self, "No images to resume processing.")
             self.workspace.batch_state = None
+            return
+
+        if videos:
+            # A batch that halted while extracting (#344): resume it the same
+            # way, describing while the rest of its videos are extracted.
+            options = {
+                'provider': batch_state['provider'],
+                'model': batch_state['model'],
+                'prompt_style': batch_state.get('prompt_style', 'default'),
+                'custom_prompt': batch_state.get('custom_prompt') or '',
+                'geocode_enabled': batch_state.get('geocode_enabled', False),
+                'embed_after_process': batch_state.get('embed_after_process', False),
+            }
+            self._reset_batch_failures()
+            self._extract_then_launch(videos, file_paths, options, skip_existing=True)
             return
 
         # Recreate processing options from batch state
@@ -9618,6 +9843,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # of the session.
             if closing_run is not None:
                 closing_run.closing = False
+                run_worker = getattr(closing_run, 'worker', None)
+                if getattr(closing_run, 'describing', False):
+                    # Describing alongside extraction (#344): the close
+                    # stopped its worker, which may still be on its last
+                    # image. That is a Stop of a describing batch: the
+                    # stopping worker stays tracked (no second run can start
+                    # and describe the same image), and the message says
+                    # descriptions were kept, not "before describing".
+                    if closed_dialog and closed_dialog is not self.batch_progress_dialog:
+                        closed_dialog.Destroy()
+                    if run_worker is not None and self.batch_worker is run_worker:
+                        self.on_stop_batch()
+                    elif not getattr(closing_run, 'announced', False):
+                        # Its completion was never handled; nothing else
+                        # will say the batch stopped.
+                        closing_run.announced = True
+                        self._reset_stopped_run_state()
+                        self._flush_checkpoints()
+                        self._save_bundle_with_progress()
+                        self._announce_stopped_before_describing(described=True)
+                    event.Veto()
+                    return
                 if self._run_cancel is closing_run:
                     # Still winding down: a full Stop, in the batch's own
                     # window (the close only hid it), so it keeps its stage

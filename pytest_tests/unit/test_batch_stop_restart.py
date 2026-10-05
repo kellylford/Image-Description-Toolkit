@@ -105,13 +105,29 @@ def _pump_until(cond, timeout=10.0):
 
 
 class _FakeWorker:
-    """Stands in for BatchProcessingWorker; records whether it was started."""
+    """Stands in for BatchProcessingWorker; records whether it was started,
+    and what was queued for describing (#344: frames join an open queue)."""
     instances = []
 
     def __init__(self, *a, **k):
         self.started = False
         self.stopped = False
+        paths = k.get("file_paths", a[1] if len(a) > 1 else [])
+        self.file_paths = list(paths or [])
+        self.queue_open = k.get("queue_open", False)
+        self.closing_note = None
         _FakeWorker.instances.append(self)
+
+    def add_files(self, paths):
+        assert self.queue_open, "frames added after the queue was closed"
+        self.file_paths.extend(paths)
+
+    def close_queue(self, note=None):
+        self.queue_open = False
+        self.closing_note = note
+
+    def queued_count(self):
+        return len(self.file_paths)
 
     def start(self):
         self.started = True
@@ -176,6 +192,13 @@ def frame(_frame, tmp_path, monkeypatch):
         f._close_progress_dialog()
 
 
+def _extracting(f):
+    """The run's extraction thread has started. Since #344 it starts once
+    describing has, after the save stage, not as the run begins."""
+    run = f._run_cancel
+    return run is not None and getattr(run, "thread", None) is not None
+
+
 def _slow_extraction(monkeypatch, f, frames_when_done):
     """Extraction that runs until cancelled (a long video), or until released."""
     release = threading.Event()
@@ -203,7 +226,10 @@ def test_stop_during_extraction_stops_the_run(frame, monkeypatch):
 
     f.on_stop_batch()
     assert _pump_until(lambda: f._run_cancel is None), "extraction thread never ended"
-    assert _FakeWorker.instances == [], "describing was set up after Stop"
+    # Describing ran alongside extraction (#344); Stop stopped both.
+    worker = _FakeWorker.instances[0]
+    assert worker.started and worker.stopped
+    assert worker.file_paths == [str(f.src / "a.jpg")], "frames queued after Stop"
     # The half-extracted video is not recorded as done: next run re-extracts it.
     assert not f.workspace.items[vid].extracted_frames
     assert f.workspace.batch_state is None
@@ -220,15 +246,17 @@ def test_second_run_refused_while_extracting(frame, monkeypatch):
     assert len(calls) == 1, "a second extraction of the same video started"
     assert any("already running" in m for m in f.infos)
 
-    # After Stop and before the run has ended, still refused. The run can only
-    # end in a CallAfter, so with no event pumping in between it is still on.
+    # After Stop and before the batch has wound down, still refused: the
+    # describe worker finishes the image in flight first.
+    worker = _FakeWorker.instances[0]
+    worker.is_alive = lambda: True        # still on its last image
     f.on_stop_batch()
-    assert f._run_cancel is not None
     f.infos.clear()
     f.on_process_all(None, skip_existing=True, preset_options=OPTIONS)
     assert len(calls) == 1
     assert any("still finishing" in m for m in f.infos)
     assert _pump_until(lambda: f._run_cancel is None)
+    worker.is_alive = lambda: False
 
 
 def test_finished_videos_keep_frames_when_stopped_later(frame, monkeypatch, tmp_path):
@@ -359,7 +387,7 @@ def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch):
 
     vids = [str(f.src / "clip.mp4"), str(v2)]
     f._extract_then_launch(vids, [], OPTIONS, True)
-    assert _pump_until(lambda: _FakeWorker.instances)
+    assert _pump_until(lambda: f._run_cancel is None)
     assert len(claimed_on) == 2
     assert threading.main_thread() not in claimed_on
     # Same folders as the main-thread path chooses, and the frames recorded
@@ -392,9 +420,11 @@ def test_video_whose_folder_cannot_be_claimed_is_skipped(frame, monkeypatch):
     monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
 
     f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
-    assert _pump_until(lambda: _FakeWorker.instances), "describing never started"
+    assert _pump_until(lambda: f._run_cancel is None)
     assert not f.workspace.items[str(f.src / "clip.mp4")].extracted_frames
     assert len(f.workspace.items[str(v2)].extracted_frames) == 1
+    # The other video's frame still reached describing.
+    assert _FakeWorker.instances[0].file_paths == f.workspace.items[str(v2)].extracted_frames
 
 
 def test_unique_video_keeps_plain_folder_name(frame):
@@ -443,9 +473,9 @@ def test_persisted_frames_resolve_after_reopen(frame, tmp_path):
 # --------------------------------------------------------------------------- #
 
 def test_stop_button_enabled_while_extracting(frame, monkeypatch):
-    """Stop must be reachable from the progress window in the extract stage
-    (it was disabled there, so the new stop path could only be reached from
-    the menu)."""
+    """Stop must be reachable from the progress window while frames are
+    extracted. Since #344 describing runs alongside, so Pause (which pauses
+    describing) applies too."""
     f = frame
     release, calls = _slow_extraction(monkeypatch, f, [])
     f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
@@ -453,7 +483,8 @@ def test_stop_button_enabled_while_extracting(frame, monkeypatch):
     dlg = f.batch_progress_dialog
     assert dlg is not None
     assert dlg.stop_button.IsEnabled()
-    assert not dlg.pause_button.IsEnabled()
+    assert dlg.pause_button.IsEnabled()
+    release.set()
 
 
 def test_failure_before_describing_does_not_leave_app_busy(frame, monkeypatch):
@@ -812,7 +843,11 @@ def test_all_videos_failing_says_so(frame, monkeypatch):
     assert not any("All images already have descriptions" in m for m in f.infos)
     assert f.batch_progress_dialog is None
     assert f._batch_active is False
-    assert _FakeWorker.instances == []
+    # Describing started (idle, waiting for frames) and was let go quietly.
+    worker = _FakeWorker.instances[0]
+    assert not worker.queue_open and worker.file_paths == []
+    assert f.batch_worker is None and f._stopping_worker is worker
+    assert f.workspace.batch_state is None
 
 
 def test_some_videos_failing_are_reported_at_the_end(frame, monkeypatch, tmp_path):
@@ -833,9 +868,11 @@ def test_some_videos_failing_are_reported_at_the_end(frame, monkeypatch, tmp_pat
         return [str(frame_file)], {}
     monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
     f._extract_then_launch([str(f.src / "clip.mp4"), str(good)], [], OPTIONS, True)
-    # Extraction, then the real _launch_batch through its save stage.
-    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    # The real _launch_batch through its save stage, then extraction.
+    assert _pump_until(lambda: f._run_cancel is None)
     assert f._batch_video_failures == [("clip.mp4", "not a video")]
+    assert _FakeWorker.instances[-1].file_paths == [str(frame_file)]
+    assert not _FakeWorker.instances[-1].queue_open
 
     w = _FakeWorker.instances[-1]
     f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
@@ -844,61 +881,45 @@ def test_some_videos_failing_are_reported_at_the_end(frame, monkeypatch, tmp_pat
                for m in f.infos)
 
 
-def test_stop_during_extraction_announces_after_the_save(frame, monkeypatch):
+def test_stop_during_the_save_stage_announces_after_the_save(frame, monkeypatch):
     """The "stopped" message used to appear at once; the save's progress window
     then took focus from it while a screen reader was reading it. The progress
-    window now says it is stopping until the (real) save is done, and the save
-    never reads as the batch's next step."""
+    window says it is stopping until the (real) save is done, and the save
+    never reads as the batch's next step. Since #344 the run saves first and
+    extracts while describing, so this is Stop during that first save."""
     import imagedescriber_wx
-    from data_models import ImageItem
     f = frame
     order = []
-    done_frame = f.src / "clip_0.00s.jpg"
-    done_frame.write_bytes(b"x")
-    v2 = f.src / "clip2.mp4"
-    v2.write_bytes(b"x")
-    f.workspace.add_item(ImageItem(str(v2), "video"))
-    second = []
-
-    def extract(vp, cfg, cancel=None, frames_dir=None):
-        if Path(vp).name == "clip.mp4":
-            return [str(done_frame)], {}
-        second.append(vp)
-        while not cancel.is_set():
-            time.sleep(0.01)
-        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
-    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    gate = threading.Event()
     real_save = f._save_bundle
-    monkeypatch.setattr(f, "_save_bundle",
-                        lambda *a, **k: (order.append("save"), real_save(*a, **k))[1])
+
+    def slow_save(*a, **k):
+        order.append("save")
+        if not gate.is_set():
+            gate.wait(10)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", slow_save)
     monkeypatch.setattr(imagedescriber_wx, "show_info",
                         lambda _p, msg, *a, **k: order.append("message"))
-    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
-    assert _pump_until(lambda: second)
+    extracted = []
+    monkeypatch.setattr(f, "_extract_video_frames_sync",
+                        lambda vp, *a, **k: (extracted.append(vp), ([], {}))[1])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: order == ["save"])
     dlg = f.batch_progress_dialog
-    titles, lists = [], []
+    titles = []
     real_set_title = dlg.SetTitle
-
-    def set_title(t):
-        titles.append(t)
-        real_set_title(t)
-    monkeypatch.setattr(dlg, "SetTitle", set_title)
-    real_update = dlg.update_progress
-
-    def update(*a, **k):
-        real_update(*a, **k)
-        lists.append([dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())])
-    monkeypatch.setattr(dlg, "update_progress", update)
+    monkeypatch.setattr(dlg, "SetTitle", lambda t: (titles.append(t), real_set_title(t)))
 
     f.on_stop_batch()
-    assert order == [], "announced before the run had wound down"
+    assert "message" not in order, "announced before the run had wound down"
+    gate.set()
     assert _pump_until(lambda: f._run_cancel is None)
-    assert order[0] == "save" and order[-1] == "message"
+    assert order[-1] == "message"
     assert titles and all("Stopping" in t for t in titles), titles
-    assert not any("step" in t for t in titles), titles
-    assert lists and all(any("Stopping" in line for line in rows) for rows in lists)
+    assert extracted == [], "extraction started after Stop"
+    assert not _FakeWorker.instances[0].started
     assert f.batch_progress_dialog is None
-
 
 def _veto_close(f, monkeypatch):
     """Run on_close with the user answering Cancel to "save changes?"."""
@@ -1011,6 +1032,7 @@ def test_video_finishing_during_the_save_question_is_written(frame, monkeypatch)
     monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
     _slow_writer(f, monkeypatch)
     f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: _extracting(f))
 
     def question():
         gate.set()                     # the video finishes during the question
@@ -1033,7 +1055,7 @@ def test_video_finishing_after_destroy_is_written(frame, monkeypatch):
     monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
     _slow_writer(f, monkeypatch)
     f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
-    assert _pump_until(lambda: f.batch_progress_dialog is not None)
+    assert _pump_until(lambda: _extracting(f))
 
     destroyed = []
     monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: True)
@@ -1060,7 +1082,7 @@ def test_quit_waits_for_a_video_finishing_as_the_app_closes(frame, monkeypatch):
     gate = threading.Event()
     monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
     f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
-    assert _pump_until(lambda: f.batch_progress_dialog is not None)
+    assert _pump_until(lambda: _extracting(f))
 
     monkeypatch.setattr(f, "confirm_unsaved_changes",
                         lambda: (threading.Timer(0.3, gate.set).start(), True)[1])
@@ -1073,7 +1095,8 @@ def test_quit_waits_for_a_video_finishing_as_the_app_closes(frame, monkeypatch):
 
 
 def test_reapplying_a_recorded_video_adds_nothing_twice(frame, monkeypatch):
-    """_record_video and then _finish_extraction both apply each video."""
+    """_record_video and then _finish_extraction both apply each video; its
+    frames are added, and queued for describing, once."""
     f = frame
     frames = [f.src / "clip_0.00s.jpg", f.src / "clip_5.00s.jpg"]
     for fr in frames:
@@ -1081,18 +1104,15 @@ def test_reapplying_a_recorded_video_adds_nothing_twice(frame, monkeypatch):
     monkeypatch.setattr(f, "_extract_video_frames_sync",
                         lambda vp, cfg, cancel=None, frames_dir=None:
                         ([str(fr) for fr in frames], {}))
-    launched = []
-    monkeypatch.setattr(f, "_launch_batch",
-                        lambda to_process, *a, **k: launched.append(list(to_process)))
     before = len(f.workspace.items)
     f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
-    assert _pump_until(lambda: launched)
-    assert launched[0] == [str(fr) for fr in frames]
+    assert _pump_until(lambda: f._run_cancel is None)
+    worker = _FakeWorker.instances[0]
+    assert worker.file_paths == [str(fr) for fr in frames]
     assert len(f.workspace.items) == before + 2
     assert f.workspace.items[str(f.src / "clip.mp4")].extracted_frames == \
         [str(fr) for fr in frames]
-    f._end_run(f._run_cancel)
-
+    assert f.workspace.batch_state["total_queued"] == 2
 
 def _extraction_waiting_for_cancel(f, monkeypatch):
     """Start a run whose only video extracts until the run is cancelled."""
@@ -1104,9 +1124,22 @@ def _extraction_waiting_for_cancel(f, monkeypatch):
 
 def test_cancelled_close_shows_the_batchs_own_window(frame, monkeypatch):
     """#346: the cancelled close built a new progress window with no Stage
-    row; the batch's window was only hidden and still has it."""
+    row; the batch's window was only hidden and still has it. Since #344 a
+    run is "preparing" only in its save stage (extraction runs alongside
+    describing, where a cancelled close is a plain Stop), so closed there."""
     f = frame
-    _extraction_waiting_for_cancel(f, monkeypatch)
+    gate = threading.Event()
+    real_save = f._save_bundle
+
+    def slow_save(*a, **k):
+        if k.get("progress") is not None and not gate.is_set():
+            gate.wait(10)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", slow_save)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: f.batch_progress_dialog is not None
+                       and "Saving" in f.batch_progress_dialog.GetTitle())
+    threading.Timer(0.5, gate.set).start()
     original = f.batch_progress_dialog
     assert original is not None
     _veto_close(f, monkeypatch)
@@ -1156,7 +1189,7 @@ def test_cancelling_the_close_leaves_later_stops_working(frame, monkeypatch):
     assert _pump_until(lambda: calls)
     _veto_close(f, monkeypatch)            # user chooses Cancel: stays
     assert _pump_until(lambda: f._run_cancel is None)
-    assert any("stopped before describing" in m for m in f.infos), \
+    assert any("Batch processing stopped" in m for m in f.infos), \
         "the run the cancelled close stopped should still say so"
 
     # A later run and Stop still announce.
@@ -1166,7 +1199,7 @@ def test_cancelling_the_close_leaves_later_stops_working(frame, monkeypatch):
     assert _pump_until(lambda: calls)
     f.on_stop_batch()
     assert _pump_until(lambda: f._run_cancel is None)
-    assert any("stopped before describing" in m for m in f.infos)
+    assert any("Batch processing stopped" in m for m in f.infos)
 
 
 def test_scan_finishing_mid_run_keeps_the_runs_window(frame, monkeypatch):
@@ -1468,11 +1501,11 @@ def test_extracted_frames_batch_carries_the_embed_choice(frame, monkeypatch):
 
 def test_completion_event_carries_its_batch():
     """The event the window reads the choice from must carry the batch."""
-    from workers_wx import ProcessingCompleteEventData
+    import workers_wx
     marker = object()
-    evt = ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "", batch=marker)
+    evt = workers_wx.ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "", batch=marker)
     assert evt.batch is marker
-    assert ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "").batch is None
+    assert workers_wx.ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "").batch is None
 
 
 # --------------------------------------------------------------------------- #
@@ -1541,3 +1574,462 @@ def test_marking_stopping_twice_shows_one_stopping_line(_frame, tick_between):
         assert _is_stopping_row(rows[dlg.stats_list.GetSelection()])
     finally:
         dlg.Destroy()
+
+
+# --------------------------------------------------------------------------- #
+# Issue 344: describe while frames are extracted                               #
+# --------------------------------------------------------------------------- #
+
+class _InstantImage(threading.Thread):
+    """Stands in for ProcessingWorker inside the real BatchProcessingWorker."""
+    seen = []
+
+    def __init__(self, parent, file_path, *a, **k):
+        super().__init__(daemon=True)
+        self.file_path = file_path
+        self.result_ok = True
+        self.result_error = None
+        self.result_kind = None
+        self.result_signature = None
+        self.result_input_tokens = self.result_output_tokens = 0
+
+    def run(self):
+        _InstantImage.seen.append(self.file_path)
+
+
+def _real_batch(monkeypatch, paths, queue_open):
+    import workers_wx
+    _InstantImage.seen = []
+    monkeypatch.setattr(workers_wx, "ProcessingWorker", _InstantImage)
+    events = []
+
+    def post(_target, evt):
+        if isinstance(evt, workers_wx.WorkflowCompleteEventData):
+            events.append(evt.input_dir)
+    monkeypatch.setattr(workers_wx.wx, "PostEvent", post)
+    w = workers_wx.BatchProcessingWorker(object(), paths, "ollama", "m", "s",
+                                         queue_open=queue_open)
+    return w, events
+
+
+def test_open_queue_waits_for_more_and_ends_after_close(monkeypatch):
+    w, events = _real_batch(monkeypatch, ["a.jpg"], queue_open=True)
+    w.start()
+    assert _pump_until(lambda: _InstantImage.seen == ["a.jpg"])
+    time.sleep(0.2)
+    assert w.is_alive(), "ended while the queue was still open"
+    w.add_files(["f1.jpg", "f2.jpg"])
+    assert _pump_until(lambda: _InstantImage.seen == ["a.jpg", "f1.jpg", "f2.jpg"])
+    assert w.is_alive()
+    w.close_queue(note="Video extraction: 1 video(s) → 2 frame(s)")
+    w.join(5)
+    assert not w.is_alive()
+    assert events == ["3/3 images"]
+
+
+def test_open_queue_with_nothing_yet_waits_and_stop_wakes_it(monkeypatch):
+    w, events = _real_batch(monkeypatch, [], queue_open=True)
+    w.start()
+    time.sleep(0.2)
+    assert w.is_alive()
+    w.stop()
+    w.join(5)
+    assert not w.is_alive(), "Stop did not wake a worker waiting for frames"
+    assert _InstantImage.seen == []
+
+
+def test_closed_queue_behaves_as_before(monkeypatch):
+    w, events = _real_batch(monkeypatch, ["a.jpg", "b.jpg"], queue_open=False)
+    w.start()
+    w.join(5)
+    assert not w.is_alive()
+    assert _InstantImage.seen == ["a.jpg", "b.jpg"]
+
+
+def test_describing_starts_before_extraction_ends(frame, monkeypatch, tmp_path):
+    """#344: nothing was described until the last video was extracted (half
+    an hour on a large library). The images start at once, and each video's
+    frames are queued as it finishes, while the next one extracts."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    first_frame = tmp_path / "clip_0.00s.jpg"
+    first_frame.write_bytes(b"x")
+    second_frame = tmp_path / "clip2_0.00s.jpg"
+    second_frame.write_bytes(b"x")
+    release = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(first_frame)], {}
+        while not release.is_set():
+            if cancel.is_set():
+                raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+            time.sleep(0.01)
+        return [str(second_frame)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)],
+                           [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[0].started)
+    worker = _FakeWorker.instances[0]
+    assert worker.queue_open
+    # The first video's frame is queued while the second is still extracting.
+    assert _pump_until(lambda: str(first_frame) in worker.file_paths)
+    assert f._run_cancel is not None and worker.queue_open
+    assert f.workspace.items[str(first_frame)].processing_state == "pending"
+    assert f.workspace.batch_state["total_queued"] == 2
+    rows = [f.batch_progress_dialog.stats_list.GetString(i)
+            for i in range(f.batch_progress_dialog.stats_list.GetCount())]
+    assert any(r.startswith("Extracting Frames:") for r in rows), rows
+    assert "extracting frames" in f.batch_progress_dialog.GetTitle().lower()
+
+    release.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert worker.file_paths == [str(f.src / "a.jpg"), str(first_frame), str(second_frame)]
+    assert not worker.queue_open
+    assert "2 video(s) → 2 frame(s)" in worker.closing_note
+    assert f.workspace.batch_state["total_queued"] == 3
+    assert f.workspace.batch_state["videos"] == [str(f.src / "clip.mp4"), str(v2)]
+    title = f.batch_progress_dialog.GetTitle()
+    assert title.startswith("Describing (step 2 of 2)"), title
+
+
+def test_stop_while_describing_and_extracting_queues_nothing_more(frame, monkeypatch, tmp_path):
+    """A video finishing just after Stop keeps its frames (no re-extraction)
+    but they are not queued, marked pending, or offered for resume."""
+    import imagedescriber_wx
+    f = frame
+    late_frame = tmp_path / "clip_0.00s.jpg"
+    late_frame.write_bytes(b"x")
+    stopped = threading.Event()
+    started = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        started.set()
+        assert stopped.wait(10)
+        return [str(late_frame)], {}      # was on its last frame
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(started.is_set)
+    worker = _FakeWorker.instances[0]
+    f.on_stop_batch()
+    stopped.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert worker.stopped
+    assert str(late_frame) not in worker.file_paths
+    assert f.workspace.items[str(f.src / "clip.mp4")].extracted_frames == [str(late_frame)]
+    assert f.workspace.items[str(late_frame)].processing_state is None
+    assert f.workspace.batch_state is None
+    stop_messages = [m for m in f.infos if "Batch processing stopped" in m]
+    assert len(stop_messages) == 1, f.infos
+    assert "extracted again next time" in stop_messages[0]
+
+
+def test_halt_while_extracting_keeps_the_rest_for_resume(frame, monkeypatch, tmp_path):
+    """Signed out while videos were still being extracted: extraction stops
+    too, the batch keeps its batch_state, and resuming extracts the videos
+    it never reached and describes everything left."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    first_frame = tmp_path / "clip_0.00s.jpg"
+    first_frame.write_bytes(b"x")
+    second_started = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(first_frame)], {}
+        second_started.set()
+        while not cancel.is_set():
+            time.sleep(0.01)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)],
+                           [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(second_started.is_set)
+    assert _pump_until(lambda: str(first_frame) in _FakeWorker.instances[0].file_paths)
+    worker = _FakeWorker.instances[0]
+
+    f.answer = False                         # "resume now?" No: later
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="0/2 images", output_dir="", worker=worker,
+        halted="Claude Code is signed out.", halted_files=[str(f.src / "a.jpg")],
+        halted_streak=False))
+    assert f._run_cancel is None, "extraction still running after the halt"
+    state = f.workspace.batch_state
+    assert state is not None and state["videos"] == [str(f.src / "clip.mp4"), str(v2)]
+    assert f.workspace.items[str(first_frame)].processing_state == "pending"
+    assert f._unextracted_batch_videos(state) == [str(v2)]
+    assert any("signed out" in q for q in f.questions)
+
+    # Resume: the unreached video is extracted, everything left is described.
+    launched = []
+    monkeypatch.setattr(f, "_extract_then_launch",
+                        lambda videos, images, options, skip_existing: launched.append(
+                            (videos, sorted(images), options['embed_after_process'])))
+    f.resume_batch_processing()
+    assert launched == [([str(v2)], sorted([str(f.src / "a.jpg"), str(first_frame)]), False)]
+
+
+def test_resume_prompt_counts_videos_left_to_extract(frame, monkeypatch):
+    f = frame
+    f.workspace.batch_state = dict(OPTIONS, total_queued=0,
+                                   videos=[str(f.src / "clip.mp4")])
+    f.prompt_resume_batch()
+    assert f.questions and "1 video to extract frames from" in f.questions[-1]
+    assert "Progress: 0 of 0" not in f.questions[-1]
+    # Answered No: the batch is forgotten.
+    assert f.workspace.batch_state is None
+
+
+def test_extraction_row_and_title(_frame):
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 0)
+    try:
+        dlg.begin_stage("Describing and extracting frames", 1, stage_index=2, stage_count=2)
+        dlg.begin_extraction(3)
+        dlg.update_progress(1, 4, image_name="a.jpg")
+        dlg.set_extraction(2, 3, "clip.mp4")
+        rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+        assert any(r.startswith("Items Processed:") and "1 / 4" in r
+                   and "more as videos finish" in r for r in rows), rows
+        assert any(r.startswith("Extracting Frames:") and "2 of 3 videos" in r for r in rows)
+        assert any(r.startswith("Last Video Extracted:") and "clip.mp4" in r for r in rows)
+        assert any(r.startswith("Current:") and "a.jpg" in r for r in rows), \
+            "an extraction tick lost the describe progress"
+        dlg.end_extraction("Describing")
+        rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+        assert not any("Extracting Frames" in r or "more as videos" in r for r in rows)
+        assert dlg.GetTitle() == "Describing (step 2 of 2) — Batch Processing"
+        dlg.set_extraction(3, 3, "late.mp4")     # a late tick is ignored
+        rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+        assert not any("Extracting Frames" in r for r in rows)
+    finally:
+        dlg.Destroy()
+
+
+# ----- #344 review findings ----- #
+
+class _LingeringWorker(_FakeWorker):
+    """Like a real batch worker: after stop() it is still alive until the
+    image in flight is done (finish())."""
+    def __init__(self, *a, **k):
+        super().__init__(*a, **k)
+        self.finished = False
+
+    def is_alive(self):
+        return self.started and not self.finished
+
+    def finish(self):
+        self.finished = True
+
+
+def _pipeline_running(f, monkeypatch, worker_cls=_FakeWorker):
+    """A run describing a.jpg while clip.mp4 extracts until cancelled."""
+    import imagedescriber_wx
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", worker_cls)
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    return _FakeWorker.instances[-1]
+
+
+def test_cancelled_close_while_describing_is_a_stop_of_a_describing_batch(frame, monkeypatch):
+    """Review finding 1: the cancelled close took the "before describing"
+    branches, said so, and dropped the still-running worker, so a new run
+    could start and describe its in-flight image again."""
+    f = frame
+    worker = _pipeline_running(f, monkeypatch, _LingeringWorker)
+    _veto_close(f, monkeypatch)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert worker.stopped and worker.is_alive()        # still on its last image
+    assert f._stopping_worker is worker
+    assert f._batch_busy_message() is not None, "a new run could start"
+    stops = [m for m in f.infos if "Batch processing stopped" in m]
+    assert len(stops) == 1, f.infos
+    assert "before describing" not in stops[0]
+    assert f.workspace.batch_state is None
+    worker.finish()
+
+
+def test_nothing_to_describe_leaves_no_batch_to_resume_on_disk(frame, monkeypatch):
+    """Review finding 2: the save stage and checkpoints wrote batch_state
+    (with its videos); clearing it only in memory left reopening offering to
+    resume a batch that had nothing to describe."""
+    f = frame
+    f._save_bundle()
+
+    def fail(vp, cfg, cancel=None, frames_dir=None):
+        raise OSError("not a video")
+    monkeypatch.setattr(f, "_extract_video_frames_sync", fail)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("No frames could be extracted" in m for m in f.infos)
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
+
+
+def test_error_in_the_extraction_hand_back_keeps_the_batch_window(frame, monkeypatch):
+    """Review finding 3, driven directly: the hand-back raises after
+    describing started."""
+    f = frame
+    released = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        released.wait(10)
+        return [], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _extracting(f))
+    worker = _FakeWorker.instances[-1]
+    dlg = f.batch_progress_dialog
+    monkeypatch.setattr(f, "mark_modified", lambda: (_ for _ in ()).throw(RuntimeError("disk gone")))
+    released.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert not worker.queue_open, "describing never told the queue was closed"
+    assert not worker.stopped
+    assert f.batch_progress_dialog is dlg, "the running batch's window was closed"
+    assert any("describing continues" in m and "disk gone" in m for m in f.infos)
+    assert not any("could not start" in m for m in f.infos)
+
+
+def test_failure_after_the_worker_started_does_not_leave_it_waiting(frame, monkeypatch):
+    """Review finding 4: starting extraction failing after the worker had
+    started left an open queue waiting forever, and every later run refused."""
+    f = frame
+
+    def cannot_start():
+        raise RuntimeError("can't start new thread")
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True,
+                    extraction=cannot_start,
+                    extraction_videos=[str(f.src / "clip.mp4")])
+    assert _pump_until(lambda: f._run_cancel is None)
+    worker = _FakeWorker.instances[-1]
+    assert worker.started and worker.stopped
+    assert f._batch_busy_message() is None
+    assert any("could not start" in m and "new thread" in m for m in f.infos)
+
+
+def test_halted_batch_final_stats_do_not_say_extracting(frame, monkeypatch):
+    """Review finding 5: after a halt the kept window still read
+    "Extracting Frames: 0 of 1 videos" and "(more as videos finish)"."""
+    f = frame
+    worker = _pipeline_running(f, monkeypatch)
+    dlg = f.batch_progress_dialog
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="0/1 images", output_dir="", worker=worker,
+        halted="Signed out.", halted_files=[str(f.src / "a.jpg")], halted_streak=False))
+    rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+    assert not any("Extracting Frames" in r or "more as videos" in r for r in rows), rows
+    # A late extraction tick doesn't rebuild over the summary.
+    dlg.set_extraction(1, 1, "late.mp4")
+    assert [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())] == rows
+    dlg.Destroy()
+
+
+def test_selection_follows_its_row_when_rows_are_added_above(_frame):
+    """Review finding 6: restoring the selection by index moved a reader from
+    "Last Description" to another row when a video finished above it."""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 0)
+    try:
+        dlg.begin_stage("Describing and extracting frames", 4, stage_index=2, stage_count=2)
+        dlg.begin_extraction(3)
+        dlg.update_progress(1, 4, image_name="a.jpg", last_image="a.jpg",
+                            last_description="A cat on a desk.")
+        rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+        target = next(i for i, r in enumerate(rows) if r.startswith("Last Description:"))
+        dlg.stats_list.SetSelection(target)
+        dlg.set_extraction(1, 3, "clip.mp4")          # adds a row above it
+        sel = dlg.stats_list.GetString(dlg.stats_list.GetSelection())
+        assert sel.startswith("Last Description:"), sel
+        dlg.end_extraction()                          # removes two rows above
+        sel = dlg.stats_list.GetString(dlg.stats_list.GetSelection())
+        assert sel.startswith("Last Description:"), sel
+    finally:
+        dlg.Destroy()
+
+
+def test_waiting_for_frames_is_not_counted_as_describing_time(frame, monkeypatch):
+    """Review finding 7: a five-minute wait for a long video counted as one
+    image taking five minutes, and the title read 100% with videos to come."""
+    f = frame
+    monkeypatch.setattr(f, "batch_start_time", time.time() - 10.0)
+    monkeypatch.setattr(f, "batch_processing_times", [])
+    evt = SimpleNamespace(message="Processing 6/6", current=6, total=6,
+                          file_path=str(f.src / "a.jpg"), waited=9.5, more_coming=True)
+    f.on_worker_progress(evt)
+    assert f.batch_processing_times[-1] < 1.0
+    assert "100%" not in f.GetTitle() and "extracting videos" in f.GetTitle()
+    evt.more_coming = False
+    f.on_worker_progress(evt)
+    assert f.GetTitle().startswith("100%, 6 of 6")
+
+
+def test_pause_while_waiting_for_frames_holds_the_next_one(monkeypatch):
+    """Review finding 9: Pause pressed while the worker waited for frames
+    still described the next frame to arrive."""
+    w, events = _real_batch(monkeypatch, [], queue_open=True)
+    w.start()
+    time.sleep(0.2)
+    w.pause()
+    w.add_files(["f1.jpg"])
+    time.sleep(0.4)
+    assert _InstantImage.seen == [], "described while paused"
+    w.resume()
+    assert _pump_until(lambda: _InstantImage.seen == ["f1.jpg"])
+    w.close_queue()
+    w.join(5)
+    assert not w.is_alive()
+
+
+def test_stale_frames_of_a_reextracted_video_are_not_described_alongside(frame, monkeypatch):
+    """Review finding 10: frames left by an interrupted extraction were both
+    in the image list and re-queued, and described while extraction cleared
+    their folder."""
+    from data_models import ImageItem
+    f = frame
+    stale = f.src / "clip_0.00s.jpg"
+    stale.write_bytes(b"x")
+    it = ImageItem(str(stale), "extracted_frame")
+    it.parent_video = str(f.src / "clip.mp4")
+    f.workspace.add_item(it)
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")],
+                           [str(f.src / "a.jpg"), str(stale)], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    assert _FakeWorker.instances[-1].file_paths == [str(f.src / "a.jpg")]
+    release.set()
+
+
+def test_last_image_finishing_during_a_cancelled_close_still_says_stopped(frame, monkeypatch):
+    """Re-review of #350: the stopped worker's completion arriving while
+    "save changes?" was open took the normal path ("Batch complete", a save
+    inside the question), and the cancelled close then said nothing."""
+    f = frame
+    worker = _pipeline_running(f, monkeypatch, _LingeringWorker)
+    saves = []
+    real_save = f._save_bundle_with_progress
+
+    def question():
+        worker.finish()                  # its last image is done...
+        f.on_workflow_complete(SimpleNamespace(   # ...while the question is open
+            input_dir="1/1 images", output_dir="", worker=worker,
+            halted=None, halted_files=[], halted_streak=False))
+        assert saves == [], "saved inside the save-changes question"
+        return False                     # Cancel: stay
+    monkeypatch.setattr(f, "_save_bundle_with_progress",
+                        lambda: (saves.append(1), real_save())[1])
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert _pump_until(lambda: f._run_cancel is None)
+    stops = [m for m in f.infos if "Batch processing stopped" in m]
+    assert len(stops) == 1 and "before describing" not in stops[0], f.infos
+    assert "Batch complete" not in f.GetStatusBar().GetStatusText(0)
+    assert f.workspace.batch_state is None

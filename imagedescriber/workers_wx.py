@@ -1095,7 +1095,8 @@ class BatchProcessingWorker(threading.Thread):
                  geocode: bool = False,
                  logs_dir: Optional[Path] = None,
                  video_preamble: Optional[str] = None,
-                 embed_after_process: bool = False):
+                 embed_after_process: bool = False,
+                 queue_open: bool = False):
         """Initialize batch worker
 
         Args:
@@ -1109,10 +1110,13 @@ class BatchProcessingWorker(threading.Thread):
             skip_existing: Skip images that already have descriptions
             progress_offset: Offset to add to progress counter (for continuing after video extraction)
             geocode: Whether to reverse-geocode GPS coordinates (requires internet)
+            queue_open: More images will be added with add_files() while it runs
+                (video frames, as each video finishes extracting: #344). The
+                worker waits for them and ends only after close_queue().
         """
         super().__init__(daemon=True)
         self.parent_window = parent_window
-        self.file_paths = file_paths
+        self.file_paths = list(file_paths)
         self.provider = provider
         self.model = model
         self.prompt_style = prompt_style
@@ -1132,7 +1136,47 @@ class BatchProcessingWorker(threading.Thread):
         self._stop_event = threading.Event()  # Set = stopped
         self._pause_event = threading.Event()  # Set = running, cleared = paused
         self._pause_event.set()  # Start in running state
-    
+
+        # The queue (file_paths) and whether more may come. Guarded by one
+        # condition so add_files/close_queue/stop wake a worker that is waiting.
+        self._queue_cond = threading.Condition()
+        self._queue_open = queue_open
+        self._closing_note = None
+
+    def add_files(self, paths) -> None:
+        """Append images to an open queue (main thread)."""
+        with self._queue_cond:
+            self.file_paths.extend(paths)
+            self._queue_cond.notify_all()
+
+    def close_queue(self, note: Optional[str] = None) -> None:
+        """No more images will be added; the worker ends once it has done the
+        ones it has. `note` goes to the run log (the extraction summary)."""
+        with self._queue_cond:
+            self._queue_open = False
+            self._closing_note = note
+            self._queue_cond.notify_all()
+
+    @property
+    def queue_open(self) -> bool:
+        with self._queue_cond:
+            return self._queue_open
+
+    def queued_count(self) -> int:
+        with self._queue_cond:
+            return len(self.file_paths)
+
+    def _next_file(self, index: int):
+        """The image at `index`, waiting while the queue is open and empty.
+        None once the queue is closed and done, or the batch was stopped."""
+        with self._queue_cond:
+            while (index >= len(self.file_paths) and self._queue_open
+                   and not self._stop_event.is_set()):
+                self._queue_cond.wait(0.5)
+            if index < len(self.file_paths) and not self._stop_event.is_set():
+                return self.file_paths[index], len(self.file_paths)
+            return None, len(self.file_paths)
+
     def run(self):
         """Process all images sequentially"""
         run_log = None
@@ -1184,7 +1228,8 @@ class BatchProcessingWorker(threading.Thread):
             halted_files = []
             halted_streak = False
             streak, streak_key = [], None
-            for i, file_path in enumerate(self.file_paths, 1):
+            i = 0
+            while True:
                 # Phase 2: Check if stopped
                 if self._stop_event.is_set():
                     if run_log:
@@ -1200,6 +1245,28 @@ class BatchProcessingWorker(threading.Thread):
                         run_log.info(f"run stopped by user after {completed} images")
                     break
 
+                # The next image; with an open queue this waits for more.
+                wait_started = time.time()
+                file_path, total = self._next_file(i)
+                if file_path is None:
+                    if self._stop_event.is_set():
+                        if run_log:
+                            run_log.info(f"run stopped by user after {completed} images")
+                    elif run_log and self._closing_note:
+                        run_log.info(self._closing_note)
+                    break
+                # Paused or stopped while waiting for frames: honour it before
+                # this image, not after it.
+                self._pause_event.wait()
+                if self._stop_event.is_set():
+                    if run_log:
+                        run_log.info(f"run stopped by user after {completed} images")
+                    break
+                # Time spent waiting for a video to finish extracting is not
+                # describing time; the window leaves it out of its averages.
+                waited = time.time() - wait_started
+                i += 1
+
                 # Post progress with current/total counts (add offset for continuing from video extraction)
                 current_progress = i + self.progress_offset
                 total_progress = total + self.progress_offset
@@ -1209,6 +1276,8 @@ class BatchProcessingWorker(threading.Thread):
                     current=current_progress,
                     total=total_progress
                 )
+                evt.waited = waited
+                evt.more_coming = self.queue_open
                 wx.PostEvent(self.parent_window, evt)
 
                 # Create worker for this image
@@ -1345,6 +1414,8 @@ class BatchProcessingWorker(threading.Thread):
         """Stop batch processing (cannot resume)"""
         self._stop_event.set()
         self._pause_event.set()  # Unblock if paused
+        with self._queue_cond:
+            self._queue_cond.notify_all()   # and if waiting for more images
     
     def is_paused(self) -> bool:
         """Check if currently paused"""
