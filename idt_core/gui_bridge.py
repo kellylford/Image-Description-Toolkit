@@ -452,7 +452,7 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict,
             existing.active_description_id = existing.descriptions[-1].id
         existing.is_missing = gui_item.get("is_missing", False)
         existing.extra.update(extra)
-        # ImageDescriber up to 4.6.1 recorded extracted frames as copied into
+        # ImageDescriber 4.6.0 and earlier recorded extracted frames as copied into
         # images/ without copying them. Correct the record when it is rewritten.
         # Same scope as Workspace.image_path's fallback: only frames under this
         # bundle's derived/, never an image whose real copy has gone missing.
