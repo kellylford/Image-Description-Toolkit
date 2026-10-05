@@ -4016,8 +4016,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # The checkpoint writer saves the frames, then the video (whose
             # extracted_frames marks it done), so a run that ends any way at
             # all, quitting included, keeps every video that finished.
-            if not self or self.workspace is None:
-                return                       # window already destroyed
+            if not self or self.IsBeingDeleted() or self.workspace is None:
+                return                       # window destroyed or closing
             try:
                 _apply_video(vp, frames, meta)
                 for fp in frames:
@@ -4028,8 +4028,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 logger.warning(f"Could not record frames of {Path(vp).name}: {exc}")
 
         def _after_extraction(results):
-            if not self:
-                return                       # window already destroyed
+            if not self or self.IsBeingDeleted():
+                return                       # window destroyed or closing
             try:
                 _finish_extraction(results)
             except Exception as exc:
@@ -5071,6 +5071,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         pass
 
                 ws.save_manifest()
+                self._checkpointer.note_manifest(bundle_path)
 
             if ws_dict is None:
                 snap_seq = self._checkpointer.snapshot_seq()

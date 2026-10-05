@@ -950,6 +950,7 @@ def test_quitting_during_extraction_keeps_finished_videos(frame, monkeypatch):
     v2 = f.src / "clip2.mp4"
     v2.write_bytes(b"x")
     f.workspace.add_item(ImageItem(str(v2), "video"))
+    f._save_bundle()                  # both videos are in the bundle beforehand
     second_started = threading.Event()
 
     def extract(vp, cfg, cancel=None, frames_dir=None):
@@ -974,7 +975,8 @@ def test_quitting_during_extraction_keeps_finished_videos(frame, monkeypatch):
     assert frame_item["parent_video"] == str(f.src / "clip.mp4")
     assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
     # The video being extracted when the app quit is extracted again.
-    assert not gui["items"].get(str(v2), {}).get("extracted_frames")
+    assert str(v2) in gui["items"]
+    assert not gui["items"][str(v2)].get("extracted_frames")
 
 
 def _extraction_waiting_for_cancel(f, monkeypatch):
