@@ -1286,8 +1286,8 @@ def test_stopping_line_stays_selected_beside_a_callers_status(_frame):
             assert sel != wx.NOT_FOUND
             assert rows[sel].endswith(STOPPING_LINE)
             assert (msg is None) or any(r.endswith(msg) for r in rows), rows
-        assert dlg.GetTitle().startswith("Stopping")
-        # A stage begun after Stop is titled with the same prefix.
+        assert dlg.GetTitle() == f"{STOPPING_PREFIX} saving workspace — Batch Processing"
+        # A stage begun after Stop is titled the same way.
         dlg.begin_stage("Describing images", 10, stage_index=3, stage_count=3)
         assert dlg.GetTitle().startswith(STOPPING_PREFIX)
     finally:

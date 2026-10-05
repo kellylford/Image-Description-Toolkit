@@ -442,7 +442,10 @@ class BatchProgressDialog(wx.Dialog):
             row = self.stats_list.GetCount() - 1
         self.stats_list.SetSelection(row)
         self.stats_list.EnsureVisible(row)
-        self.SetTitle("Stopping  —  Batch Processing")
+        # The same title begin_stage gives a stage begun while stopping.
+        stage = getattr(self, 'stage_name', None)
+        self.SetTitle(f"{STOPPING_PREFIX} {stage.lower()} — Batch Processing"
+                      if stage else "Stopping — Batch Processing")
 
     def mark_complete(self, summary: str = "", stopped: bool = False):
         """

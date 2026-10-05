@@ -4375,7 +4375,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _reset_stopped_run_state(self) -> None:
         """What stopping a run before describing resets: no batch to resume,
-        no pending items, no unstarted worker, no embed choice."""
+        no pending items, no unstarted worker."""
         if self.workspace:
             self.workspace.batch_state = None
             for item in self.workspace.items.values():
