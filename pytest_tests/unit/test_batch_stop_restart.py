@@ -150,6 +150,7 @@ def frame(_frame, tmp_path, monkeypatch):
     monkeypatch.setattr(f, "_changed_seq", {})
     monkeypatch.setattr(f, "_run_cancel", None)
     monkeypatch.setattr(f, "_stopping_worker", None)
+    monkeypatch.setattr(f, "_window_closing", False)
     monkeypatch.setattr(f, "batch_worker", None)
     monkeypatch.setattr(f, "batch_progress_dialog", None)
     _FakeWorker.instances = []
@@ -168,7 +169,9 @@ def frame(_frame, tmp_path, monkeypatch):
     yield f
     if f._run_cancel is not None:          # never leave a thread waiting
         f._run_cancel.set()
-        _pump_until(lambda: f._run_cancel is None, 5)
+        # After a (stubbed) Destroy the run's hand-back leaves the window
+        # alone, so _run_cancel is never cleared: just let the thread finish.
+        _pump_until(lambda: f._run_cancel is None, 0.5 if f._window_closing else 5)
     if f.batch_progress_dialog:
         f._close_progress_dialog()
 
@@ -933,6 +936,212 @@ def test_closing_during_extraction_saves_nothing_and_says_nothing(frame, monkeyp
     cancel.set()
     assert _pump_until(lambda: f._run_cancel is None)
     assert saves == []
+    assert f.infos == []
+
+
+def test_quitting_during_extraction_keeps_finished_videos(frame, monkeypatch):
+    """#345: quitting mid-extraction (answering Don't Save) lost every video
+    already extracted, because they were only recorded when the whole
+    extraction handed back, which never happens once the window is gone. The
+    next run extracted all of them again: 20+ minutes for 1,000 videos on a
+    network share."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    f._save_bundle()                  # both videos are in the bundle beforehand
+    second_started = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(done_frame)], {"fps": 30}
+        second_started.set()
+        while not cancel.is_set():
+            time.sleep(0.01)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(second_started.is_set)
+    wx.SafeYield()                    # let the first video's record run
+
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: True)  # Don't Save
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+
+    gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
+    frame_item = gui["items"].get(str(done_frame))
+    assert frame_item is not None, "finished video's frame was not saved"
+    assert frame_item["parent_video"] == str(f.src / "clip.mp4")
+    assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
+    # The video being extracted when the app quit is extracted again.
+    assert str(v2) in gui["items"]
+    assert not gui["items"][str(v2)].get("extracted_frames")
+
+
+def _slow_writer(f, monkeypatch, secs=0.3):
+    """Each checkpoint write takes `secs`, so an unflushed one is still queued."""
+    real = f._checkpointer._handle
+
+    def slow(*a):
+        time.sleep(secs)
+        return real(*a)
+    monkeypatch.setattr(f._checkpointer, "_handle", slow)
+
+
+def _video_released_by(gate, done_frame):
+    """Extraction of one video that finishes only when `gate` is set (not on
+    cancel: a video already being written finishes)."""
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        assert gate.wait(10)
+        return [str(done_frame)], {}
+    return extract
+
+
+def test_video_finishing_during_the_save_question_is_written(frame, monkeypatch):
+    """#347 review: a video recorded while "save changes?" is open queues its
+    writes after on_close's first flush; the second flush must wait for them."""
+    f = frame
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    gate = threading.Event()
+    monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
+    _slow_writer(f, monkeypatch)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+
+    def question():
+        gate.set()                     # the video finishes during the question
+        assert _pump_until(lambda: str(done_frame) in f.workspace.items)
+        return True                    # Don't Save
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert f._checkpointer._queue.unfinished_tasks == 0, "left unwritten at exit"
+
+
+def test_video_finishing_after_destroy_is_written(frame, monkeypatch):
+    """#347 review: Destroy only schedules deletion, and on msw neither
+    IsBeingDeleted() nor bool(frame) changes before queued CallAfters run. A
+    video recorded then must still be written: nothing flushes after it."""
+    f = frame
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    gate = threading.Event()
+    monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
+    _slow_writer(f, monkeypatch)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f.batch_progress_dialog is not None)
+
+    destroyed = []
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: True)
+    monkeypatch.setattr(f, "Destroy", lambda: destroyed.append(1))
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert destroyed == [1] and f._window_closing
+
+    gate.set()                         # finishes after the window is gone
+    assert _pump_until(lambda: str(done_frame) in f.workspace.items)
+    assert f._checkpointer._queue.unfinished_tasks == 0, "recorded but never written"
+    gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
+    assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
+
+
+def test_quit_waits_for_a_video_finishing_as_the_app_closes(frame, monkeypatch):
+    """#347 Windows probe: MainLoop exits ~0.4 s after Close, and a video's
+    hand-back queued later never runs, so the video was lost. on_close now
+    waits for the cancelled extraction thread and runs its hand-back before
+    the last flush. Checked with no event pumping after on_close returns,
+    as at a real exit."""
+    f = frame
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    gate = threading.Event()
+    monkeypatch.setattr(f, "_extract_video_frames_sync", _video_released_by(gate, done_frame))
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f.batch_progress_dialog is not None)
+
+    monkeypatch.setattr(f, "confirm_unsaved_changes",
+                        lambda: (threading.Timer(0.3, gate.set).start(), True)[1])
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert str(done_frame) in f.workspace.items, "finished video never recorded"
+    assert f._checkpointer._queue.unfinished_tasks == 0
+    gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
+    assert gui["items"][str(f.src / "clip.mp4")]["extracted_frames"] == [str(done_frame)]
+
+
+def test_reapplying_a_recorded_video_adds_nothing_twice(frame, monkeypatch):
+    """_record_video and then _finish_extraction both apply each video."""
+    f = frame
+    frames = [f.src / "clip_0.00s.jpg", f.src / "clip_5.00s.jpg"]
+    for fr in frames:
+        fr.write_bytes(b"x")
+    monkeypatch.setattr(f, "_extract_video_frames_sync",
+                        lambda vp, cfg, cancel=None, frames_dir=None:
+                        ([str(fr) for fr in frames], {}))
+    launched = []
+    monkeypatch.setattr(f, "_launch_batch",
+                        lambda to_process, *a, **k: launched.append(list(to_process)))
+    before = len(f.workspace.items)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: launched)
+    assert launched[0] == [str(fr) for fr in frames]
+    assert len(f.workspace.items) == before + 2
+    assert f.workspace.items[str(f.src / "clip.mp4")].extracted_frames == \
+        [str(fr) for fr in frames]
+    f._end_run(f._run_cancel)
+
+
+def _extraction_waiting_for_cancel(f, monkeypatch):
+    """Start a run whose only video extracts until the run is cancelled."""
+    _, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    return calls
+
+
+def test_cancelled_close_shows_the_batchs_own_window(frame, monkeypatch):
+    """#346: the cancelled close built a new progress window with no Stage
+    row; the batch's window was only hidden and still has it."""
+    f = frame
+    _extraction_waiting_for_cancel(f, monkeypatch)
+    original = f.batch_progress_dialog
+    assert original is not None
+    _veto_close(f, monkeypatch)
+    assert f.batch_progress_dialog is original
+    assert original.IsShown()
+    rows = [original.stats_list.GetString(i)
+            for i in range(original.stats_list.GetCount())]
+    assert any(r.startswith("Stage:") for r in rows), rows
+    assert any("Stopping" in r for r in rows), rows
+    assert _pump_until(lambda: f._run_cancel is None)
+
+
+def test_close_that_cannot_be_vetoed_does_not_become_a_stop(frame, monkeypatch):
+    """#346: at shutdown Cancel can't keep the app open. Converting the run
+    into a Stop opened a window and a save, then destroyed the frame under
+    them."""
+    f = frame
+    _extraction_waiting_for_cancel(f, monkeypatch)
+    calls, saves, stops = [], [], []
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: False)
+    monkeypatch.setattr(f, "Destroy", lambda: calls.append("destroy"))
+    real_flush = f._flush_checkpoints
+    monkeypatch.setattr(f, "_flush_checkpoints",
+                        lambda *a, **k: (calls.append("flush"), real_flush(*a, **k))[1])
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: saves.append(1))
+    monkeypatch.setattr(f, "_stop_preparing_run", lambda: stops.append(1))
+    f.on_close(SimpleNamespace(CanVeto=lambda: False, Veto=lambda: None))
+    assert calls[-2:] == ["flush", "destroy"], calls
+    assert f._window_closing
+    assert stops == [] and saves == []
+    assert f.batch_progress_dialog is None
+    # The thread's hand-back after Destroy leaves the window alone.
+    for _ in range(20):
+        wx.SafeYield()
+        time.sleep(0.02)
     assert f.infos == []
 
 

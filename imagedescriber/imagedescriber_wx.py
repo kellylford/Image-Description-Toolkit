@@ -766,6 +766,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # last image.
         self._run_cancel: Optional[threading.Event] = None
         self._stopping_worker = None
+        # Set just before on_close destroys the window; see _record_video.
+        self._window_closing = False
         # What the run being prepared changed, so a failed start can undo
         # exactly that (see _abort_run).
         self._preparing_queue = None
@@ -3976,6 +3978,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             frames_dir=frame_dirs[vp])
                         logger.info(f"Extracted {len(frames)} frame(s) from {Path(vp).name}")
                         results.append((vp, frames, meta or {}))
+                        if frames:
+                            # Recorded and checkpointed now, not when the whole
+                            # extraction ends: quitting partway used to lose
+                            # every finished video (#345).
+                            wx.CallAfter(_record_video, vp, frames, meta or {})
                     except ExtractionCancelled:
                         logger.info(f"Extraction of {Path(vp).name} stopped partway; "
                                     "it will be extracted again on the next run")
@@ -3991,7 +3998,50 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # Always hand back, or the run would stay "busy" for good.
                 wx.CallAfter(_after_extraction, results)
 
+        def _apply_video(vp, frames, meta):
+            """Put one finished video's frames into the workspace. Idempotent."""
+            if vp in self.workspace.items:
+                vi = self.workspace.items[vp]
+                vi.extracted_frames = frames
+                if meta:
+                    vi.video_metadata = meta
+            frame_sub = self._frame_subfolder(frame_dirs[vp])
+            for fp in frames:
+                if fp not in self.workspace.items:
+                    fi = ImageItem(fp, "extracted_frame")
+                    fi.parent_video = vp
+                    fi.subfolder = frame_sub
+                    self.workspace.add_item(fi)
+
+        def _record_video(vp, frames, meta):
+            # Main thread, one video at a time while extraction carries on.
+            # The checkpoint writer saves the frames, then the video (whose
+            # extracted_frames marks it done), so a run that ends any way at
+            # all, quitting included, keeps every video that finished.
+            if self.workspace is None:
+                return
+            # After on_close's last flush the window is going away, but wx may
+            # still run this (Destroy only schedules deletion; on msw neither
+            # IsBeingDeleted() nor bool(self) changes in time). Record it and
+            # wait for the write here, since nothing else will flush it.
+            closing = self._window_closing
+            if not closing and (not self or self.IsBeingDeleted()):
+                return
+            try:
+                _apply_video(vp, frames, meta)
+                for fp in frames:
+                    self._checkpoint_item(fp)
+                self._checkpoint_item(vp)
+                if closing:
+                    self._checkpointer.flush(10)
+                else:
+                    self.mark_modified()
+            except Exception as exc:
+                logger.warning(f"Could not record frames of {Path(vp).name}: {exc}")
+
         def _after_extraction(results):
+            if self._window_closing or not self or self.IsBeingDeleted():
+                return                       # window destroyed or closing
             try:
                 _finish_extraction(results)
             except Exception as exc:
@@ -4008,31 +4058,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             vid_count = 0
             frame_count = 0
             for vp, frames, meta in results:
-                if vp in self.workspace.items:
-                    vi = self.workspace.items[vp]
-                    vi.extracted_frames = frames
-                    if meta:
-                        vi.video_metadata = meta
                 frame_count += len(frames)
                 if not frames:
                     # Includes a video whose folder could not be claimed, which
                     # has no entry in frame_dirs.
                     continue
                 vid_count += 1          # videos that produced frames
-                frame_sub = self._frame_subfolder(frame_dirs[vp])
+                # Already done by _record_video (queued before this hand-back);
+                # repeated so a frame is never left out of the describe queue.
+                _apply_video(vp, frames, meta)
                 for fp in frames:
-                    if fp not in self.workspace.items:
-                        fi = ImageItem(fp, "extracted_frame")
-                        fi.parent_video = vp
-                        fi.subfolder = frame_sub
-                        self.workspace.add_item(fi)
                     fi = self.workspace.items.get(fp)
                     if fi and (not skip_existing or not fi.descriptions):
                         to_process.append(fp)
 
             if results:
-                # New frames and videos' frame lists exist only in memory until
-                # a save writes them; say so, whatever happens next.
+                # The frames are checkpointed, but the tree and other state
+                # still differ from the saved bundle until a full save.
                 self.mark_modified()
 
             if cancel.is_set():
@@ -4042,7 +4084,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     # Saved off the main thread with a progress window. Not
                     # while the app is closing: that save would run inside the
                     # "save changes?" question and write edits the user may be
-                    # about to discard (the frames are re-extracted next time).
+                    # about to discard. The finished videos are kept anyway:
+                    # _record_video checkpointed each one as it finished, and
+                    # on_close waits for those writes.
                     if results and not _closing(cancel):
                         self._save_bundle_with_progress()
                 finally:
@@ -4078,7 +4122,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self._launch_batch(to_process, options, skip_existing, video_preamble=preamble,
                                video_failures=failed_videos)
 
-        threading.Thread(target=_do_all_extractions, daemon=True).start()
+        # Kept on the run so on_close can wait for it (_wait_for_extraction).
+        cancel.thread = threading.Thread(target=_do_all_extractions, daemon=True)
+        cancel.thread.start()
 
     def _check_mlx_model_ready(self, provider: str, model: str) -> bool:
         """Check if an MLX model is ready to use; warn the user if not yet downloaded.
@@ -5039,6 +5085,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         pass
 
                 ws.save_manifest()
+                self._checkpointer.note_manifest(bundle_path)
 
             if ws_dict is None:
                 snap_seq = self._checkpointer.snapshot_seq()
@@ -6129,6 +6176,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         for file_path, seq in list(self._changed_seq.items()):
             if seq > snap_seq:
                 self._checkpoint_item(file_path)
+
+    def _wait_for_extraction(self, run, timeout: float = 5.0) -> None:
+        """Before the last flush at exit: let a cancelled extraction thread
+        end, then run what it handed back, so a video that finished just as
+        the app closed is recorded and written. Its CallAfter could otherwise
+        arrive after MainLoop exits and never run (#347). A cancelled thread
+        ends within a frame; the window keeps painting while it does."""
+        thread = getattr(run, "thread", None)
+        if thread is None:
+            return
+        deadline = time.monotonic() + timeout
+        while thread.is_alive() and time.monotonic() < deadline:
+            thread.join(0.05)
+            wx.SafeYield(None, True)
+        if thread.is_alive():
+            logger.warning("Extraction thread still running at exit; "
+                           "the video in progress will be extracted again")
+        wx.SafeYield(None, True)       # its last _record_video, if queued
 
     def _flush_checkpoints(self, timeout: float = 30.0) -> None:
         """Wait for queued checkpoint writes, so nothing is lost on exit."""
@@ -9475,6 +9540,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # CRITICAL FIX: Close batch progress dialog first (it has wx.STAY_ON_TOP)
         # This ensures the unsaved changes dialog won't be hidden behind it
+        # Kept so a cancelled close can show this same window again: its
+        # Close only hides it, and it still has the run's stage and counts.
+        closed_dialog = self.batch_progress_dialog
         if self.batch_progress_dialog:
             logger.info("Closing batch progress dialog before exit")
             try:
@@ -9490,7 +9558,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if workers_stopped:
             logger.info(f"Stopped workers: {', '.join(workers_stopped)}")
         # A run still extracting frames has no worker to stop; tell its thread.
-        # The video in progress is then not recorded and is re-extracted next time.
+        # The video in progress is then not recorded and is re-extracted next
+        # time; finished videos were checkpointed as each one finished.
         closing_run = self._run_cancel
         if closing_run is not None:
             # Marked on the run itself, so it can't outlive that run.
@@ -9521,21 +9590,40 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     except Exception as e:
                         logger.warning(f"Failed to clean up Untitled workspace: {e}")
 
+            # Videos that finished while "save changes?" was open were
+            # recorded then (the dialog runs the event loop); write them too,
+            # and any the thread hands back as it ends.
+            self._wait_for_extraction(closing_run)
+            self._flush_checkpoints()
+
             # Force destroy the window
             logger.info("Calling Destroy()")
+            self._window_closing = True
             self.Destroy()
             logger.info("Destroy() completed")
         else:
             logger.info("User cancelled close")
+            if not event.CanVeto():
+                # The system is shutting down regardless. Turning the run into
+                # a Stop would open a progress window and a save, then destroy
+                # the frame under them (#346).
+                logger.warning("Event cannot be vetoed but user cancelled - forcing close anyway")
+                self._wait_for_extraction(closing_run)
+                self._flush_checkpoints()
+                self._window_closing = True
+                self.Destroy()
+                return
             # Staying after all: the run cancelled above becomes a normal
             # Stop. A flag left set here silenced every later Stop for the rest
             # of the session.
             if closing_run is not None:
                 closing_run.closing = False
                 if self._run_cancel is closing_run:
-                    # Still winding down: a full Stop, in a window that says
-                    # so (the close hid the batch's window); it saves and
-                    # announces when it ends.
+                    # Still winding down: a full Stop, in the batch's own
+                    # window (the close only hid it), so it keeps its stage
+                    # row; it saves and announces when it ends.
+                    if closed_dialog and self.batch_progress_dialog is None:
+                        self.batch_progress_dialog = closed_dialog
                     self._ensure_progress_dialog({}, 0)
                     self._stop_preparing_run()
                 else:
@@ -9547,11 +9635,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     self._flush_checkpoints()
                     self._save_bundle_with_progress()
                     self._announce_stopped_before_describing()
-            if event.CanVeto():
-                event.Veto()
-            else:
-                logger.warning("Event cannot be vetoed but user cancelled - forcing close anyway")
-                self.Destroy()
+                    # The batch's window, hidden by the close, has nothing
+                    # left to show; it lived on hidden until the app quit.
+                    if closed_dialog and closed_dialog is not self.batch_progress_dialog:
+                        closed_dialog.Destroy()
+            event.Veto()
 
     def on_save(self, event):
         """Wrapper for ModifiedStateMixin"""

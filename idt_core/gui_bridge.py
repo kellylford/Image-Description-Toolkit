@@ -516,6 +516,10 @@ class BundleCheckpointWriter:
         self._seq = 0
         self._seq_lock = threading.Lock()
         self._written: dict = {}
+        # Per bundle: sidecar_name_index, kept current as the writer saves.
+        # Without it each new item (every extracted frame) walked all of
+        # descriptions/: ~50 ms an item at 30,000 sidecars.
+        self._indexes: dict = {}
         self._thread: Optional[threading.Thread] = None
         self._since_manifest = 0
         self._last_manifest = time.monotonic()
@@ -539,6 +543,17 @@ class BundleCheckpointWriter:
             return False
         self._written[key] = seq
         return True
+
+    # Claimed like an item, so a queued job's batch_state, captured before a
+    # full save wrote a newer one, can't put the old one back.
+    MANIFEST_KEY = "\0manifest"
+
+    def note_manifest(self, bundle_path) -> None:
+        """Call holding ``lock`` after a full save writes the manifest from live
+        state: jobs queued before now may no longer refresh it."""
+        self.claim(bundle_path, self.MANIFEST_KEY, self.snapshot_seq())
+        # The save may have added sidecars the writer's name index lacks.
+        self._indexes.pop(str(Path(bundle_path)), None)
 
     # ----- queueing ----- #
     def enqueue_item(self, bundle_path, file_path: str, gui_item: dict,
@@ -584,13 +599,24 @@ class BundleCheckpointWriter:
         with self.lock:
             ws = Workspace(bundle_path)
             if self.claim(bundle_path, file_path, seq):
-                ws.save_item(gui_item_to_ws_item(ws, file_path, gui_item))
+                key = str(bundle_path)
+                index = self._indexes.get(key)
+                if index is None:
+                    index = self._indexes[key] = sidecar_name_index(ws)
+                wi = gui_item_to_ws_item(ws, file_path, gui_item, index)
+                ws.save_item(wi)
+                written = ws._sidecar_path(wi.image, wi.subfolder)
+                paths = index.setdefault(written.name, [])
+                if written not in paths:
+                    paths.append(written)
                 self.items_written += 1
             self._since_manifest += 1
             due = (self._since_manifest >= self.manifest_every
                    or time.monotonic() - self._last_manifest >= self.manifest_secs)
             if not due:
                 return
+            if not self.claim(bundle_path, self.MANIFEST_KEY, seq):
+                return        # older than the manifest on disk; next job retries
             # Re-read so settings a full save just wrote (defaults, models)
             # survive; _save_bundle holds this lock for its manifest write too.
             ws = Workspace.open(bundle_path)

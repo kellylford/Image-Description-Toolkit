@@ -118,6 +118,66 @@ class TestWriter:
                      for i in ws.items()}
         assert by_source == {"A": ["A's desc"], "B": ["B's desc"], "C": ["C's desc"]}
 
+    def test_stale_job_does_not_put_back_older_batch_state(self, bundle):
+        """#345 review: per-video frame checkpoints queue jobs during
+        extraction carrying the old batch_state. One still queued when the
+        pre-describe full save writes the new batch_state must not restore
+        the old one, or a crash then loses (or misdirects) resume."""
+        path, src = bundle
+        w = BundleCheckpointWriter(manifest_every=1)
+        stale_seq = w.snapshot_seq()               # taken before the save
+        with w.lock:                                # as _save_bundle does
+            ws = Workspace.open(path)
+            ws.batch_state = {"total_queued": 9, "provider": "new"}
+            ws.save_manifest()
+            w.note_manifest(path)
+        w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
+                       {"total_queued": 1, "provider": "old"}, stale_seq)
+        flushed = w.flush(5)
+        assert flushed
+        on_disk = Workspace.open(path).batch_state
+        assert on_disk["provider"] == "new"
+        # A job snapshotted after the save still refreshes it.
+        w.enqueue_item(path, str(src / "b.jpg"), _gui_item(src / "b.jpg", "b"),
+                       {"total_queued": 9, "provider": "newer"}, w.snapshot_seq())
+        flushed = w.flush(5)
+        assert flushed
+        on_disk = Workspace.open(path).batch_state
+        assert on_disk["provider"] == "newer"
+
+    def test_name_index_built_once_and_kept_current(self, bundle, monkeypatch):
+        """#345 review: each new item (every extracted frame) used to walk
+        all of descriptions/; ~50 ms an item at 30,000 sidecars. The index is
+        built once per bundle and updated as the writer saves, so an item it
+        wrote under one subfolder is still found by name afterwards."""
+        gb = sys.modules[BundleCheckpointWriter.__module__]
+        path, src = bundle
+        builds = []
+        real = gb.sidecar_name_index
+        monkeypatch.setattr(gb, "sidecar_name_index",
+                            lambda ws: (builds.append(1), real(ws))[1])
+        frame = src / "clip_0.00s.jpg"
+        frame.write_bytes(b"x")
+        w = BundleCheckpointWriter()
+        w.enqueue_item(path, str(frame), _gui_item(frame, "first", subfolder="frames/clip"),
+                       None, w.snapshot_seq())
+        # Same image, no subfolder (an older GUI item): found through the index.
+        w.enqueue_item(path, str(frame), _gui_item(frame, "second"),
+                       None, w.snapshot_seq())
+        flushed = w.flush(5)
+        assert flushed
+        assert builds == [1]
+        mine = [i for i in Workspace(path).items() if i.image == frame.name]
+        assert len(mine) == 1 and [d.text for d in mine[0].descriptions] == ["second"]
+        # A full save may add sidecars the index lacks: it is rebuilt after one.
+        with w.lock:
+            w.note_manifest(path)
+        w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
+                       None, w.snapshot_seq())
+        flushed = w.flush(5)
+        assert flushed
+        assert builds == [1, 1]
+
     def test_name_only_lookup_still_finds_the_same_image(self, bundle):
         """A GUI item with no subfolder still updates its own sidecar in a subfolder."""
         path, src = bundle
