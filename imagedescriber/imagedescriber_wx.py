@@ -1104,8 +1104,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             cancel: Set by Stop. Checked before each frame; raises
                 ExtractionCancelled so a half-extracted video is never recorded
                 as done (it is extracted again on the next run).
-            frames_dir: Output folder from _frames_dir_for_video, computed on
-                the main thread. Falls back to derived/frames/<name>.
+            frames_dir: Output folder, already claimed: by _claim_frames_dir_for
+                on the extraction thread in a batch. Falls back to
+                derived/frames/<name>.
 
         Returns:
             tuple: (list of extracted frame paths, video metadata dict)

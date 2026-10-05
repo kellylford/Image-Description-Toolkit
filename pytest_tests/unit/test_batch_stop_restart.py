@@ -329,7 +329,7 @@ def test_same_named_videos_without_subfolder_still_separate(frame):
 
 def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch, tmp_path):
     """Issue #342: claiming reads each source video (fingerprint). On a macOS
-    network share that took ~75 ms a video, all on the main thread before the
+    network share that took ~60 ms a video, all on the main thread before the
     progress window appeared: 1,340 videos froze the app for ~2 minutes."""
     import imagedescriber_wx
     from data_models import ImageItem
