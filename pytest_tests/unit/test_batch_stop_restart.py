@@ -1488,11 +1488,11 @@ def test_extracted_frames_batch_carries_the_embed_choice(frame, monkeypatch):
 
 def test_completion_event_carries_its_batch():
     """The event the window reads the choice from must carry the batch."""
-    from workers_wx import ProcessingCompleteEventData
+    import workers_wx
     marker = object()
-    evt = ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "", batch=marker)
+    evt = workers_wx.ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "", batch=marker)
     assert evt.batch is marker
-    assert ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "").batch is None
+    assert workers_wx.ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "").batch is None
 
 
 # --------------------------------------------------------------------------- #
