@@ -440,10 +440,13 @@ class BatchProgressDialog(wx.Dialog):
         label_row = wx.NOT_FOUND
         if (stopping_row == wx.NOT_FOUND and saved_label
                 and saved_selection not in self.separator_indices):
-            label_row = next((i for i in range(count)
-                              if i not in self.separator_indices
-                              and _row_label(self.stats_list.GetString(i)) == saved_label),
-                             wx.NOT_FOUND)
+            same = [i for i in range(count)
+                    if i not in self.separator_indices
+                    and _row_label(self.stats_list.GetString(i)) == saved_label]
+            if same:
+                # Rows can share a label (two status lines); take the one
+                # nearest where the reader was.
+                label_row = min(same, key=lambda i: abs(i - saved_selection))
         if stopping_row != wx.NOT_FOUND:
             self.stats_list.SetSelection(stopping_row)
             self.stats_list.EnsureVisible(stopping_row)

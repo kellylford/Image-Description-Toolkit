@@ -2006,3 +2006,30 @@ def test_stale_frames_of_a_reextracted_video_are_not_described_alongside(frame, 
     assert _pump_until(lambda: calls)
     assert _FakeWorker.instances[-1].file_paths == [str(f.src / "a.jpg")]
     release.set()
+
+
+def test_last_image_finishing_during_a_cancelled_close_still_says_stopped(frame, monkeypatch):
+    """Re-review of #350: the stopped worker's completion arriving while
+    "save changes?" was open took the normal path ("Batch complete", a save
+    inside the question), and the cancelled close then said nothing."""
+    f = frame
+    worker = _pipeline_running(f, monkeypatch, _LingeringWorker)
+    saves = []
+    real_save = f._save_bundle_with_progress
+
+    def question():
+        worker.finish()                  # its last image is done...
+        f.on_workflow_complete(SimpleNamespace(   # ...while the question is open
+            input_dir="1/1 images", output_dir="", worker=worker,
+            halted=None, halted_files=[], halted_streak=False))
+        assert saves == [], "saved inside the save-changes question"
+        return False                     # Cancel: stay
+    monkeypatch.setattr(f, "_save_bundle_with_progress",
+                        lambda: (saves.append(1), real_save())[1])
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert _pump_until(lambda: f._run_cancel is None)
+    stops = [m for m in f.infos if "Batch processing stopped" in m]
+    assert len(stops) == 1 and "before describing" not in stops[0], f.infos
+    assert "Batch complete" not in f.GetStatusBar().GetStatusText(0)
+    assert f.workspace.batch_state is None
