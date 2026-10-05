@@ -133,12 +133,14 @@ class TestWriter:
             w.note_manifest(path)
         w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
                        {"total_queued": 1, "provider": "old"}, stale_seq)
-        assert w.flush(5)
+        flushed = w.flush(5)
+        assert flushed
         assert Workspace.open(path).batch_state["provider"] == "new"
         # A job snapshotted after the save still refreshes it.
         w.enqueue_item(path, str(src / "b.jpg"), _gui_item(src / "b.jpg", "b"),
                        {"total_queued": 9, "provider": "newer"}, w.snapshot_seq())
-        assert w.flush(5)
+        flushed = w.flush(5)
+        assert flushed
         assert Workspace.open(path).batch_state["provider"] == "newer"
 
     def test_name_index_built_once_and_kept_current(self, bundle, monkeypatch):
@@ -146,7 +148,7 @@ class TestWriter:
         all of descriptions/; ~50 ms an item at 30,000 sidecars. The index is
         built once per bundle and updated as the writer saves, so an item it
         wrote under one subfolder is still found by name afterwards."""
-        import idt_core.gui_bridge as gb
+        gb = sys.modules[BundleCheckpointWriter.__module__]
         path, src = bundle
         builds = []
         real = gb.sidecar_name_index
@@ -160,7 +162,8 @@ class TestWriter:
         # Same image, no subfolder (an older GUI item): found through the index.
         w.enqueue_item(path, str(frame), _gui_item(frame, "second"),
                        None, w.snapshot_seq())
-        assert w.flush(5)
+        flushed = w.flush(5)
+        assert flushed
         assert builds == [1]
         mine = [i for i in Workspace(path).items() if i.image == frame.name]
         assert len(mine) == 1 and [d.text for d in mine[0].descriptions] == ["second"]
@@ -169,7 +172,8 @@ class TestWriter:
             w.note_manifest(path)
         w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
                        None, w.snapshot_seq())
-        assert w.flush(5)
+        flushed = w.flush(5)
+        assert flushed
         assert builds == [1, 1]
 
     def test_name_only_lookup_still_finds_the_same_image(self, bundle):

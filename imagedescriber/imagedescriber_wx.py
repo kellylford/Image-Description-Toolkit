@@ -766,6 +766,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # last image.
         self._run_cancel: Optional[threading.Event] = None
         self._stopping_worker = None
+        # Set just before on_close destroys the window; see _record_video.
+        self._window_closing = False
         # What the run being prepared changed, so a failed start can undo
         # exactly that (see _abort_run).
         self._preparing_queue = None
@@ -4016,19 +4018,29 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # The checkpoint writer saves the frames, then the video (whose
             # extracted_frames marks it done), so a run that ends any way at
             # all, quitting included, keeps every video that finished.
-            if not self or self.IsBeingDeleted() or self.workspace is None:
-                return                       # window destroyed or closing
+            if self.workspace is None:
+                return
+            # After on_close's last flush the window is going away, but wx may
+            # still run this (Destroy only schedules deletion; on msw neither
+            # IsBeingDeleted() nor bool(self) changes in time). Record it and
+            # wait for the write here, since nothing else will flush it.
+            closing = self._window_closing
+            if not closing and (not self or self.IsBeingDeleted()):
+                return
             try:
                 _apply_video(vp, frames, meta)
                 for fp in frames:
                     self._checkpoint_item(fp)
                 self._checkpoint_item(vp)
-                self.mark_modified()
+                if closing:
+                    self._checkpointer.flush(10)
+                else:
+                    self.mark_modified()
             except Exception as exc:
                 logger.warning(f"Could not record frames of {Path(vp).name}: {exc}")
 
         def _after_extraction(results):
-            if not self or self.IsBeingDeleted():
+            if self._window_closing or not self or self.IsBeingDeleted():
                 return                       # window destroyed or closing
             try:
                 _finish_extraction(results)
@@ -9564,6 +9576,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # Force destroy the window
             logger.info("Calling Destroy()")
+            self._window_closing = True
             self.Destroy()
             logger.info("Destroy() completed")
         else:
@@ -9574,6 +9587,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # the frame under them (#346).
                 logger.warning("Event cannot be vetoed but user cancelled - forcing close anyway")
                 self._flush_checkpoints()
+                self._window_closing = True
                 self.Destroy()
                 return
             # Staying after all: the run cancelled above becomes a normal
@@ -9598,6 +9612,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     self._flush_checkpoints()
                     self._save_bundle_with_progress()
                     self._announce_stopped_before_describing()
+                    # The batch's window, hidden by the close, has nothing
+                    # left to show; it lived on hidden until the app quit.
+                    if closed_dialog and closed_dialog is not self.batch_progress_dialog:
+                        closed_dialog.Destroy()
             event.Veto()
 
     def on_save(self, event):
