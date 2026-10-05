@@ -1246,6 +1246,7 @@ class BatchProcessingWorker(threading.Thread):
                     break
 
                 # The next image; with an open queue this waits for more.
+                wait_started = time.time()
                 file_path, total = self._next_file(i)
                 if file_path is None:
                     if self._stop_event.is_set():
@@ -1254,6 +1255,16 @@ class BatchProcessingWorker(threading.Thread):
                     elif run_log and self._closing_note:
                         run_log.info(self._closing_note)
                     break
+                # Paused or stopped while waiting for frames: honour it before
+                # this image, not after it.
+                self._pause_event.wait()
+                if self._stop_event.is_set():
+                    if run_log:
+                        run_log.info(f"run stopped by user after {completed} images")
+                    break
+                # Time spent waiting for a video to finish extracting is not
+                # describing time; the window leaves it out of its averages.
+                waited = time.time() - wait_started
                 i += 1
 
                 # Post progress with current/total counts (add offset for continuing from video extraction)
@@ -1265,6 +1276,8 @@ class BatchProcessingWorker(threading.Thread):
                     current=current_progress,
                     total=total_progress
                 )
+                evt.waited = waited
+                evt.more_coming = self.queue_open
                 wx.PostEvent(self.parent_window, evt)
 
                 # Create worker for this image
