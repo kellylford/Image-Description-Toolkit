@@ -65,7 +65,8 @@ class TestWriter:
         w.enqueue_item(path, str(src / "a.jpg"), _gui_item(src / "a.jpg", "a"),
                        state, w.snapshot_seq())
         assert w.flush(5)
-        assert Workspace.open(path).batch_state is None   # not due yet
+        not_due = Workspace.open(path).batch_state
+        assert not_due is None   # not due yet
         w.enqueue_item(path, str(src / "b.jpg"), _gui_item(src / "b.jpg", "b"),
                        state, w.snapshot_seq())
         assert w.flush(5)
@@ -227,7 +228,6 @@ def frame(_frame, bundle, monkeypatch):
     monkeypatch.setattr(f, "workspace", ws)
     monkeypatch.setattr(f, "workspace_file", path)
     monkeypatch.setattr(f, "_batch_active", True)
-    monkeypatch.setattr(f, "_batch_embed", False)
     monkeypatch.setattr(f, "_checkpointer", BundleCheckpointWriter())
     monkeypatch.setattr(f, "_changed_seq", {})
     for name in ("show_error", "show_warning", "show_info"):
@@ -277,7 +277,8 @@ def test_stop_does_not_leave_batch_state_behind(frame, bundle, monkeypatch):
     f.on_worker_complete(_completion(src / "a.jpg", "a"))
     f.on_stop_batch()
     f._flush_checkpoints(5)
-    assert Workspace.open(path).batch_state is None
+    on_disk = Workspace.open(path).batch_state
+    assert on_disk is None
     assert [d.text for d in _sidecar(path, "a.jpg").descriptions] == ["a"]
 
 

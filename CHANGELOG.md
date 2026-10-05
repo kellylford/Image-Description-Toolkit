@@ -1,3 +1,14 @@
+## [Unreleased]
+
+### 🐛 Bug Fixes
+
+**"Embed description after processing" follows each batch in ImageDescriber (#346)**
+- The image being described when Stop was pressed is now embedded too, if its batch was set to embed.
+- A resumed batch (after a sign-in halt, or when reopening a workspace) now embeds as the original batch did. Before this, resumed images were described but never embedded.
+- Images processed straight after downloading from a web page, and video frames processed straight after extraction, now follow the **Embed description after processing** checkbox. Before this, they were never embedded.
+- A single image, follow-up question or rename during a batch that embeds no longer embeds unless it was asked to.
+- While a batch is stopping, the progress window keeps its "Stopping" line, and focus stays on that line, even when another status message appears alongside it.
+
 ## [4.6.1] - 2026-10-05
 
 Maintenance release. The two providers added in 4.6.0 are unchanged; these are

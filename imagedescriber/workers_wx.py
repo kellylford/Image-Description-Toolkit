@@ -203,9 +203,16 @@ def raise_if_provider_error(description, provider: str, model: str) -> str:
 
 # Custom event classes that properly store attributes
 class ProcessingCompleteEventData(ProcessingCompleteEvent):
-    """Event data for processing completion"""
-    def __init__(self, file_path, description, provider, model, prompt_style, custom_prompt, metadata=None):
+    """Event data for processing completion
+
+    batch: the BatchProcessingWorker this image belongs to, or None (a single
+        image, a follow-up, a rename). Its embed_after_process decides whether
+        the description is embedded, so the choice belongs to that batch.
+    """
+    def __init__(self, file_path, description, provider, model, prompt_style, custom_prompt,
+                 metadata=None, batch=None):
         ProcessingCompleteEvent.__init__(self)
+        self.batch = batch
         self.file_path = file_path
         self.description = description
         self.provider = provider
@@ -438,7 +445,8 @@ class ProcessingWorker(threading.Thread):
                 model=self.model,
                 prompt_style=self.prompt_style,
                 custom_prompt=self.custom_prompt,
-                metadata=metadata
+                metadata=metadata,
+                batch=self.batch,
             )
             wx.PostEvent(self.parent_window, evt)
             self.result_ok = True
@@ -1086,7 +1094,8 @@ class BatchProcessingWorker(threading.Thread):
                  progress_offset: int = 0,
                  geocode: bool = False,
                  logs_dir: Optional[Path] = None,
-                 video_preamble: Optional[str] = None):
+                 video_preamble: Optional[str] = None,
+                 embed_after_process: bool = False):
         """Initialize batch worker
 
         Args:
@@ -1114,6 +1123,10 @@ class BatchProcessingWorker(threading.Thread):
         self.geocode = geocode
         self.logs_dir = logs_dir
         self.video_preamble = video_preamble
+        # Read by the window from each image's completion event (event.batch):
+        # this batch's own choice, not a window-wide flag, so it can't leak to
+        # a later single image or be lost for the image in flight at Stop.
+        self.embed_after_process = embed_after_process
 
         # Phase 2: Pause/Resume/Stop controls using threading.Event
         self._stop_event = threading.Event()  # Set = stopped

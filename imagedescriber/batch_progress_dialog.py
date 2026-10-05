@@ -20,6 +20,17 @@ from pathlib import Path
 from typing import Optional
 
 SEP_LINE = "─" * 44  # reused in mark_complete()
+#: The stopping state's line, and the text that identifies its row (see
+#: update_progress, which keeps it selected through rebuilds).
+STOPPING_PREFIX = "Stopping:"
+STOPPING_LINE = f"{STOPPING_PREFIX} finishing the current video or save…"
+
+
+def _is_stopping_row(row: str) -> bool:
+    """The Stopping row, as mark_stopping appends it or a rebuild shows it.
+    Matched on the whole line, not "Stopping:" anywhere, so a file name or a
+    description containing that word is never mistaken for it."""
+    return row.endswith(STOPPING_LINE)
 
 
 # "claude-code" -> "Claude Code". idt_core imports the same way in dev and
@@ -189,7 +200,7 @@ class BatchProgressDialog(wx.Dialog):
         # when the dialog is the active window. While stopping, the save that
         # finishes the stop must not read as the batch's next step.
         if self._stopping:
-            self.SetTitle(f"Stopping: {name.lower()} — Batch Processing")
+            self.SetTitle(f"{STOPPING_PREFIX} {name.lower()} — Batch Processing")
         elif stage_index and stage_count:
             self.SetTitle(f"{name} (step {stage_index} of {stage_count}) — Batch Processing")
         else:
@@ -244,7 +255,7 @@ class BatchProgressDialog(wx.Dialog):
         # rebuild puts it at the top), so follow it by text, not by row.
         on_stopping_line = (
             self._stopping and saved_selection != wx.NOT_FOUND
-            and "Stopping:" in self.stats_list.GetString(saved_selection))
+            and _is_stopping_row(self.stats_list.GetString(saved_selection)))
 
         # Track separator row indices for keyboard navigation skip logic
         self.separator_indices = set()
@@ -253,13 +264,15 @@ class BatchProgressDialog(wx.Dialog):
         self.stats_list.Clear()
 
         # While stopping, every rebuild keeps saying so (it used to be wiped by
-        # the first progress tick after Stop).
-        if self._stopping and not status_message:
-            status_message = "Stopping: finishing the current video or save…"
+        # the first progress tick after Stop), alongside any caller's own status.
+        status_lines = [STOPPING_LINE] if self._stopping else []
+        if status_message and status_message != STOPPING_LINE:
+            status_lines.append(status_message)
 
         # ── Optional status message (e.g. MLX model loading / download) ─────
-        if status_message:
-            self.stats_list.Append(f"⏳ Status:                   {status_message}")
+        if status_lines:
+            for line in status_lines:
+                self.stats_list.Append(f"⏳ Status:                   {line}")
             self.stats_list.Append("─" * 44)
             self.separator_indices.add(self.stats_list.GetCount() - 1)
 
@@ -345,9 +358,16 @@ class BatchProgressDialog(wx.Dialog):
 
         # Restore the previously selected row (skip separators if needed)
         count = self.stats_list.GetCount()
-        if on_stopping_line and count > 0:
-            self.stats_list.SetSelection(0)     # the "Status: Stopping..." row
-            self.stats_list.EnsureVisible(0)
+        stopping_row = wx.NOT_FOUND
+        if on_stopping_line:
+            # Found by its text rather than assumed to be row 0, so the
+            # selection follows it if the rows above it ever change.
+            stopping_row = next((i for i in range(count)
+                                 if _is_stopping_row(self.stats_list.GetString(i))),
+                                wx.NOT_FOUND)
+        if stopping_row != wx.NOT_FOUND:
+            self.stats_list.SetSelection(stopping_row)
+            self.stats_list.EnsureVisible(stopping_row)
         elif saved_selection != wx.NOT_FOUND and count > 0:
             idx = min(saved_selection, count - 1)
             # Scan forward past any separator, then backward if still on one
@@ -411,13 +431,21 @@ class BatchProgressDialog(wx.Dialog):
         self.stats_list.SetFocus()
         self.pause_button.Enable(False)
         self.stop_button.Enable(False)
-        self.stats_list.Append(SEP_LINE)
-        self.separator_indices.add(self.stats_list.GetCount() - 1)
-        self.stats_list.Append("Stopping: finishing the current video or save…")
-        last = self.stats_list.GetCount() - 1
-        self.stats_list.SetSelection(last)
-        self.stats_list.EnsureVisible(last)
-        self.SetTitle("Stopping  —  Batch Processing")
+        # Called again (Stop, then a cancelled close): go back to the line
+        # already there rather than adding a second one.
+        row = next((i for i in range(self.stats_list.GetCount())
+                    if _is_stopping_row(self.stats_list.GetString(i))), wx.NOT_FOUND)
+        if row == wx.NOT_FOUND:
+            self.stats_list.Append(SEP_LINE)
+            self.separator_indices.add(self.stats_list.GetCount() - 1)
+            self.stats_list.Append(STOPPING_LINE)
+            row = self.stats_list.GetCount() - 1
+        self.stats_list.SetSelection(row)
+        self.stats_list.EnsureVisible(row)
+        # The same title begin_stage gives a stage begun while stopping.
+        stage = getattr(self, 'stage_name', None)
+        self.SetTitle(f"{STOPPING_PREFIX} {stage.lower()} — Batch Processing"
+                      if stage else "Stopping — Batch Processing")
 
     def mark_complete(self, summary: str = "", stopped: bool = False):
         """
