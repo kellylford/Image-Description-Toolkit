@@ -55,6 +55,10 @@ found while using them, most of them in long ImageDescriber batches.
 - **Failed images no longer open an error window each.** A batch with many
   failures used to bury the screen in error windows, one per image. Failures are
   now counted in the progress window, and the end of the batch reports them once.
+- **A batch with many videos starts straight away on a Mac.** With videos on a
+  network share, ImageDescriber could freeze for up to two minutes before its
+  progress window appeared, and VoiceOver reported no windows at all. The window
+  and its "Extracting frames" stage now appear immediately.
 - **Stopping and restarting a batch with videos works.** Stopping a batch, then
   choosing **Process → Describe All Undescribed**, could extract a video's frames a
   second time and then fail with "file not found". Stop now works at every stage,

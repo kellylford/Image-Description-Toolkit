@@ -281,7 +281,8 @@ def test_stop_during_save_stage_never_starts_describing(frame, monkeypatch):
     assert _pump_until(lambda: f._run_cancel is None)
     assert not _FakeWorker.instances[0].started
     assert f.workspace.batch_state is None
-    assert Workspace.open(Path(f.workspace_file)).batch_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
     item = Workspace.open(Path(f.workspace_file)).get_item("a.jpg")
     assert item.extra.get("processing_state") is None
 
@@ -327,6 +328,72 @@ def test_same_named_videos_without_subfolder_still_separate(frame):
     assert da == f._frames_dir_for_video(a.file_path), "must be stable across calls"
 
 
+def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch):
+    """Issue #342: claiming reads each source video (fingerprint). On a macOS
+    network share that took ~60 ms a video, all on the main thread before the
+    progress window appeared: 1,340 videos froze the app for ~2 minutes."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    claimed_on = []
+    real_claim = imagedescriber_wx._claim_frames_dir_for
+
+    def claim(*a):
+        claimed_on.append(threading.current_thread())
+        return real_claim(*a)
+    monkeypatch.setattr(imagedescriber_wx, "_claim_frames_dir_for", claim)
+    dirs = {}
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        dirs[vp] = frames_dir
+        out = Path(frames_dir) / f"{Path(vp).stem}_0.00s.jpg"
+        out.write_bytes(b"x")
+        return [str(out)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+
+    vids = [str(f.src / "clip.mp4"), str(v2)]
+    f._extract_then_launch(vids, [], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances)
+    assert len(claimed_on) == 2
+    assert threading.main_thread() not in claimed_on
+    # Same folders as the main-thread path chooses, and the frames recorded
+    # under them.
+    for vp in vids:
+        assert dirs[vp] == f._frames_dir_for_video(vp)
+        frame_path = f.workspace.items[vp].extracted_frames[0]
+        assert f.workspace.items[frame_path].subfolder == f._frame_subfolder(dirs[vp])
+
+
+def test_video_whose_folder_cannot_be_claimed_is_skipped(frame, monkeypatch):
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    real_claim = imagedescriber_wx._claim_frames_dir_for
+
+    def claim(derived, vp, *a):
+        if Path(vp).name == "clip.mp4":
+            raise OSError("share went away")
+        return real_claim(derived, vp, *a)
+    monkeypatch.setattr(imagedescriber_wx, "_claim_frames_dir_for", claim)
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        out = Path(frames_dir) / "clip2_0.00s.jpg"
+        out.write_bytes(b"x")
+        return [str(out)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances), "describing never started"
+    assert not f.workspace.items[str(f.src / "clip.mp4")].extracted_frames
+    assert len(f.workspace.items[str(v2)].extracted_frames) == 1
+
+
 def test_unique_video_keeps_plain_folder_name(frame):
     f = frame
     d = f._frames_dir_for_video(str(f.src / "clip.mp4"))
@@ -346,15 +413,21 @@ def test_persisted_frames_resolve_after_reopen(frame, tmp_path):
         frames.append(str(p))
         fi = ImageItem(str(p), "extracted_frame")
         fi.parent_video = vid
+        fi.subfolder = "frames/clip"
         f.workspace.add_item(fi)
     f.workspace.items[vid].extracted_frames = frames
 
-    f._persist_extracted_frames_to_bundle()
+    # The save a batch runs before describing ("Saving workspace" stage); it
+    # replaced a separate main-thread frame save, so it must record frames
+    # the same way: storage "reference", parent_video and subfolder kept.
+    f._save_bundle()
 
     ws = Workspace.open(Path(f.workspace_file))
     # Recorded truthfully (they are not in images/), not rescued by the
     # image_path fallback that exists for bundles the old code wrote.
     assert {ws.get_item(Path(p).name).storage for p in frames} == {"reference"}
+    subfolders = {ws.get_item(Path(p).name, "frames/clip").subfolder for p in frames}
+    assert subfolders == {"frames/clip"}
     gui = bundle_to_gui_workspace_dict(ws)
     for p in frames:
         assert p in gui["items"], "frame no longer at its real path after reopen"
@@ -588,6 +661,7 @@ def test_end_of_batch_reports_failures_once(frame):
                                            worker=w, halted=None, halted_files=[]))
     assert any("could not be described" in m and "bad image" in m for m in f.infos)
 
+
 def test_failed_start_keeps_a_halted_batchs_resume_state(frame, monkeypatch):
     f = frame
     halted_state = {"total_queued": 9, "provider": "claude-code"}
@@ -596,9 +670,9 @@ def test_failed_start_keeps_a_halted_batchs_resume_state(frame, monkeypatch):
     f.workspace.items[other].processing_state = "pending"
 
     def boom(*a, **k):
-        raise RuntimeError("persist exploded")
+        raise RuntimeError("refresh exploded")
     # Fails before the new run sets batch_state or marks anything pending.
-    monkeypatch.setattr(f, "_persist_extracted_frames_to_bundle", boom)
+    monkeypatch.setattr(f, "refresh_image_list", boom)
     f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
     assert f.workspace.batch_state is halted_state
     assert f.workspace.items[other].processing_state == "pending"
@@ -716,3 +790,337 @@ def test_pump_depth_recovers_when_closing_the_dialog_raises(frame, monkeypatch):
     with pytest.raises(RuntimeError):
         f._run_with_progress("Saving workspace", 1, lambda cb: None)
     assert f._progress_pump_depth == 0
+
+
+def test_all_videos_failing_says_so(frame, monkeypatch):
+    """Every video's extraction failing used to end with "All images already
+    have descriptions." (third reviewer of PR 343)."""
+    from data_models import ImageDescription
+    f = frame
+    f.workspace.items[str(f.src / "a.jpg")].descriptions.append(
+        ImageDescription(text="done"))
+
+    def fail(vp, cfg, cancel=None, frames_dir=None):
+        raise OSError("share went read-only")
+    monkeypatch.setattr(f, "_extract_video_frames_sync", fail)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("No frames could be extracted" in m and "read-only" in m for m in f.infos)
+    assert not any("All images already have descriptions" in m for m in f.infos)
+    assert f.batch_progress_dialog is None
+    assert f._batch_active is False
+    assert _FakeWorker.instances == []
+
+
+def test_some_videos_failing_are_reported_at_the_end(frame, monkeypatch, tmp_path):
+    """A failed video was counted in the progress window but missing from the
+    end-of-batch summary (fourth reviewer of PR 343). Driven through the real
+    _launch_batch, so the hand-over into the batch is covered too."""
+    from data_models import ImageItem
+    f = frame
+    good = f.src / "good.mp4"
+    good.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(good), "video"))
+    frame_file = tmp_path / "good_0.00s.jpg"
+    frame_file.write_bytes(b"x")
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            raise OSError("not a video")
+        return [str(frame_file)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(good)], [], OPTIONS, True)
+    # Extraction, then the real _launch_batch through its save stage.
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    assert f._batch_video_failures == [("clip.mp4", "not a video")]
+
+    w = _FakeWorker.instances[-1]
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/1 images", output_dir="",
+                                           worker=w, halted=None, halted_files=[]))
+    assert any("could not be extracted from 1 video" in m and "not a video" in m
+               for m in f.infos)
+
+
+def test_stop_during_extraction_announces_after_the_save(frame, monkeypatch):
+    """The "stopped" message used to appear at once; the save's progress window
+    then took focus from it while a screen reader was reading it. The progress
+    window now says it is stopping until the (real) save is done, and the save
+    never reads as the batch's next step."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    order = []
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    second = []
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(done_frame)], {}
+        second.append(vp)
+        while not cancel.is_set():
+            time.sleep(0.01)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    real_save = f._save_bundle
+    monkeypatch.setattr(f, "_save_bundle",
+                        lambda *a, **k: (order.append("save"), real_save(*a, **k))[1])
+    monkeypatch.setattr(imagedescriber_wx, "show_info",
+                        lambda _p, msg, *a, **k: order.append("message"))
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(lambda: second)
+    dlg = f.batch_progress_dialog
+    titles, lists = [], []
+    real_set_title = dlg.SetTitle
+
+    def set_title(t):
+        titles.append(t)
+        real_set_title(t)
+    monkeypatch.setattr(dlg, "SetTitle", set_title)
+    real_update = dlg.update_progress
+
+    def update(*a, **k):
+        real_update(*a, **k)
+        lists.append([dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())])
+    monkeypatch.setattr(dlg, "update_progress", update)
+
+    f.on_stop_batch()
+    assert order == [], "announced before the run had wound down"
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert order[0] == "save" and order[-1] == "message"
+    assert titles and all("Stopping" in t for t in titles), titles
+    assert not any("step" in t for t in titles), titles
+    assert lists and all(any("Stopping" in line for line in rows) for rows in lists)
+    assert f.batch_progress_dialog is None
+
+
+def _veto_close(f, monkeypatch):
+    """Run on_close with the user answering Cancel to "save changes?"."""
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: False)
+    vetoed = []
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: vetoed.append(1)))
+    assert vetoed
+
+
+def test_closing_during_extraction_saves_nothing_and_says_nothing(frame, monkeypatch):
+    """Closing used to run a full save inside the "save changes?" question."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    saves, extracted = [], []
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: saves.append(1))
+    done_frame = f.src / "clip_0.00s.jpg"
+    done_frame.write_bytes(b"x")
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            return [str(done_frame)], {}
+        extracted.append(vp)
+        while not cancel.is_set():
+            time.sleep(0.01)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(lambda: extracted)
+    cancel = f._run_cancel
+    cancel.closing = True             # as on_close marks it
+    cancel.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert saves == []
+    assert f.infos == []
+
+
+def test_cancelling_the_close_leaves_later_stops_working(frame, monkeypatch):
+    """A closing flag that outlived the cancelled close silenced every later
+    Stop for the rest of the session (fifth reviewer of PR 343)."""
+    import imagedescriber_wx
+    f = frame
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: None)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    _veto_close(f, monkeypatch)            # user chooses Cancel: stays
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("stopped before describing" in m for m in f.infos), \
+        "the run the cancelled close stopped should still say so"
+
+    # A later run and Stop still announce.
+    f.infos.clear()
+    calls.clear()
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    f.on_stop_batch()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("stopped before describing" in m for m in f.infos)
+
+
+def test_scan_finishing_mid_run_keeps_the_runs_window_and_embed_choice(frame, monkeypatch):
+    """A folder scan completing while a run extracted frames closed the run's
+    progress window, and with it reset "embed after processing"."""
+    f = frame
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    opts = dict(OPTIONS, embed_after_process=True)
+    f._batch_embed = True
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], opts, True)
+    assert _pump_until(lambda: calls)
+    dlg = f.batch_progress_dialog
+    f.on_scan_failed(SimpleNamespace(error="share went away"))
+    assert f.batch_progress_dialog is dlg
+    assert f._batch_embed is True
+    f._run_cancel.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+
+
+def test_cancelled_close_during_the_save_stage_is_a_full_stop(frame, monkeypatch):
+    """Closing then choosing Cancel during "Saving workspace" left batch_state
+    and pending flags set, so reopening offered to resume a batch the user was
+    told had stopped (sixth reviewer of PR 343)."""
+    f = frame
+    gate = threading.Event()
+    real_save = f._save_bundle
+
+    def slow_save(*a, **k):
+        if k.get("progress") is not None and not gate.is_set():
+            gate.wait(10)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", slow_save)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert f._run_cancel is not None
+    _veto_close(f, monkeypatch)
+    gate.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f.workspace.batch_state is None
+    assert f.workspace.items[str(f.src / "a.jpg")].processing_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
+    assert any("stopped before describing" in m for m in f.infos)
+    assert not _FakeWorker.instances[-1].started
+
+
+def test_scan_progress_does_not_paint_into_a_runs_window(frame, monkeypatch):
+    f = frame
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    dlg = f.batch_progress_dialog
+    painted = []
+    monkeypatch.setattr(dlg, "update_progress", lambda *a, **k: painted.append(a))
+    f.on_scan_progress(SimpleNamespace(files_found=812, message="scanning"))
+    f.on_scan_complete(SimpleNamespace(total_files=812, elapsed_time=3.1))
+    wx.SafeYield()
+    assert painted == []
+    f._run_cancel.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+
+
+def test_halted_question_mentions_failed_videos(frame, monkeypatch):
+    f = frame
+    monkeypatch.setattr(f, "_save_bundle", lambda *a, **k: None)
+    w = _FakeWorker()
+    f.batch_worker = w
+    f._reset_batch_failures()
+    f._batch_video_failures = [("clip.mp4", "not a video")]
+    f.on_workflow_complete(SimpleNamespace(input_dir="1/2 images", output_dir="",
+                                           worker=w, halted="signed out",
+                                           halted_files=[], halted_streak=False))
+    assert any("could not be extracted from 1 video" in q for q in f.questions)
+
+
+def test_frames_all_already_described_is_not_called_a_failure(frame, monkeypatch, tmp_path):
+    """One video fails, another gives frames that are all already described:
+    nothing to do, but frames *were* extracted, so the message must not say
+    none could be."""
+    from data_models import ImageItem, ImageDescription
+    f = frame
+    f.workspace.items[str(f.src / "a.jpg")].descriptions.append(ImageDescription(text="d"))
+    good = f.src / "good.mp4"
+    good.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(good), "video"))
+    fr = tmp_path / "good_0.00s.jpg"
+    fr.write_bytes(b"x")
+    done = ImageItem(str(fr), "extracted_frame")
+    done.descriptions.append(ImageDescription(text="already"))
+    f.workspace.add_item(done)
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        if Path(vp).name == "clip.mp4":
+            raise OSError("not a video")
+        return [str(fr)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(good)], [], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert not any("No frames could be extracted" in m for m in f.infos)
+    assert any("All images already have descriptions" in m for m in f.infos)
+
+
+def test_stopping_line_stays_selected_through_rebuilds(_frame):
+    """mark_stopping appends the line at the end and selects it; the next
+    rebuild moves it to the top. Restoring the selection by row number landed
+    a screen reader on "Prompt Style" instead of "Stopping". (From the Mac
+    session, which found it independently.)"""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 10, batch_provider="ollama",
+                              batch_model="m", batch_prompt="detailed")
+    try:
+        dlg.begin_stage("Extracting frames", 10, stage_index=1, stage_count=3)
+        dlg.update_progress(3, 10, image_name="clip.mp4")
+        dlg.mark_stopping()
+        dlg.begin_stage("Saving workspace", 10, stage_index=2, stage_count=3)
+        for _ in range(2):
+            dlg.update_progress(4, 10, image_name="clip2.mp4")
+            sel = dlg.stats_list.GetSelection()
+            assert sel != wx.NOT_FOUND
+            assert "Stopping:" in dlg.stats_list.GetString(sel)
+            rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+            assert not any("step" in r for r in rows), rows
+    finally:
+        dlg.Destroy()
+
+
+def test_mark_stopping_shows_a_hidden_window_before_focusing_it(_frame):
+    """Focus moved into a hidden progress window went nowhere for the save."""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 10)
+    try:
+        dlg.Show()
+        dlg.Hide()                     # what its Close button does
+        dlg.mark_stopping()
+        assert dlg.IsShown()
+    finally:
+        dlg.Destroy()
+
+
+def test_cancelled_close_after_the_run_ended_is_still_a_full_stop(frame, monkeypatch):
+    """The save stage ended while "save changes?" was open, then Cancel: the
+    user was told "stopped" but the batch was saved as resumable (seventh
+    reviewer of PR 343)."""
+    f = frame
+    gate = threading.Event()
+    real_save = f._save_bundle
+
+    def slow_save(*a, **k):
+        if k.get("progress") is not None and not gate.is_set():
+            gate.wait(10)
+        return real_save(*a, **k)
+    monkeypatch.setattr(f, "_save_bundle", slow_save)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+
+    def question():
+        gate.set()                     # the save finishes during the question
+        assert _pump_until(lambda: f._run_cancel is None)
+        return False                   # Cancel
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    vetoed = []
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: vetoed.append(1)))
+    assert vetoed
+    assert f.workspace.batch_state is None
+    assert f.workspace.items[str(f.src / "a.jpg")].processing_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
+    assert any("stopped before describing" in m for m in f.infos)
