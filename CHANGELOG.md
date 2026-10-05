@@ -1,4 +1,13 @@
-## [Unreleased]
+## [4.6.1] - 2026-10-05
+
+Maintenance release. The two providers added in 4.6.0 are unchanged; these are
+fixes found while using them.
+
+### ✨ New Features
+
+**Play a video from ImageDescriber**
+- Press **Enter** (or double-click) on a video in the image list, or choose **Process → Play Video**, to open it in the system's default video player.
+- If the video file has moved or been deleted, ImageDescriber says so instead of doing nothing.
 
 ### 🐛 Bug Fixes
 
@@ -19,19 +28,6 @@
 - If the provider is signed out, rejects your API key, or isn't set up, the batch now stops at the first such failure. It shows the provider's own message and offers to resume: fix the problem (for Claude Code, run `claude auth login`), then choose **Yes** to carry on with the same images, provider and prompt. Choose **No** to resume later; reopening the workspace offers it. Other failures, such as a single unreadable image or a temporary server error, don't stop the batch.
 - A batch also stops when 10 images in a row fail with exactly the same error, which catches a used-up Claude Code plan or Ollama not running. Ten genuinely problem images in a row with an identical error, such as ten too large for the provider, stop it the same way; choosing **Yes** resumes with them still queued.
 - For Claude Code, a failed image triggers a check of `claude auth status`, so an expired sign-in is recognised even when Claude Code's message is unclear. Claude Code's own sign-in messages still count too. Apple Intelligence stops a batch only on setup problems it detects itself (wrong Mac, licence not accepted, model switched off), not on a server error that a retry recovers from.
-
-## [4.6.1] - 2026-10-04
-
-Maintenance release. The two providers added in 4.6.0 are unchanged; these are
-fixes found while using them.
-
-### ✨ New Features
-
-**Play a video from ImageDescriber**
-- Press **Enter** (or double-click) on a video in the image list, or choose **Process → Play Video**, to open it in the system's default video player.
-- If the video file has moved or been deleted, ImageDescriber says so instead of doing nothing.
-
-### 🐛 Bug Fixes
 
 **ImageDescriber saves each description as soon as it is written**
 - During a batch, descriptions were kept only in memory until the whole batch finished. Nothing reached the workspace on disk unless you pressed Save, so a crash, power loss or forced quit partway through a long run lost every description since the last save.

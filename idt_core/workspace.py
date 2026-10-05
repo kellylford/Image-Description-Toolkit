@@ -730,7 +730,7 @@ class Workspace:
         if item.storage == "reference" and item.source_path:
             return Path(item.source_path)
         copy_path = self._image_copy_path(item.image, item.subfolder)
-        # ImageDescriber up to 4.6.1 recorded extracted video frames as
+        # ImageDescriber 4.6.0 and earlier recorded extracted video frames as
         # storage="copy" without copying them; they live at source_path under
         # this bundle's derived/frames/. Only that case: any other missing copy
         # is still reported missing rather than quietly using an original.

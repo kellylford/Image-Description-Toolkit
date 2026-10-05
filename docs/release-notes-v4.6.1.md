@@ -34,21 +34,53 @@ people want the installer, which puts all three on the Start menu.
 ## What changed in 4.6.1
 
 A maintenance release. 4.6.0's two new providers are unchanged; this fixes things
-found while using them.
+found while using them, most of them in long ImageDescriber batches.
 
-- **ImageDescriber saves each description as soon as it is written.** Before, a
-  batch kept every description in memory until the whole batch finished, so a crash
-  or power cut partway through a long run lost all of it unless you had pressed
-  Save. Now each image's description is written to the workspace when that image
-  finishes. If the run is interrupted, reopening the workspace offers to resume at
-  the first image not yet described.
-- **On a Mac, selecting a described image shows its description in full.**
-  Before, the description list filled in but the description editor next to it
-  could stay unchanged.
+**Long batches**
+
+- **Each description is saved as soon as it is written.** Before, a batch kept
+  every description in memory until the whole batch finished, so a crash or power
+  cut partway through a long run lost all of it unless you had pressed Save. If a
+  run is interrupted now, reopening the workspace offers to resume at the first
+  image not yet described.
+- **A batch stops when the AI provider can't be used.** If Claude Code's sign-in
+  expires partway through, your API key is refused, or the provider isn't set up,
+  every remaining image would fail the same way. Before, the batch carried on and
+  failed them one by one: 533 images in 17 minutes in one real run. Now it stops at
+  the first such failure, shows the provider's message and keeps its place. Fix the
+  problem (for Claude Code, run `claude auth login`), then choose **Yes** to resume
+  the same batch, or **No** to resume later from the workspace. A batch also stops
+  when 10 images in a row fail with exactly the same error, which catches a
+  used-up plan or Ollama not running.
+- **Failed images no longer open an error window each.** A batch with many
+  failures used to bury the screen in error windows, one per image. Failures are
+  now counted in the progress window, and the end of the batch reports them once.
+- **Stopping and restarting a batch with videos works.** Stopping a batch, then
+  choosing **Process → Describe All Undescribed**, could extract a video's frames a
+  second time and then fail with "file not found". Stop now works at every stage,
+  including while frames are being extracted, and only one batch can run at a
+  time, so a second batch can no longer delete frames the first is using.
+- **Extracted video frames are found after you reopen a workspace.** Before, every
+  frame could show as "not found" after reopening. Workspaces saved by earlier
+  versions find their frames again.
+- **Two videos with the same name keep their own frames.** Videos called, for
+  example, `IMG_0001.MOV` in different folders shared one frames folder, so one
+  video's frames were lost or given the other's descriptions. This is fixed in
+  ImageDescriber and in the `idt` command-line tool.
+- **The open workspace can't be replaced while a batch is using it.** Opening
+  another workspace during a batch sent the batch's descriptions nowhere;
+  ImageDescriber now says a batch is running instead.
+- **An empty answer from the AI counts as a failure.** It used to be saved as a
+  blank description, and the image was then treated as described.
+
+**Everything else**
+
 - **Play a video from ImageDescriber.** Press **Enter** (or double-click) on a
   video in the image list, or choose **Process → Play Video**, to open it in your
   usual video player.
-
+- **On a Mac, selecting a described image shows its description in full.**
+  Before, the description list filled in but the description editor next to it
+  could stay unchanged.
 - **Apple Intelligence retries when its model manager drops a request.** Apple's
   on-device model occasionally fails to load for one image, with an error that
   looks like a server fault. It is momentary — every image that hit it described
