@@ -23,6 +23,7 @@ import logging
 import re
 import subprocess
 import threading
+import collections
 from types import SimpleNamespace
 import time
 import base64
@@ -127,6 +128,21 @@ from idt_core.gui_bridge import BundleCheckpointWriter  # noqa: E402
 
 class ExtractionCancelled(Exception):
     """Frame extraction was stopped partway through a video."""
+
+
+def _claim_frames_dir_for(derived: Path, video_path: str, subfolder: Optional[str],
+                          collides: bool) -> Path:
+    """Choose and claim one video's frames folder from a _plan_frames_dirs plan.
+
+    Reads the source video (size and fingerprint) and writes the folder's owner
+    marker, so it is slow on a network share; it reads nothing from the
+    workspace, so it can run on the extraction thread.
+    """
+    from idt_core.workspace import choose_frames_relpath, claim_frames_dir
+    vp = Path(video_path)
+    target = derived / choose_frames_relpath(derived, vp, subfolder, force_hash=collides)
+    claim_frames_dir(target, vp)
+    return target
 
 try:
     import openai
@@ -1029,24 +1045,41 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         case-insensitively, like the file systems they live on), or a folder
         already claimed by a different video. The folder is claimed here.
         """
-        from idt_core.workspace import choose_frames_relpath, claim_frames_dir
-        vp = Path(video_path)
-        item = self.workspace.items.get(str(video_path)) if self.workspace else None
-        sub = getattr(item, 'subfolder', None) or None
-        derived = self._derived_dir()
+        derived, plans = self._plan_frames_dirs([video_path])
+        return _claim_frames_dir_for(derived, video_path, *plans[video_path])
 
-        collides = False
-        if self.workspace:
-            fold = os.path.normcase if sys.platform != "darwin" else str.lower
-            mine = (fold(vp.stem), fold(sub or ""))
-            collides = any(
-                other.item_type == "video" and other_path != str(video_path)
-                and (fold(Path(other_path).stem),
-                     fold(getattr(other, 'subfolder', None) or "")) == mine
-                for other_path, other in self.workspace.items.items())
-        target = derived / choose_frames_relpath(derived, vp, sub, force_hash=collides)
-        claim_frames_dir(target, vp)
-        return target
+    def _plan_frames_dirs(self, video_paths: list) -> tuple:
+        """What choosing each video's frames folder needs from the workspace.
+        Main thread only; touches no source file.
+
+        Returns (derived dir, {video path: (subfolder, collides)}), to hand to
+        _claim_frames_dir_for, which does the file work and may run on a worker
+        thread. That work used to run here for every video before a batch's
+        progress window appeared: it opens each source video to fingerprint
+        it, and on a macOS network share (smbfs) each open costs tens of
+        milliseconds, so 1,340 videos froze the window for almost two minutes
+        (issue #342). One pass over the workspace finds the collisions; this
+        was a scan of every item per video.
+        """
+        derived = self._derived_dir()
+        fold = os.path.normcase if sys.platform != "darwin" else str.lower
+        items = self.workspace.items if self.workspace else {}
+
+        def key(path, sub):
+            return (fold(Path(path).stem), fold(sub or ""))
+
+        counts = collections.Counter(
+            key(p, getattr(i, 'subfolder', None))
+            for p, i in items.items() if i.item_type == "video")
+        plans = {}
+        for vp in video_paths:
+            item = items.get(str(vp))
+            sub = getattr(item, 'subfolder', None) or None
+            # Videos other than this one with the same name and subfolder.
+            others = counts[key(vp, sub)] - (
+                1 if item is not None and item.item_type == "video" else 0)
+            plans[vp] = (sub, others > 0)
+        return derived, plans
 
     def _frame_subfolder(self, frames_dir: Path) -> Optional[str]:
         """Sidecar subfolder for frames in `frames_dir` (e.g. frames/jan/IMG_0001).
@@ -3909,8 +3942,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         cancel = self._begin_run()
         try:
             extraction_config = self._load_video_extraction_config()
-            # Decided here: it reads the workspace, which the thread must not.
-            frame_dirs = {vp: self._frames_dir_for_video(vp) for vp in videos_to_extract}
+            # Planned here: it reads the workspace, which the thread must not.
+            # The folders are claimed on the thread (source file reads; see
+            # _plan_frames_dirs) and recorded in frame_dirs as each is claimed.
+            derived, frame_plans = self._plan_frames_dirs(videos_to_extract)
+            frame_dirs = {}
 
             # Three stages when there are videos: extract → save → describe.
             self._ensure_progress_dialog(options, 3)
@@ -3929,6 +3965,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if cancel.is_set():
                         break
                     try:
+                        frame_dirs[vp] = _claim_frames_dir_for(
+                            derived, vp, *frame_plans[vp])
                         frames, meta = self._extract_video_frames_sync(
                             vp, extraction_config, cancel=cancel,
                             frames_dir=frame_dirs[vp])
@@ -3966,6 +4004,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                         vi.video_metadata = meta
                 vid_count += 1
                 frame_count += len(frames)
+                if not frames:
+                    # Includes a video whose folder could not be claimed, which
+                    # has no entry in frame_dirs.
+                    continue
                 frame_sub = self._frame_subfolder(frame_dirs[vp])
                 for fp in frames:
                     if fp not in self.workspace.items:

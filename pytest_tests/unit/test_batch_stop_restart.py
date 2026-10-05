@@ -327,6 +327,72 @@ def test_same_named_videos_without_subfolder_still_separate(frame):
     assert da == f._frames_dir_for_video(a.file_path), "must be stable across calls"
 
 
+def test_frame_folders_claimed_off_the_main_thread(frame, monkeypatch, tmp_path):
+    """Issue #342: claiming reads each source video (fingerprint). On a macOS
+    network share that took ~75 ms a video, all on the main thread before the
+    progress window appeared: 1,340 videos froze the app for ~2 minutes."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    claimed_on = []
+    real_claim = imagedescriber_wx._claim_frames_dir_for
+
+    def claim(*a):
+        claimed_on.append(threading.current_thread())
+        return real_claim(*a)
+    monkeypatch.setattr(imagedescriber_wx, "_claim_frames_dir_for", claim)
+    dirs = {}
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        dirs[vp] = frames_dir
+        out = Path(frames_dir) / f"{Path(vp).stem}_0.00s.jpg"
+        out.write_bytes(b"x")
+        return [str(out)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+
+    vids = [str(f.src / "clip.mp4"), str(v2)]
+    f._extract_then_launch(vids, [], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances)
+    assert len(claimed_on) == 2
+    assert threading.main_thread() not in claimed_on
+    # Same folders as the main-thread path chooses, and the frames recorded
+    # under them.
+    for vp in vids:
+        assert dirs[vp] == f._frames_dir_for_video(vp)
+        frame_path = f.workspace.items[vp].extracted_frames[0]
+        assert f.workspace.items[frame_path].subfolder == f._frame_subfolder(dirs[vp])
+
+
+def test_video_whose_folder_cannot_be_claimed_is_skipped(frame, monkeypatch, tmp_path):
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    v2 = f.src / "clip2.mp4"
+    v2.write_bytes(b"x")
+    f.workspace.add_item(ImageItem(str(v2), "video"))
+    real_claim = imagedescriber_wx._claim_frames_dir_for
+
+    def claim(derived, vp, *a):
+        if Path(vp).name == "clip.mp4":
+            raise OSError("share went away")
+        return real_claim(derived, vp, *a)
+    monkeypatch.setattr(imagedescriber_wx, "_claim_frames_dir_for", claim)
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        out = Path(frames_dir) / "clip2_0.00s.jpg"
+        out.write_bytes(b"x")
+        return [str(out)], {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+
+    f._extract_then_launch([str(f.src / "clip.mp4"), str(v2)], [], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances), "describing never started"
+    assert not f.workspace.items[str(f.src / "clip.mp4")].extracted_frames
+    assert len(f.workspace.items[str(v2)].extracted_frames) == 1
+
+
 def test_unique_video_keeps_plain_folder_name(frame):
     f = frame
     d = f._frames_dir_for_video(str(f.src / "clip.mp4"))
