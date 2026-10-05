@@ -803,9 +803,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.last_completed_description: Optional[str] = None  # Last description (for progress dialog)
 
 
-        # Embed-after-process flag: set from ProcessingOptionsDialog each run; checked
-        # in on_worker_complete to embed each image's description as it completes.
-        self._batch_embed = False
 
         # AI Model caching (for faster dialog loading)
         self.cached_ollama_models = None  # Will be populated on first use or manual refresh
@@ -3887,9 +3884,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self._refuse_if_batch_busy():
             return
 
-        # Store embed-after-process flag for on_worker_complete to pick up per image
-        self._batch_embed = options.get('embed_after_process', False)
-
         # Phase 5: Use skip_existing parameter instead of options
         # Get files to process - handle videos separately
         images_to_process = []
@@ -4226,9 +4220,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self._refuse_if_batch_busy():
             return
 
-        # Store embed-after-process flag for on_worker_complete to pick up per image
-        self._batch_embed = options.get('embed_after_process', False)
-
         if videos_to_extract:
             self._extract_then_launch(videos_to_extract, to_process, options, True)
             return  # resumes on the extraction thread → _launch_batch
@@ -4392,7 +4383,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     item.processing_state = None
                     item.batch_queue_position = None
         self.batch_worker = None   # created for the save stage but never started
-        self._batch_embed = False
         self.processing_items.clear()
         doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
         self.update_window_title("ImageDescriber", doc_name)
@@ -4437,10 +4427,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.batch_progress_dialog.Close()
             self.batch_progress_dialog = None
         self._batch_active = False
-        # Per run: a later single image must not embed. Only once no run is
-        # going, since a folder scan finishing mid-run also closes dialogs.
-        if self._run_cancel is None and not self._batch_worker_running():
-            self._batch_embed = False
         if hasattr(self, 'show_batch_progress_item'):
             self.show_batch_progress_item.Enable(False)
         if hasattr(self, 'workspace_stats_item'):
@@ -4704,6 +4690,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             geocode=options.get('geocode_enabled', False),
             logs_dir=self._workspace_logs_dir(),
             video_preamble=video_preamble,
+            embed_after_process=options.get('embed_after_process', False),
         )
         self.batch_worker = worker
         self.batch_start_time = time.time()
@@ -6066,8 +6053,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
             # Embed description into workspace embedded/ folder if requested.
             # Single-image path: embed_after_process stored in proc_info.
-            # Batch path: _batch_embed flag set when the batch worker started.
-            if proc_info.get('embed_after_process', False) or self._batch_embed:
+            # Batch path: the batch worker's own choice, carried on the event.
+            batch = getattr(event, 'batch', None)
+            if (proc_info.get('embed_after_process', False)
+                    or getattr(batch, 'embed_after_process', False)):
                 self._embed_single_description(image_item, desc)
 
             # Track last completed for progress dialog (with safe error handling)
@@ -6543,7 +6532,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.SetStatusText("Batch stopped: provider refused the request" if halted
                            else "Batch complete", 0)
         self._batch_active = False
-        self._batch_embed = False
         self.refresh_image_list()
 
         if (failures or video_failures) and not halted:
@@ -7093,7 +7081,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # completion event; until then new runs are refused (_batch_busy_message).
         self.batch_worker.stop()
         self._stopping_worker = self.batch_worker
-        self._batch_embed = False   # the stopped run's choice ends with it
         self._reset_batch_failures()
 
         # Clear batch state (won't resume automatically)
@@ -7515,6 +7502,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             progress_offset=0,
             geocode=options.get('geocode_enabled', False),
             logs_dir=self._workspace_logs_dir(),
+            embed_after_process=options.get('embed_after_process', False),
         )
         self.batch_worker.start()
 
@@ -7590,6 +7578,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             skip_existing=True,
             geocode=options.get('geocode_enabled', False),
             logs_dir=self._workspace_logs_dir(),
+            embed_after_process=options.get('embed_after_process', False),
         )
         self.batch_worker.start()
 

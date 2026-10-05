@@ -960,19 +960,18 @@ def test_cancelling_the_close_leaves_later_stops_working(frame, monkeypatch):
     assert any("stopped before describing" in m for m in f.infos)
 
 
-def test_scan_finishing_mid_run_keeps_the_runs_window_and_embed_choice(frame, monkeypatch):
+def test_scan_finishing_mid_run_keeps_the_runs_window(frame, monkeypatch):
     """A folder scan completing while a run extracted frames closed the run's
-    progress window, and with it reset "embed after processing"."""
+    progress window. (It also reset "embed after processing"; that choice now
+    lives on the batch worker, which a scan can't touch.)"""
     f = frame
     release, calls = _slow_extraction(monkeypatch, f, [])
     opts = dict(OPTIONS, embed_after_process=True)
-    f._batch_embed = True
     f._extract_then_launch([str(f.src / "clip.mp4")], [], opts, True)
     assert _pump_until(lambda: calls)
     dlg = f.batch_progress_dialog
     f.on_scan_failed(SimpleNamespace(error="share went away"))
     assert f.batch_progress_dialog is dlg
-    assert f._batch_embed is True
     f._run_cancel.set()
     assert _pump_until(lambda: f._run_cancel is None)
 
@@ -1124,3 +1123,94 @@ def test_cancelled_close_after_the_run_ended_is_still_a_full_stop(frame, monkeyp
     on_disk = Workspace.open(Path(f.workspace_file)).batch_state
     assert on_disk is None
     assert any("stopped before describing" in m for m in f.infos)
+
+
+# --------------------------------------------------------------------------- #
+# Issue 346 item 1: "embed after processing" belongs to the batch              #
+# --------------------------------------------------------------------------- #
+
+def _completion(path, batch):
+    return SimpleNamespace(file_path=path, description="a cat", provider="ollama",
+                           model="m", prompt_style="detailed", custom_prompt="",
+                           metadata={}, batch=batch)
+
+
+@pytest.mark.parametrize("choice", [True, False])
+def test_batch_completion_embeds_by_the_batchs_own_choice(frame, monkeypatch, choice):
+    """The choice was a window-wide flag, cleared on Stop, so the image still
+    in flight when Stop was pressed lost it. Now it rides on the worker."""
+    f = frame
+    embedded = []
+    monkeypatch.setattr(f, "_embed_single_description",
+                        lambda item, desc: embedded.append(item.file_path))
+    batch = _FakeWorker()
+    batch.embed_after_process = choice
+    batch.start()
+    monkeypatch.setattr(f, "batch_worker", batch)
+    path = str(f.src / "a.jpg")
+    f.on_stop_batch()                 # in flight at Stop: still its batch's choice
+    f.on_worker_complete(_completion(path, batch))
+    assert embedded == ([path] if choice else [])
+
+
+def test_single_image_does_not_inherit_a_batchs_embed_choice(frame, monkeypatch):
+    """A single image (no batch) after an embedding batch must not embed."""
+    f = frame
+    embedded = []
+    monkeypatch.setattr(f, "_embed_single_description",
+                        lambda item, desc: embedded.append(item.file_path))
+    path = str(f.src / "a.jpg")
+    f.on_worker_complete(_completion(path, SimpleNamespace(embed_after_process=True)))
+    assert embedded == [path]
+    f.processing_items[path] = {"embed_after_process": False}
+    f.on_worker_complete(_completion(path, None))
+    assert embedded == [path]
+    f.processing_items[path] = {"embed_after_process": True}
+    f.on_worker_complete(_completion(path, None))
+    assert embedded == [path, path]
+
+
+def test_launched_batch_worker_carries_the_embed_choice(frame, monkeypatch):
+    import imagedescriber_wx
+    f = frame
+    seen = []
+
+    class _Recording(_FakeWorker):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            seen.append(k.get("embed_after_process"))
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _Recording)
+    f._launch_batch([str(f.src / "a.jpg")], dict(OPTIONS, embed_after_process=True), True)
+    assert _pump_until(lambda: seen)
+    assert seen == [True]
+
+
+def test_completion_event_carries_its_batch():
+    """The event the window reads the choice from must carry the batch."""
+    from workers_wx import ProcessingCompleteEventData
+    marker = object()
+    evt = ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "", batch=marker)
+    assert evt.batch is marker
+    assert ProcessingCompleteEventData("p", "d", "ollama", "m", "s", "").batch is None
+
+
+def test_stopping_row_found_by_text_when_rows_shift(_frame):
+    """Item 4: a status message adds a row; the selection must still land on
+    the Stopping line, found by its text, not by a row number."""
+    from batch_progress_dialog import BatchProgressDialog, STOPPING_PREFIX
+    dlg = BatchProgressDialog(_frame, 10, batch_provider="ollama",
+                              batch_model="m", batch_prompt="detailed")
+    try:
+        dlg.begin_stage("Saving workspace", 10, stage_index=2, stage_count=3)
+        dlg.mark_stopping()
+        for msg in ("Writing manifest", None):
+            dlg.update_progress(4, 10, image_name="clip.mp4", status_message=msg)
+            sel = dlg.stats_list.GetSelection()
+            assert sel != wx.NOT_FOUND
+            assert STOPPING_PREFIX in dlg.stats_list.GetString(sel)
+        assert dlg.GetTitle().startswith("Stopping")
+        # A stage begun after Stop is titled with the same prefix.
+        dlg.begin_stage("Describing images", 10, stage_index=3, stage_count=3)
+        assert dlg.GetTitle().startswith(STOPPING_PREFIX)
+    finally:
+        dlg.Destroy()
