@@ -120,6 +120,18 @@ def _failure_signature(exc: BaseException):
     return (_provider_error_kind(exc), None, _normalise_failure_text(text))
 
 
+def _is_per_image_failure(exc: BaseException) -> bool:
+    """True if `exc`, or anything it was raised from, says the provider
+    declined this one image (``per_image``) rather than failed."""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if getattr(exc, "per_image", False) is True:
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
 def _provider_error_kind(exc: BaseException):
     """The ErrorKind carried by `exc` or anything it was raised from, else None."""
     seen = set()
@@ -271,9 +283,10 @@ class WorkflowCompleteEventData(WorkflowCompleteEvent):
 
 class WorkflowFailedEventData(WorkflowFailedEvent):
     """Event data for workflow failure"""
-    def __init__(self, error):
+    def __init__(self, error, worker=None):
         WorkflowFailedEvent.__init__(self)
         self.error = error
+        self.worker = worker   # the BatchProcessingWorker that crashed, if one
 
 
 class FilesDiscoveredEventData(FilesDiscoveredEvent):
@@ -362,6 +375,7 @@ class ProcessingWorker(threading.Thread):
         self.result_error = None
         self.result_kind = None   # ErrorKind of a provider failure, if known
         self.result_signature = None   # see _failure_signature
+        self.result_per_image = False   # see _is_per_image_failure
         # The BatchProcessingWorker this image belongs to, or None. Carried on
         # the failure event so the window can tell batch images from a single
         # image, a follow-up question or a rename, and from a batch that has
@@ -458,6 +472,7 @@ class ProcessingWorker(threading.Thread):
             self.result_error = str(e)
             self.result_kind = _provider_error_kind(e)
             self.result_signature = _failure_signature(e)
+            self.result_per_image = _is_per_image_failure(e)
             evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e),
                                             kind=self.result_kind, batch=self.batch)
             wx.PostEvent(self.parent_window, evt)
@@ -1312,8 +1327,14 @@ class BatchProcessingWorker(threading.Thread):
                 completed += 1
 
                 # Track a run of identical failures (same kind, same message).
+                # A refusal of one image (Apple's safety guardrails) neither
+                # counts nor breaks the run: ten such photos in a row (a
+                # trip's worth of the same scene) halted the whole batch as if
+                # the provider were down (#352).
                 if worker.result_ok:
                     streak = []
+                elif getattr(worker, 'result_per_image', False):
+                    pass
                 else:
                     key = worker.result_signature
                     if streak and streak_key != key:
@@ -1392,7 +1413,8 @@ class BatchProcessingWorker(threading.Thread):
                 run_log.error(f"batch aborted: {error_msg}")
 
             # Post failure event
-            evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}")
+            evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}",
+                                          worker=self)
             wx.PostEvent(self.parent_window, evt)
         finally:
             if run_log:

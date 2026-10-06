@@ -907,9 +907,15 @@ def test_stop_during_the_save_stage_announces_after_the_save(frame, monkeypatch)
     f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
     assert _pump_until(lambda: order == ["save"])
     dlg = f.batch_progress_dialog
-    titles = []
+    titles, lists = [], []
     real_set_title = dlg.SetTitle
     monkeypatch.setattr(dlg, "SetTitle", lambda t: (titles.append(t), real_set_title(t)))
+    real_update = dlg.update_progress
+
+    def update(*a, **k):
+        real_update(*a, **k)
+        lists.append([dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())])
+    monkeypatch.setattr(dlg, "update_progress", update)
 
     f.on_stop_batch()
     assert "message" not in order, "announced before the run had wound down"
@@ -917,6 +923,10 @@ def test_stop_during_the_save_stage_announces_after_the_save(frame, monkeypatch)
     assert _pump_until(lambda: f._run_cancel is None)
     assert order[-1] == "message"
     assert titles and all("Stopping" in t for t in titles), titles
+    # Restored from before #344 (#352): the save never reads as a step of the
+    # batch, and every repaint keeps saying it is stopping.
+    assert not any("step" in t for t in titles), titles
+    assert all(any("Stopping" in line for line in rows) for rows in lists), lists
     assert extracted == [], "extraction started after Stop"
     assert not _FakeWorker.instances[0].started
     assert f.batch_progress_dialog is None
@@ -2033,3 +2043,207 @@ def test_last_image_finishing_during_a_cancelled_close_still_says_stopped(frame,
     assert len(stops) == 1 and "before describing" not in stops[0], f.infos
     assert "Batch complete" not in f.GetStatusBar().GetStatusText(0)
     assert f.workspace.batch_state is None
+
+
+# ----- #352: post-merge review of #350 ----- #
+
+def _batch_done(worker):
+    return SimpleNamespace(input_dir="1/1 images", output_dir="", worker=worker,
+                           halted=None, halted_files=[], halted_streak=False)
+
+
+def _close_with_late_completion(f, monkeypatch, answer):
+    """on_close with the usual real ordering: extraction hands back (ending
+    the run) while "save changes?" is open, and only then does the stopped
+    worker's last image finish. Returns what happened inside the question."""
+    worker = _pipeline_running(f, monkeypatch, _LingeringWorker)
+    saves, seen = [], {}
+    real_save = f._save_bundle_with_progress
+    monkeypatch.setattr(f, "_save_bundle_with_progress",
+                        lambda: (saves.append(1), real_save())[1])
+
+    def question():
+        assert _pump_until(lambda: f._run_cancel is None)   # extraction ended first
+        worker.finish()
+        f.on_workflow_complete(_batch_done(worker))
+        seen["saves"] = len(saves)
+        seen["status"] = f.GetStatusBar().GetStatusText(0)
+        seen["batch_state"] = f.workspace.batch_state
+        return answer
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    return seen
+
+
+def test_late_completion_during_a_cancelled_close_is_still_a_stop(frame, monkeypatch):
+    """#352 item 1: the closing branch read the close off the run, which
+    extraction usually ends first; the completion then saved inside the
+    question and said "Batch complete"."""
+    f = frame
+    seen = _close_with_late_completion(f, monkeypatch, answer=False)   # Cancel
+    assert seen["saves"] == 0, "saved inside the save-changes question"
+    assert "Batch complete" not in seen["status"]
+    stops = [m for m in f.infos if "Batch processing stopped" in m]
+    assert len(stops) == 1, f.infos
+    assert f.workspace.batch_state is None
+
+
+def test_late_completion_during_a_quit_keeps_the_batch_to_resume(frame, monkeypatch):
+    """Quitting (Don't Save) must leave the batch on disk for the next open to
+    offer to resume; the normal completion path cleared it."""
+    f = frame
+    seen = _close_with_late_completion(f, monkeypatch, answer=True)    # quit
+    assert seen["saves"] == 0
+    assert "Batch complete" not in seen["status"]
+    assert seen["batch_state"] is not None
+    assert Workspace.open(Path(f.workspace_file)).batch_state is not None
+    assert f.infos == []
+
+
+def test_cancelled_close_of_a_batch_without_videos_is_a_stop(frame, monkeypatch):
+    """A plain describe batch stopped by a close that was then cancelled: its
+    completion announced "Batch complete" for a batch that had been stopped."""
+    import imagedescriber_wx
+    f = frame
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    worker = _FakeWorker.instances[-1]
+    _veto_close(f, monkeypatch)
+    assert f._stopping_worker is worker
+    worker.finish()
+    f.on_workflow_complete(_batch_done(worker))
+    stops = [m for m in f.infos if "Batch processing stopped" in m]
+    assert len(stops) == 1, f.infos
+    assert "Batch complete" not in f.GetStatusBar().GetStatusText(0)
+    assert not getattr(worker, "stopped_by_close", False)
+
+
+def test_describe_worker_crash_stops_extraction_and_frees_the_batch(frame, monkeypatch):
+    """#352 item 6: a crashed describe worker left extraction running for a
+    batch that was gone, and new runs refused as "already running"."""
+    f = frame
+    worker = _pipeline_running(f, monkeypatch)
+    run = f._run_cancel
+    f.on_workflow_failed(SimpleNamespace(error="Batch processing failed: boom", worker=worker))
+    assert run.is_set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f.batch_worker is None
+    assert f._batch_busy_message() is None
+    assert f.batch_progress_dialog is None
+    assert f.workspace.batch_state is not None, "reopening should offer to resume"
+    assert any("boom" in m for m in f.infos)
+
+
+def test_videos_giving_no_frames_without_an_error_say_so(frame, monkeypatch):
+    """#352 item 4: an empty result with no exception said "All images
+    already have descriptions"."""
+    f = frame
+    monkeypatch.setattr(f, "_extract_video_frames_sync", lambda vp, *a, **k: ([], {}))
+    f._extract_then_launch([str(f.src / "clip.mp4")], [], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("No frames could be extracted" in m for m in f.infos), f.infos
+    assert not any("already have descriptions" in m for m in f.infos)
+
+
+def _stats_rows(dlg):
+    return [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+
+
+@pytest.mark.parametrize("target", ["Provider", "Model", "Prompt Style",
+                                    "Last Image Described", "Average Processing Time"])
+def test_selected_row_is_kept_when_extraction_ends(_frame, target):
+    """#352 item 2: the restore checked the old row number against the NEW
+    list's separators, so a reader on "Model" landed on "Last Image
+    Described" when the extraction rows above went away."""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 0, batch_provider="ollama",
+                              batch_model="m", batch_prompt="d")
+    try:
+        dlg.begin_stage("Describing and extracting frames", 10, stage_index=2, stage_count=2)
+        dlg.begin_extraction(3)
+        dlg.update_progress(2, 10, file_path="/x/a.jpg", avg_time=3.0,
+                            last_image="a.jpg", last_description="A cat.")
+        dlg.set_extraction(1, 3, "clip.mp4")
+        row = next(i for i, r in enumerate(_stats_rows(dlg)) if r.startswith(target + ":"))
+        dlg.stats_list.SetSelection(row)
+        dlg.end_extraction()
+        assert dlg.stats_list.GetString(dlg.stats_list.GetSelection()).startswith(target + ":")
+    finally:
+        dlg.Destroy()
+
+
+def test_gauge_and_estimate_wait_for_the_total_while_extracting(_frame, monkeypatch):
+    """#352 item 3: the gauge was a percentage of a growing total (100%, then
+    50%), and the estimate counted only frames queued so far."""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 0)
+    try:
+        values = []
+        real = dlg.progress_bar.SetValue
+        monkeypatch.setattr(dlg.progress_bar, "SetValue", lambda v: (values.append(v), real(v)))
+        dlg.begin_extraction(3)
+        dlg.update_progress(5, 5, avg_time=2.0)
+        dlg.update_progress(6, 12, avg_time=2.0)
+        assert values == [], "a percentage of a total still growing"
+        assert not any(r.startswith("Estimated Time Remaining") for r in _stats_rows(dlg))
+        dlg.end_extraction()
+        dlg.update_progress(6, 12, avg_time=2.0)
+        assert values and values[-1] == 50
+        assert any(r.startswith("Estimated Time Remaining") for r in _stats_rows(dlg))
+    finally:
+        dlg.Destroy()
+
+
+def _pending(f, name, position):
+    from data_models import ImageItem
+    path = f.src / name
+    path.write_bytes(b"x")
+    item = ImageItem(str(path))
+    item.processing_state = "pending"
+    item.batch_queue_position = position
+    f.workspace.add_item(item)
+
+
+def test_resume_prompt_counts_from_the_items_not_a_stale_total(frame, monkeypatch):
+    """#352 item 5: after a crash the manifest's total lagged the frames
+    queued since, and the prompt read "0 of 1 completed / Remaining: 3"."""
+    f = frame
+    for i, pos in enumerate((3, 4, 5)):
+        _pending(f, f"f{i}.jpg", pos)
+    f.workspace.batch_state = {"total_queued": 1, "provider": "ollama",
+                               "model": "m", "prompt_style": "d"}
+    f.answer = False
+    f.prompt_resume_batch()
+    assert "Progress: 3 of 6 images completed" in f.questions[-1], f.questions[-1]
+    assert "Remaining: 3 images" in f.questions[-1]
+
+
+def test_resume_prompt_with_only_videos_left(frame, monkeypatch):
+    f = frame
+    f.workspace.batch_state = {"total_queued": 2, "provider": "ollama", "model": "m",
+                               "prompt_style": "d", "videos": [str(f.src / "clip.mp4")]}
+    f.answer = False
+    f.prompt_resume_batch()
+    assert "Remaining: 1 video to extract frames from" in f.questions[-1], f.questions[-1]
+    assert "0 images" not in f.questions[-1]
+
+
+def test_resuming_while_extracting_shows_no_percentage(frame, monkeypatch):
+    """#352: Resume after Pause showed "100%, 3 of 3" while videos were still
+    adding frames."""
+    f = frame
+    worker = _FakeWorker(None, [], queue_open=True)
+    worker.started = True
+    worker.queue_open = True
+    worker.pause = worker.resume = lambda: None
+    monkeypatch.setattr(f, "batch_worker", worker)
+    monkeypatch.setattr(f, "batch_progress",
+                        {"current": 3, "total": 3, "file_path": str(f.src / "a.jpg")},
+                        raising=False)
+    monkeypatch.setattr(f, "_save_bundle_with_progress", lambda: None)
+    f.on_pause_batch()
+    f.on_resume_batch()
+    assert "%" not in f.GetTitle(), f.GetTitle()
+    assert "extracting videos" in f.GetTitle()

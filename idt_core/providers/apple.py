@@ -195,13 +195,18 @@ class AppleFMError(RuntimeError):
     ``fm`` cannot be launched). A batch stops on those instead of failing every
     remaining image; it is set where the condition is detected, so callers
     never have to recognise it from the wording.
+
+    ``per_image`` is True when the model declined this one image (its safety
+    guardrails): says nothing about the next image, so a batch must not count
+    it toward its run of identical failures (#337, #352).
     """
 
     def __init__(self, message: str, status_code: Optional[int] = None,
-                 setup: bool = False):
+                 setup: bool = False, per_image: bool = False):
         super().__init__(message)
         self.status_code = status_code
         self.setup = setup
+        self.per_image = per_image
 
 
 # ---------------------------------------------------------------------------
@@ -589,7 +594,7 @@ class FmServer:
             if _CONTEXT_MARKER in detail:
                 raise AppleFMError(CONTEXT_HINT)
             if _GUARDRAIL_MARKER in detail:
-                raise AppleFMError(GUARDRAIL_HINT)
+                raise AppleFMError(GUARDRAIL_HINT, per_image=True)
             if _MODEL_MANAGER_MARKER in detail:
                 # 503 rather than the 500 the server sent: this one is worth
                 # retrying, and the status is what both classifiers read first.
@@ -747,7 +752,7 @@ def response_text(data: dict) -> str:
     message = choices[0].get("message") or {}
     refusal = message.get("refusal")
     if refusal:
-        raise AppleFMError(f"Apple Intelligence declined: {refusal}")
+        raise AppleFMError(f"Apple Intelligence declined: {refusal}", per_image=True)
     text = (message.get("content") or "").strip()
     if not text:
         reason = choices[0].get("finish_reason") or "no content"

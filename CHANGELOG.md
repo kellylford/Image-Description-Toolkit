@@ -6,10 +6,25 @@
 - A batch with many videos used to describe nothing until every video's frames were extracted: over half an hour for a large iPhone library. ImageDescriber now describes the photos straight away and adds each video's frames to the batch as soon as that video is extracted.
 - The progress window shows the describing progress, whose total grows as videos finish, and a separate **Extracting Frames** line counting the videos. Its title changes once, when extraction finishes, not on every update.
 - **Stop** stops describing and extraction together. Fully extracted videos keep their frames; a video stopped partway is extracted again next time.
-- If the batch stops because the provider refused the request (for example, a sign-out), resuming it extracts the videos it never reached, then describes them.
+- If the batch stops before it finishes (the provider refused the request, for example a sign-out, or ImageDescriber was quit or closed unexpectedly), resuming it carries on the same way: it describes what was left while extracting the videos it never reached.
 - **Pause** pauses describing; extraction carries on.
+- While videos are still being extracted, the progress bar shows activity rather than a percentage (the total is still growing, so a percentage went backwards), and there's no time-remaining estimate until it can be right.
 
 ### 🐛 Bug Fixes
+
+**Quitting during frame extraction keeps the videos already extracted (#345)**
+- Quitting ImageDescriber while a batch was extracting video frames lost every video already finished, and the next run extracted them all again: over 20 minutes for a large library on a network share. Each video is now saved as soon as its frames are extracted, so only the video in progress is extracted again.
+- If an image finishes describing while ImageDescriber is closing, the batch is still recorded as stopped, not "complete", so reopening the workspace offers to resume it (#352).
+
+**Apple Intelligence declining a few photos no longer stops a batch (#352)**
+- Apple's safety guardrails decline some ordinary photos (see #337). Each one is counted as a failure, but they no longer count toward the "ten identical failures in a row" rule, which stopped a whole batch after a run of similar photos as if Apple Intelligence had stopped working.
+
+**Smaller fixes to describing while extracting (#352)**
+- In the progress window, the line you're on stays selected when lines above it appear or disappear (for example, when extraction finishes). A screen reader could otherwise move you to a different line.
+- If the videos give no frames at all, ImageDescriber says frames could not be extracted, not "All images already have descriptions."
+- The resume question after an unexpected exit counts the images done and left correctly, and no longer says "0 images, and N videos".
+- Resuming a paused batch while videos are still extracting no longer shows a percentage in the window title.
+- If describing fails outright, frame extraction stops too, instead of carrying on for a batch that has ended.
 
 **"Embed description after processing" follows each batch in ImageDescriber (#346)**
 - The image being described when Stop was pressed is now embedded too, if its batch was set to embed.

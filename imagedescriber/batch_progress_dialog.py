@@ -319,6 +319,10 @@ class BatchProgressDialog(wx.Dialog):
         on_stopping_line = (
             self._stopping and saved_selection != wx.NOT_FOUND
             and _is_stopping_row(self.stats_list.GetString(saved_selection)))
+        # Taken before the rebuild replaces separator_indices: checked against
+        # the new list, a real row whose index now holds a separator skipped
+        # the label match and the reader landed on another row (#352).
+        saved_on_separator = saved_selection in self.separator_indices
 
         # Track separator row indices for keyboard navigation skip logic
         self.separator_indices = set()
@@ -369,7 +373,10 @@ class BatchProgressDialog(wx.Dialog):
         if avg_time > 0:
             self.stats_list.Append(f"Average Processing Time:    {avg_time:.1f} seconds")
 
-        if avg_time > 0 and current < total:
+        # Not while videos are still extracting: the total so far leaves out
+        # every frame still to come, so the estimate was far too short, and
+        # the row vanished whenever describing caught up (#352).
+        if avg_time > 0 and current < total and self._extraction is None:
             remaining_images = total - current
             estimated_seconds = remaining_images * avg_time
             if estimated_seconds < 60:
@@ -422,8 +429,11 @@ class BatchProgressDialog(wx.Dialog):
         elif file_path:
             self.stats_list.Append(f"Current Image:              {Path(file_path).name}")
 
-        # Update progress bar — pulse when the total is unknown
-        if total > 0:
+        # Update progress bar — pulse when the total is unknown. It is not
+        # known while videos are extracting either: the total grows as each
+        # one finishes, so a percentage fell (100% then 50%), and screen
+        # readers announce the gauge's changes (#352).
+        if total > 0 and self._extraction is None:
             self.progress_bar.SetValue(int((current / total) * 100))
         else:
             self.progress_bar.Pulse()
@@ -439,7 +449,7 @@ class BatchProgressDialog(wx.Dialog):
                                 wx.NOT_FOUND)
         label_row = wx.NOT_FOUND
         if (stopping_row == wx.NOT_FOUND and saved_label
-                and saved_selection not in self.separator_indices):
+                and not saved_on_separator):
             same = [i for i in range(count)
                     if i not in self.separator_indices
                     and _row_label(self.stats_list.GetString(i)) == saved_label]

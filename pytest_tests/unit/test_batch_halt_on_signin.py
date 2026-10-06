@@ -116,6 +116,7 @@ class _FakeImageWorker:
         self.result_kind = None if outcome in ("ok", "plain") else outcome
         self.result_signature = (None if self.result_ok
                                  else (self.result_kind, None, self.result_error))
+        self.result_per_image = outcome == "declined"
 
     def start(self):
         _FakeImageWorker.seen.append(Path(self.file_path).name)
@@ -275,6 +276,45 @@ def test_a_success_resets_the_streak(monkeypatch):
     done, _ = _run_batch(monkeypatch, names, script)
     assert _FakeImageWorker.seen == names
     assert done.halted is None
+
+
+def test_refusals_of_single_images_never_halt(monkeypatch):
+    """#352: Apple's guardrails refuse some photos (taxidermy, #337) with an
+    identical message. Ten in a row, as a trip's photos can be, halted the
+    whole batch as though Apple Intelligence were down."""
+    names = [f"{i}.jpg" for i in range(15)]
+    done, _ = _run_batch(monkeypatch, names, {n: "declined" for n in names})
+    assert _FakeImageWorker.seen == names
+    assert done.halted is None
+
+
+def test_a_refusal_does_not_hide_a_real_streak(monkeypatch):
+    names = [f"{i}.jpg" for i in range(15)]
+    script = {n: "plain" for n in names}
+    script["5.jpg"] = "declined"           # 5 failures, a refusal, 5 more
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert len(_FakeImageWorker.seen) == workers_wx.SAME_FAILURE_STREAK + 1
+    assert done.halted == "failed: plain"
+
+
+def test_guardrail_refusal_is_per_image_through_the_adapter():
+    """The flag must survive the adapter's re-raise and the worker's wrap,
+    which is what the batch actually sees."""
+    from ai_providers import raise_provider_error
+    from idt_core.providers.apple import AppleFMError, GUARDRAIL_HINT
+    try:
+        try:
+            try:
+                raise AppleFMError(GUARDRAIL_HINT, per_image=True)
+            except AppleFMError as exc:   # as AppleProvider.describe_image does
+                raise_provider_error(provider="Apple Intelligence", kind=ErrorKind.UNKNOWN,
+                                     message=str(exc))
+        except ProviderError as e:        # as ProcessingWorker does
+            raise Exception(f"AI processing failed: {e}") from e
+    except Exception as wrapped:
+        assert workers_wx._is_per_image_failure(wrapped)
+    assert not workers_wx._is_per_image_failure(AppleFMError("fm crashed"))
+    assert not workers_wx._is_per_image_failure(RuntimeError("x"))
 
 
 def test_identical_failures_match_despite_timestamps():
