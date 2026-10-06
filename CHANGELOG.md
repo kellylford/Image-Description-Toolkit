@@ -1,3 +1,20 @@
+## [4.8.0] - 2026-10-06
+
+### ✨ New
+
+**Windows AI: describe images on a Copilot+ PC, on the PC itself (#360)**
+- A new provider, `windows-ai`, uses Windows' own on-device model. It runs on the PC's NPU: no API key, no account, no internet connection and no cost, and pictures never leave the PC. It needs a Copilot+ PC with Windows 11 24H2 or later.
+- Its models are the four kinds of description Windows offers: accessible (the default, written for people who are blind or have low vision), detailed, brief and diagram. It takes no prompt, so the prompt style isn't used and descriptions record the prompt as "none".
+- It works in `idt describe` and the other describing commands, `idt guideme`, and ImageDescriber. It isn't offered for chat, follow-up questions or auto-rename, which all need a prompt.
+- Windows declines some pictures: ones that are mostly text (OCR suits those better), and ones its content filter stops. Each is marked as failed and the batch carries on, as for Apple Intelligence's refusals.
+- When Windows' model fails on a picture with an internal error, IDT tries it again at smaller sizes. Whether it fails depends on the picture's size, so most of these are then described.
+- The installer sets it up when **Set up Windows AI** is ticked (the default on Windows 11 24H2 and later) and the PC has an NPU, adding the Windows App Runtime from Microsoft if the PC doesn't have it. Uninstalling IDT removes it.
+
+### 🐛 Bug Fixes
+
+- ImageDescriber's Processing Options dialog now opens on the model in your default settings. It read a setting the real settings don't have, so it always started on the first model in the list.
+- Very large images sent to Claude Code that were still too big after resizing are now made smaller again instead of failing.
+
 ## [4.7.0] - 2026-10-06
 
 ### ✨ Improvements

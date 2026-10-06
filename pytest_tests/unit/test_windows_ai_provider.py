@@ -530,3 +530,50 @@ def test_only_windows_ai_takes_no_prompt():
     assert not registry.uses_prompt("windows-ai") and not registry.uses_prompt("Windows AI")
     assert [p for p in registry.list_providers() if not registry.uses_prompt(p)] == ["windows-ai"]
     assert registry.uses_prompt("something-new"), "an unknown provider is assumed to take a prompt"
+
+
+# ---------------------------------------------------------------------------
+# InternalError: the picture at another size
+# ---------------------------------------------------------------------------
+
+
+def _photo(width, height):
+    import os as _os
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.frombytes("RGB", (width, height), _os.urandom(width * height * 3)).save(out, format="JPEG", quality=60)
+    return out.getvalue()
+
+
+def test_a_picture_windows_fails_on_is_tried_again_smaller(helper):
+    helper.configure(serve=["code:internal_error", "ok"])
+    result = WindowsAIProvider("brief").describe(_photo(3000, 2000), "image/jpeg", "")
+    assert result.text == "brief description 2"
+    first, second = helper.requests()
+    assert second["image_bytes"] < first["image_bytes"]
+    assert second["kind"] == "brief" and second["mime"] == "image/jpeg"
+
+
+def test_each_smaller_size_is_tried_before_giving_up_on_one_picture(helper):
+    helper.configure(serve=["code:internal_error"] * 4)
+    with pytest.raises(WindowsAIError, match="smaller sizes too") as caught:
+        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
+    assert len(helper.requests()) == 4, "full size, then 2048, 1024 and 512"
+    # One picture Windows can't do: the batch carries on, and nothing retries it again.
+    assert caught.value.per_image and caught.value.status_code is None
+
+
+def test_only_sizes_smaller_than_the_picture_are_tried(helper):
+    helper.configure(serve=["code:internal_error"] * 4)
+    with pytest.raises(WindowsAIError):
+        WindowsAIProvider().describe(_photo(800, 600), "image/jpeg", "")
+    assert len(helper.requests()) == 2, "full size, then 512"
+
+
+def test_a_different_failure_at_a_smaller_size_is_reported_as_itself(helper):
+    helper.configure(serve=["code:internal_error", "code:content_filtered"])
+    with pytest.raises(WindowsAIError) as caught:
+        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
+    assert caught.value.code == "content_filtered"

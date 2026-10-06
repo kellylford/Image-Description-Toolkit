@@ -164,7 +164,10 @@ def test_a_refusal_of_one_picture_is_not_retried_and_says_so(pc, picture, code):
 
 
 def test_a_helper_that_restarted_is_tried_once_more(pc, picture):
-    helper = pc(error_for_code("internal_error", "InternalError"), "Second time lucky.")
+    # (InternalError is retried at smaller sizes by the provider itself: see
+    # test_windows_ai_provider. This is the helper dying, which is retried as it is.)
+    helper = pc(WindowsAIError("The Windows AI helper stopped unexpectedly.", status_code=503),
+                "Second time lucky.")
     assert ai_providers.WindowsAIProvider().describe_image(picture, "", "brief") == "Second time lucky."
     assert len(helper.kinds) == 2
 
