@@ -4,6 +4,7 @@ Pytest configuration and shared fixtures for IDT test suite.
 This file contains fixtures that are available to all tests.
 """
 
+import os
 import sys
 from pathlib import Path
 import pytest
@@ -35,6 +36,14 @@ def _stop_wx_app_restoring_stdio():
 
 
 _stop_wx_app_restoring_stdio()
+
+
+# No test wants the model lists refreshed in the background when it builds an
+# ImageDescriber window. That thread queries Ollama and the Claude and OpenAI
+# APIs, then changes the shared model catalog while later tests on the same
+# worker run: test_model_refresh failed now and then under -n 4. Set before any
+# test runs, so it also covers windows built by module-scoped fixtures.
+os.environ["IDT_SKIP_STARTUP_MODEL_REFRESH"] = "1"
 
 
 @pytest.fixture(autouse=True)
