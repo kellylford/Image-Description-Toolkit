@@ -1,0 +1,53 @@
+name: "Windows AI Helper"
+
+# Builds IDT's Windows AI helper (windows_ai_helper/, C#) for both architectures and runs its
+# protocol tests. The runner has no NPU and no package identity, so nothing here describes a
+# picture: that is tested on a Copilot+ PC. Signing and packing into an .msix belong to the
+# Windows build, not here.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'windows_ai_helper/**'
+      - '.github/workflows/windows-ai-helper.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'windows_ai_helper/**'
+      - '.github/workflows/windows-ai-helper.yml'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  helper:
+    name: "Build + test the Windows AI helper"
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Protocol tests
+        run: dotnet test windows_ai_helper/IdtWindowsAI.Tests --nologo
+        shell: pwsh
+
+      - name: Build x64 and arm64 package layouts
+        run: |
+          foreach ($arch in 'x64', 'arm64') {
+            ./windows_ai_helper/build_helper.ps1 -Arch $arch
+            foreach ($f in 'IdtWindowsAI.exe', 'AppxManifest.xml', 'Assets\Square44x44Logo.png') {
+              if (-not (Test-Path "windows_ai_helper/out/$arch/$f")) { throw "The $arch layout is missing $f." }
+            }
+            $manifest = Get-Content "windows_ai_helper/out/$arch/AppxManifest.xml" -Raw
+            if ($manifest -match '\$[A-Z]+\$') { throw "The $arch manifest still has a placeholder: $($Matches[0])" }
+            if ($manifest -notmatch "ProcessorArchitecture=`"$arch`"") { throw "The $arch manifest names the wrong architecture." }
+          }
+        shell: pwsh
