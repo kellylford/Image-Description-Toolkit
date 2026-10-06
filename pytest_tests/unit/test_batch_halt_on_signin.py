@@ -288,6 +288,26 @@ def test_refusals_of_single_images_never_halt(monkeypatch):
     assert done.halted is None
 
 
+def test_a_prompt_refused_on_every_image_halts(monkeypatch):
+    """PR 353 review: exempt from the identical-failure rule, a prompt the
+    guardrails refuse on every image ground through the whole library."""
+    names = [f"{i}.jpg" for i in range(40)]
+    done, _ = _run_batch(monkeypatch, names, {n: "declined" for n in names})
+    assert len(_FakeImageWorker.seen) == workers_wx.REFUSAL_STREAK
+    assert done.halted == "failed: declined"
+    assert done.halted_streak
+    assert len(done.halted_files) == workers_wx.REFUSAL_STREAK
+
+
+def test_a_described_image_resets_the_refusal_count(monkeypatch):
+    names = [f"{i}.jpg" for i in range(40)]
+    script = {n: "declined" for n in names}
+    script["20.jpg"] = "ok"
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert _FakeImageWorker.seen == names
+    assert done.halted is None
+
+
 def test_a_refusal_does_not_hide_a_real_streak(monkeypatch):
     names = [f"{i}.jpg" for i in range(15)]
     script = {n: "plain" for n in names}

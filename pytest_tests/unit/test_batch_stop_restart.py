@@ -2134,6 +2134,8 @@ def test_describe_worker_crash_stops_extraction_and_frees_the_batch(frame, monke
     assert f.batch_progress_dialog is None
     assert f.workspace.batch_state is not None, "reopening should offer to resume"
     assert any("boom" in m for m in f.infos)
+    # The extraction it cancelled ends quietly: this handler said what happened.
+    assert not any("Batch processing stopped" in m for m in f.infos), f.infos
 
 
 def test_videos_giving_no_frames_without_an_error_say_so(frame, monkeypatch):
@@ -2247,3 +2249,68 @@ def test_resuming_while_extracting_shows_no_percentage(frame, monkeypatch):
     f.on_resume_batch()
     assert "%" not in f.GetTitle(), f.GetTitle()
     assert "extracting videos" in f.GetTitle()
+
+
+def _halted_done(worker, path):
+    return SimpleNamespace(input_dir="1/1 images", output_dir="", worker=worker,
+                           halted="Claude Code is not signed in. Run: claude auth login",
+                           halted_files=[path], halted_streak=False)
+
+
+def _close_with_halt(f, monkeypatch, answer):
+    """The batch's last image, in flight as the app closes, halts it."""
+    import imagedescriber_wx
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+    a = str(f.src / "a.jpg")
+    f._launch_batch([a], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    worker = _FakeWorker.instances[-1]
+
+    def question():
+        f.workspace.items[a].processing_state = "failed"   # as its failure set it
+        f._checkpoint_item(a)                              # ...and saved it
+        worker.finish()
+        f.on_workflow_complete(_halted_done(worker, a))
+        return answer
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    return a
+
+
+def test_a_halt_during_a_quit_is_requeued_for_resume(frame, monkeypatch):
+    """PR 353 review: the close's early return skipped the halt's requeue, so
+    the image a sign-out halted on stayed "failed" and resume skipped it."""
+    f = frame
+    a = _close_with_halt(f, monkeypatch, answer=True)          # quit
+    gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
+    assert gui["items"][a]["processing_state"] == "pending"
+    assert gui["batch_state"] is not None
+
+
+def test_a_halt_during_a_cancelled_close_is_delivered(frame, monkeypatch):
+    """...and on a cancelled close the batch was called "stopped" and its
+    resume wiped, so the user never heard the halt's reason."""
+    f = frame
+    f.answer = False                    # "resume now?" -> No, keep it for later
+    a = _close_with_halt(f, monkeypatch, answer=False)         # Cancel
+    assert not any("Batch processing stopped" in m for m in f.infos), f.infos
+    assert any("claude auth login" in q for q in f.questions + f.infos)
+    assert f.workspace.items[a].processing_state == "pending"
+    assert f.workspace.batch_state is not None
+
+
+def test_a_worker_that_already_finished_is_not_marked_stopped_by_close(frame, monkeypatch):
+    """PR 353 review: a batch that finished on its own, its completion not yet
+    handled when Quit was pressed, was treated as stopped by the close."""
+    import imagedescriber_wx
+    f = frame
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    worker = _FakeWorker.instances[-1]
+    worker.finish()                     # done; its completion is still queued
+    monkeypatch.setattr(f, "confirm_unsaved_changes", lambda: True)
+    monkeypatch.setattr(f, "Destroy", lambda: None)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    assert not getattr(worker, "stopped_by_close", False)

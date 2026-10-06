@@ -6524,6 +6524,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 logger.info(f"Batch stopped by closing finished its last image ({event.input_dir})")
                 if run is not None:
                     run.set()
+                if getattr(event, 'halted', None):
+                    # It halted on that last image (signed out, or a streak).
+                    # Requeue what the halt says was never really tried, so a
+                    # quit's resume includes it; a cancelled close delivers
+                    # this completion normally, with the halt's own message.
+                    for halted_file in getattr(event, 'halted_files', None) or ():
+                        item = self.workspace.items.get(halted_file)
+                        if item is not None:
+                            item.processing_state = "pending"
+                            item.processing_error = None
+                            self._checkpoint_item(halted_file)
+                    source.close_halt = SimpleNamespace(
+                        input_dir=event.input_dir, output_dir=event.output_dir,
+                        worker=source, halted=event.halted,
+                        halted_files=list(getattr(event, 'halted_files', None) or ()),
+                        halted_streak=getattr(event, 'halted_streak', False))
                 self._flush_checkpoints()
                 return
             if run is not None:
@@ -7416,6 +7432,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._batch_active = False
         self.refresh_image_list()
         self.image_list.SetFocus()
+
+    def _end_close_stopped_batch(self, worker) -> None:
+        """A cancelled close stopped this batch's worker: end the batch as a
+        Stop, or, if its last image halted it, deliver that halt (its reason,
+        and the offer to resume), which the close had held back (#352)."""
+        held = getattr(worker, 'close_halt', None)
+        if held is not None:
+            worker.close_halt = None
+            self.on_workflow_complete(held)
+        else:
+            self.on_stop_batch()
 
     def _pipeline_run_of(self, worker):
         """The run still extracting frames for this describe worker, or None."""
@@ -9838,7 +9865,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Marked before it is stopped, so its completion (which can arrive
         # after the extraction run has ended) knows the close stopped it.
         closing_worker = self.batch_worker
-        if closing_worker is not None:
+        if closing_worker is not None and closing_worker.is_alive():
+            # Not one that already finished on its own: its completion, still
+            # queued, is a real completion (or halt), not a close's stop.
             closing_worker.stopped_by_close = True
         workers_stopped = self._stop_all_workers()
         if workers_stopped:
@@ -9909,7 +9938,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 # A describe batch with no extraction: the close stopped its
                 # worker, so this is a Stop. Without it the worker's completion
                 # announced "Batch complete" for a batch that was stopped.
-                self.on_stop_batch()
+                if closed_dialog and closed_dialog is not self.batch_progress_dialog:
+                    closed_dialog.Destroy()
+                self._end_close_stopped_batch(closing_worker)
             if closing_run is not None:
                 closing_run.closing = False
                 run_worker = getattr(closing_run, 'worker', None)
@@ -9923,7 +9954,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if closed_dialog and closed_dialog is not self.batch_progress_dialog:
                         closed_dialog.Destroy()
                     if run_worker is not None and self.batch_worker is run_worker:
-                        self.on_stop_batch()
+                        self._end_close_stopped_batch(run_worker)
                     elif not getattr(closing_run, 'announced', False):
                         # Its completion was never handled; nothing else
                         # will say the batch stopped.

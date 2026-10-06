@@ -81,6 +81,12 @@ RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 #: Ollama not running. Large enough that a few bad files in a row don't trip it.
 SAME_FAILURE_STREAK = 10
 
+#: Consecutive images the provider declined (per-image refusals, which the
+#: identical-failure rule ignores). A few dozen similar photos can each be
+#: refused; this many in a row is the prompt itself being refused on every
+#: image, and the batch stops rather than fail the whole library (#352).
+REFUSAL_STREAK = 25
+
 
 _TIMESTAMP_TAIL = re.compile(r"\s*-\s*\(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(,\d+)?\)\s*$")
 _HEX_ADDRESS = re.compile(r"\b0x[0-9a-fA-F]+\b")
@@ -1243,6 +1249,7 @@ class BatchProcessingWorker(threading.Thread):
             halted_files = []
             halted_streak = False
             streak, streak_key = [], None
+            refusals = []
             i = 0
             while True:
                 # Phase 2: Check if stopped
@@ -1333,9 +1340,11 @@ class BatchProcessingWorker(threading.Thread):
                 # the provider were down (#352).
                 if worker.result_ok:
                     streak = []
+                    refusals = []
                 elif getattr(worker, 'result_per_image', False):
-                    pass
+                    refusals.append(file_path)
                 else:
+                    refusals = []
                     key = worker.result_signature
                     if streak and streak_key != key:
                         streak = []
@@ -1349,6 +1358,8 @@ class BatchProcessingWorker(threading.Thread):
                 # images in a row with an identical error halt it too; that
                 # costs a resume, not the images.
                 fatal = not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS
+                if len(refusals) >= REFUSAL_STREAK:
+                    streak = refusals      # halted on, and requeued, as a streak
                 if fatal or len(streak) >= SAME_FAILURE_STREAK:
                     halted = worker.result_error or "The provider refused the request."
                     # A run-fatal halt requeues just that image (the window
