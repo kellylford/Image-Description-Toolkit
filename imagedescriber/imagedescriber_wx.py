@@ -4163,6 +4163,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if not announced and not _closing(cancel):
                     self._announce_stopped_before_describing(
                         described=getattr(cancel, 'describing', False))
+                if getattr(cancel, 'resume_when_stopped', False) and not _closing(cancel):
+                    # Yes to "resume?" was answered while this let go.
+                    wx.CallAfter(self._resume_when_extraction_stopped)
                 return
 
             self._end_run(cancel)
@@ -4176,9 +4179,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             dlg = self.batch_progress_dialog
             if dlg:
                 dlg.end_extraction("Describing")
-            if worker is not None and getattr(worker, 'is_paused', lambda: False)():
-                # Paused: the title said "extracting videos"; it no longer is.
-                self._set_batch_title(paused=True, more_coming=False)
+            if worker is not None and self.batch_progress:
+                # The title said "extracting videos"; it no longer is. Its
+                # total is the last image event's, from before this video's
+                # frames were queued: refreshed, or a paused batch read
+                # "(Paused) 100%, 5 of 5" with 195 frames to go.
+                self.batch_progress['total'] = (worker.queued_total()
+                                                + getattr(worker, 'progress_offset', 0))
+                self._set_batch_title(
+                    paused=getattr(worker, 'is_paused', lambda: False)(),
+                    more_coming=False)
 
             if worker is not None and worker.queued_total() == 0:
                 # Nothing to describe: no images, and no video gave new frames.
@@ -4786,6 +4796,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if item is not None and item.processing_state == "pending":
                     item.processing_state = None
                     item.batch_queue_position = None
+            # ...and put back what this run replaced: an older halted
+            # batch's batch_state, and its images' flags (#352).
+            if (self.workspace.batch_state is None
+                    and getattr(cancel, 'prev_batch_state', None) is not None):
+                self.workspace.batch_state = cancel.prev_batch_state
+            for fp, (state_, pos) in (getattr(cancel, 'prev_flags', None) or {}).items():
+                item = self.workspace.items.get(fp)
+                if item is not None and item.processing_state is None:
+                    item.processing_state = state_
+                    item.batch_queue_position = pos
         self._preparing_queue = self._preparing_state = None
         try:
             self._close_progress_dialog()
@@ -4843,6 +4863,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # progress window, and reported with the image failures at the end.
         self._batch_video_failures = list(video_failures or ())
 
+        # What this run replaces, for _abort_run to put back if it fails to
+        # start: an older halted batch's batch_state, and the flags of the
+        # images it re-marks (an image in both batches) (#352).
+        cancel.prev_batch_state = self.workspace.batch_state
+        cancel.prev_flags = {
+            fp: (it.processing_state, it.batch_queue_position)
+            for fp in to_process
+            if (it := self.workspace.items.get(fp)) is not None
+            and it.processing_state in ("pending", "paused")}
         # Mark items as pending (recorded first, so _abort_run can undo it)
         self._preparing_queue = list(to_process)
         for i, fp in enumerate(to_process):
@@ -4893,8 +4922,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         # Make sure the dialog exists even on paths that reach _launch_batch
         # without going through on_process_all's staged setup.
-        self._ensure_progress_dialog(options, getattr(self, '_stage_count',
-                                                      self._run_stage_count()))
+        self._ensure_progress_dialog(options, self._run_stage_count())
 
         def _start_describing():
             try:
@@ -4927,17 +4955,8 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                                       len(to_process), can_interrupt=True)
                 worker.start()
                 cancel.describing = True
-                # Pending flags left by an older batch (halted, resume
-                # declined) aren't this batch's: this batch_state replaced
-                # theirs, and their old queue positions overstated the resume
-                # total ("990 of 1000" for a 10-image batch) (#352). Cleared
-                # only now, so a failed start keeps them (see _abort_run).
-                this_batch = set(to_process)
-                for it in self.workspace.items.values():
-                    if (it.processing_state in ("pending", "paused")
-                            and it.file_path not in this_batch):
-                        it.processing_state = None
-                        it.batch_queue_position = None
+                # Recorded, so a failure from here on can put them back.
+                cancel.prev_flags.update(self._forget_older_batch(to_process))
                 if extraction is not None:
                     extraction()
                     self.SetStatusText(
@@ -6779,6 +6798,12 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 if halted and getattr(event, 'halted_streak', False) else 0)
             if n_failed > 0:
                 summary += f" ({n_failed} failed)"
+            if halted and getattr(event, 'halted_streak', False):
+                # The stats count them as the summary does: requeued, they
+                # will be tried again, so not failures (#352).
+                dlg = self.batch_progress_dialog
+                dlg.failed_count = max(
+                    0, dlg.failed_count - len(getattr(event, 'halted_files', None) or ()))
             self.batch_progress_dialog.mark_complete(summary, stopped=bool(halted))
             self.batch_progress_dialog = None  # detach ref; dialog stays visible until user closes it
 
@@ -7532,14 +7557,42 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def _resume_after_halt(self) -> None:
         """Yes to "resume?" after a halt. A halt waits up to 30 s for the
-        extraction thread, and opening a video or a network share can take
-        longer; Yes was then refused as busy. Wait for it here instead,
-        saying so (#352)."""
+        extraction thread, and opening a video on a network share can take
+        longer; Yes was then refused as busy. Now the resume happens when the
+        thread lets go (_finish_extraction), and meanwhile a progress window
+        says so, without blocking the app (#352)."""
         run = self._run_cancel
-        if run is not None and getattr(run, 'thread', None) is not None:
-            self.SetStatusText("Waiting for frame extraction to stop…", 0)
-            self._wait_for_extraction(run, timeout=120.0)
+        if run is None or getattr(run, 'thread', None) is None:
+            self.resume_batch_processing()
+            return
+        run.resume_when_stopped = True
+        dlg = self._ensure_progress_dialog({}, 0)
+        if dlg:
+            dlg.begin_stage("Resuming once frame extraction stops", 0)
+            dlg.Show()
+            dlg.Raise()
+            dlg.stats_list.SetFocus()
+        self.SetStatusText("Resuming once frame extraction stops…", 0)
+
+    def _resume_when_extraction_stopped(self) -> None:
+        """The halted batch's extraction has let go: resume it now."""
+        self._close_progress_dialog()
         self.resume_batch_processing()
+
+    def _forget_older_batch(self, keep) -> dict:
+        """A new batch is starting: the pending or paused flags of an older
+        batch (halted, its resume declined) aren't this one's, and their old
+        queue positions overstated the new batch's resume total ("990 of
+        1000" for a 10-image batch) (#352). Returns what was cleared, so a
+        start that then fails can put it back."""
+        keep = set(keep)
+        cleared = {}
+        for it in self.workspace.items.values():
+            if it.processing_state in ("pending", "paused") and it.file_path not in keep:
+                cleared[it.file_path] = (it.processing_state, it.batch_queue_position)
+                it.processing_state = None
+                it.batch_queue_position = None
+        return cleared
 
     def _pipeline_run_of(self, worker):
         """The run still extracting frames for this describe worker, or None."""
@@ -7922,6 +7975,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._reset_batch_failures()
 
         # Mark images as pending for batch processing
+        self._forget_older_batch(image_paths)
         for i, img_path in enumerate(image_paths):
             if img_path in self.workspace.items:
                 img_item = self.workspace.items[img_path]
@@ -8025,6 +8079,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         prompt_config_path = self.config_file
 
         # Mark frames as pending for batch processing
+        self._forget_older_batch(frame_paths)
         for i, frame_path in enumerate(frame_paths):
             if frame_path in self.workspace.items:
                 frame_item = self.workspace.items[frame_path]

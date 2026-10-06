@@ -2429,25 +2429,6 @@ def test_a_refusal_halt_with_nothing_left_does_not_offer_to_carry_on(frame, monk
 
 # ----- #352, the items #353 left ----- #
 
-def test_yes_to_resume_waits_for_a_slow_extraction_to_stop(frame, monkeypatch):
-    """A halt waits 30 s for the extraction thread; a video still opening on
-    a share can take longer, and Yes was then refused as busy."""
-    f = frame
-    run = f._begin_run()
-    run.set()
-
-    def slow_to_let_go():
-        time.sleep(0.5)
-        wx.CallAfter(f._end_run, run)
-    run.thread = threading.Thread(target=slow_to_let_go, daemon=True)
-    run.thread.start()
-    busy_at_resume = []
-    monkeypatch.setattr(f, "resume_batch_processing",
-                        lambda: busy_at_resume.append(f._batch_busy_message()))
-    f._resume_after_halt()
-    assert busy_at_resume == [None]
-
-
 def test_worker_says_when_it_waits_for_frames(monkeypatch):
     import workers_wx
     w, _ = _real_batch(monkeypatch, ["a.jpg"], queue_open=True)
@@ -2467,15 +2448,18 @@ def test_waiting_for_frames_replaces_the_stale_current_image(frame, monkeypatch)
     f = frame
     _pipeline_running(f, monkeypatch)
     dlg = f.batch_progress_dialog
-    dlg.update_progress(1, 1, image_name="a.jpg")
+    dlg.update_progress(1, 1, file_path=str(f.src / "a.jpg"))
+    progress_before = f.batch_progress
     times_before = list(f.batch_processing_times)
     f.on_worker_progress(SimpleNamespace(message="Waiting for the next video's frames…",
                                          current=0, total=1, file_path="",
                                          waiting_for_frames=True))
     rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
-    assert any("waiting for the next video" in r for r in rows), rows
-    assert not any(r.startswith("Current:") and "a.jpg" in r for r in rows)
+    assert any(r.startswith("Current Image:") and "waiting for the next video" in r
+               for r in rows), rows
+    assert not any("a.jpg" in r for r in rows if r.startswith("Current"))
     assert f.batch_processing_times == times_before
+    assert f.batch_progress is progress_before, "a wait is not an image"
     f._run_cancel.set()
 
 
@@ -2500,7 +2484,6 @@ def test_paused_title_stops_saying_extracting_when_extraction_ends(frame, monkey
     worker = _FakeWorker.instances[-1]
     worker.is_paused = lambda: True
     f.batch_progress = {"current": 1, "total": 1, "file_path": str(f.src / "a.jpg")}
-    f.on_pause_batch.__func__        # the title it sets says "extracting videos"
     f._set_batch_title(paused=True)
     assert "extracting videos" in f.GetTitle()
     release.set()
@@ -2588,3 +2571,186 @@ def test_final_stats_count_the_last_failure(_frame):
         assert failed and failed[0].split()[-1] == "4", rows
     finally:
         dlg.Destroy()
+
+
+# ----- #355 review ----- #
+
+def test_yes_to_resume_resumes_once_extraction_lets_go(frame, monkeypatch):
+    """#352: after a halt whose extraction thread outlived the 30 s wait, Yes
+    was refused as busy. Now it resumes when the thread lets go, with the
+    progress window saying so meanwhile and the app not blocked."""
+    import imagedescriber_wx
+    f = frame
+    let_go = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        while not cancel.is_set():
+            time.sleep(0.01)
+        assert let_go.wait(10)            # a share slow to release the video
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _extracting(f))
+    worker = _FakeWorker.instances[-1]
+    monkeypatch.setattr(f, "_wait_for_extraction", lambda run, timeout=5.0: None)  # timed out
+    resumed = []
+    monkeypatch.setattr(f, "resume_batch_processing",
+                        lambda: resumed.append(f._batch_busy_message()))
+    f.answer = True                                    # "resume now?" Yes
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="0/1 images", output_dir="", worker=worker,
+        halted="Claude Code is not signed in.", halted_files=[str(f.src / "a.jpg")],
+        halted_streak=False, halted_refusals=False))
+    assert resumed == [], "resumed while extraction still held the video"
+    dlg = f.batch_progress_dialog
+    assert dlg is not None and "Resuming once frame extraction stops" in dlg.GetTitle()
+    let_go.set()
+    assert _pump_until(lambda: resumed)
+    assert resumed == [None], "refused as busy"
+    assert f.batch_progress_dialog is None or f.batch_progress_dialog is not dlg
+
+
+def test_paused_title_counts_frames_queued_as_extraction_ends(frame, monkeypatch, tmp_path):
+    """#355 review: paused at 1 of 1, a video then adds frames; the title read
+    "(Paused) 100%, 1 of 1" with them still to describe."""
+    f = frame
+    frames = []
+    for n in range(3):
+        fr = tmp_path / f"clip_{n}.00s.jpg"
+        fr.write_bytes(b"x")
+        frames.append(str(fr))
+    gate = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        assert gate.wait(10)
+        return frames, {}
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _extracting(f))
+    worker = _FakeWorker.instances[-1]
+    worker.is_paused = lambda: True
+    worker.progress_offset = 0
+    f.batch_progress = {"current": 1, "total": 1, "file_path": str(f.src / "a.jpg")}
+    gate.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f.GetTitle().startswith("(Paused) 25%, 1 of 4"), f.GetTitle()
+
+
+def test_title_drops_extracting_when_extraction_ends_unpaused(frame, monkeypatch):
+    f = frame
+    release, calls = _slow_extraction(monkeypatch, f, [])
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: calls)
+    worker = _FakeWorker.instances[-1]
+    worker.is_paused = lambda: False
+    worker.progress_offset = 0
+    f.batch_progress = {"current": 1, "total": 1, "file_path": str(f.src / "a.jpg")}
+    f._set_batch_title()
+    assert "extracting videos" in f.GetTitle()
+    release.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert f.GetTitle().startswith("100%, 1 of 1"), f.GetTitle()
+
+
+def test_waiting_line_is_not_left_in_the_final_summary(_frame):
+    """#355 review: describing waited, the last video gave nothing new, and
+    the completed window still said it was waiting, above "Batch Complete"."""
+    from batch_progress_dialog import BatchProgressDialog
+    dlg = BatchProgressDialog(_frame, 3)
+    try:
+        dlg.begin_stage("Describing and extracting frames", 3, stage_index=2, stage_count=2)
+        dlg.begin_extraction(2)
+        dlg.update_progress(3, 3, file_path="3.jpg")
+        dlg.show_waiting_for_frames()
+        dlg.end_extraction()
+        dlg.mark_complete("3/3 images")
+        rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+        assert not any("waiting" in r for r in rows), rows
+        assert not any(r.startswith("Current") for r in rows), rows
+    finally:
+        dlg.Destroy()
+
+
+def test_a_failed_start_puts_back_the_older_halted_batch(frame, monkeypatch):
+    """#355 review: a batch halted (resume declined), a new batch then failed
+    to start, and the older batch's resume state was gone."""
+    from data_models import ImageItem
+    f = frame
+    old = str(f.src / "old.jpg")
+    shared = str(f.src / "a.jpg")
+    f.workspace.add_item(ImageItem(old))
+    older = {"provider": "ollama", "model": "m", "total_queued": 2}
+    f.workspace.batch_state = older
+    for fp, pos in ((old, 0), (shared, 1)):
+        f.workspace.items[fp].processing_state = "pending"
+        f.workspace.items[fp].batch_queue_position = pos
+
+    def cannot_start():
+        raise RuntimeError("can't start new thread")
+    f._launch_batch([shared], OPTIONS, True, extraction=cannot_start,
+                    extraction_videos=[str(f.src / "clip.mp4")])
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert any("could not start" in m for m in f.infos)
+    assert f.workspace.batch_state is older
+    assert (f.workspace.items[old].processing_state, f.workspace.items[old].batch_queue_position) == ("pending", 0)
+    assert (f.workspace.items[shared].processing_state, f.workspace.items[shared].batch_queue_position) == ("pending", 1)
+
+
+@pytest.mark.parametrize("entry", ["downloads", "frames"])
+def test_every_batch_start_lets_go_of_an_older_batchs_flags(frame, monkeypatch, entry):
+    """#355 review: only one of the ways a batch starts cleared them."""
+    import imagedescriber_wx
+    from data_models import ImageItem
+    f = frame
+    old = str(f.src / "old.jpg")
+    f.workspace.add_item(ImageItem(old))
+    f.workspace.items[old].processing_state = "pending"
+    f.workspace.items[old].batch_queue_position = 989
+    a = str(f.src / "a.jpg")
+    if entry == "downloads":
+        f.auto_process_downloaded_images([a], dict(OPTIONS))
+    else:
+        class _Dialog:
+            def __init__(self, *a, **k):
+                pass
+
+            def ShowModal(self):
+                return wx.ID_OK
+
+            def get_config(self):
+                return dict(OPTIONS)
+
+            def Destroy(self):
+                pass
+        monkeypatch.setattr(imagedescriber_wx, "ProcessingOptionsDialog", _Dialog)
+        monkeypatch.setattr(f, "_persist_processing_options", lambda o: None)
+        f.auto_process_extracted_frames([a])
+    assert f.workspace.items[old].processing_state is None
+    assert f.workspace.items[a].processing_state == "pending"
+
+
+def test_stats_and_summary_agree_after_a_streak_halt(frame, monkeypatch):
+    """#355 review: ten identical failures halt and are requeued; the summary
+    left them out of "failed" but the stats still read "Failed: 10"."""
+    import imagedescriber_wx
+    f = frame
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+    f._launch_batch([str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    worker = _FakeWorker.instances[-1]
+    dlg = f.batch_progress_dialog
+    streak = [str(f.src / f"s{n}.jpg") for n in range(10)]
+    dlg.update_progress(10, 10, file_path=streak[-1])
+    for fp in streak:
+        f._batch_failures += 1
+        dlg.note_failure(Path(fp).name, "same error")
+    worker.finish()
+    f.answer = False
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="10/10 images", output_dir="", worker=worker,
+        halted="Same error ten times.", halted_files=streak,
+        halted_streak=True, halted_refusals=False))
+    rows = [dlg.stats_list.GetString(i) for i in range(dlg.stats_list.GetCount())]
+    assert not any(r.startswith("Failed:") for r in rows), rows
+    assert not any("failed)" in r for r in rows), rows
+    dlg.Destroy()

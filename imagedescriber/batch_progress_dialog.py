@@ -87,6 +87,9 @@ class BatchProgressDialog(wx.Dialog):
         self.stage_index = 0
         self.stage_count = 0
         self.separator_indices = set()
+        # Describing waits for the next video's frames (#352); see
+        # show_waiting_for_frames.
+        self._waiting = False
         # Frame extraction running alongside describing (#344): its own row,
         # so the describe counts never overwrite it. None when not extracting.
         self._extraction = None
@@ -240,12 +243,14 @@ class BatchProgressDialog(wx.Dialog):
 
     def show_waiting_for_frames(self) -> None:
         """Describing has caught up with extraction: say so in place of the
-        last image, which was no longer being described."""
+        last image, which was no longer being described. Shown on the same
+        "Current Image" row, so a reader on it stays there; cleared by the
+        next image, the end of extraction, or the end of the batch."""
         if self._last_progress is None:
             return
+        self._waiting = True
         args = dict(self._last_progress)
-        args.update(file_path=None,
-                    image_name="(waiting for the next video's frames)")
+        args.update(file_path=None, image_name=None)
         self.update_progress(**args)
 
     def stop_extraction(self) -> None:
@@ -437,6 +442,8 @@ class BatchProgressDialog(wx.Dialog):
             self.stats_list.Append(f"Last Image Described:       {last_image}")
             self.stats_list.Append(f"Last Description:           {last_description}")
 
+        if image_name or file_path:
+            self._waiting = False
         if image_name:
             self.stats_list.Append(f"Current:                    {image_name}")
             if provider and model:
@@ -444,6 +451,9 @@ class BatchProgressDialog(wx.Dialog):
                 self.stats_list.Append(f"Model:                      {model}")
         elif file_path:
             self.stats_list.Append(f"Current Image:              {Path(file_path).name}")
+        elif self._waiting and self._extraction is not None:
+            self.stats_list.Append("Current Image:              "
+                                   "(waiting for the next video's frames)")
 
         # Update progress bar — pulse when the total is unknown. It is not
         # known while videos are extracting either: the total grows as each
@@ -570,6 +580,11 @@ class BatchProgressDialog(wx.Dialog):
         Changes Pause→disabled, Stop→Close, updates title to show completion.
         """
         self._is_complete = True
+        # Nothing is current any more: no "Current" or "waiting" row above
+        # the summary.
+        self._waiting = False
+        if self._last_progress is not None:
+            self._last_progress.update(file_path=None, image_name=None)
         # Redraw first: a failure noted after the last progress update (the
         # batch's last image failing) was counted in the summary below but
         # not in the stats, which read "Failed: 3" over "4 failed".

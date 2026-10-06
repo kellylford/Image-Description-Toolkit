@@ -26,14 +26,14 @@
 - Resuming a paused batch while videos are still extracting no longer shows a percentage in the window title.
 - If describing fails outright, frame extraction stops too, instead of carrying on for a batch that has ended.
 - While describing waits for the next video's frames, the progress window says so, instead of showing the last image as the one being described.
-- The progress window's statistics count the batch's last failure. They read "Failed: 3" above a "4 failed" summary.
-- Choosing Yes to resume after a batch stopped waits for frame extraction to finish stopping, instead of being refused because a batch was "still finishing".
+- The progress window's statistics count failures as its summary does: the last image's failure is counted, and images a stopped batch will retry aren't. They read "Failed: 3" above a "4 failed" summary.
+- Choosing Yes to resume after a batch stopped resumes it as soon as frame extraction has finished stopping, with the progress window saying so, instead of being refused because a batch was "still finishing".
 - If a batch is paused when extraction finishes, the window title stops saying "extracting videos".
-- When you cancel quitting partway through a batch, its progress window stays open saying "Stopping" until the batch has stopped, instead of only the status bar saying so.
+- When you cancel quitting partway through a batch, and its last image has already finished but a video is still being let go, its progress window stays open saying "Stopping" until the batch has stopped, instead of only the status bar saying so.
 - A workspace that hasn't been saved yet no longer shows "step 1 of 2" with no step 2.
 - If some videos give only frames that are already described and others give none, both are reported, not just "All images already have descriptions."
 - A new batch no longer inherits queued images from an older stopped batch, which made its resume question overstate the count.
-- A batch that fails to start right after describing begins doesn't leave a batch behind to resume.
+- A batch that fails to start doesn't leave itself behind to resume, and puts back an older stopped batch it was replacing.
 
 **"Embed description after processing" follows each batch in ImageDescriber (#346)**
 - The image being described when Stop was pressed is now embedded too, if its batch was set to embed.
