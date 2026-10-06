@@ -325,12 +325,32 @@ def test_windows_ai_takes_its_kinds_whatever_their_case(capsys, given, expected)
     assert capsys.readouterr().err == ""
 
 
-def test_a_foreign_model_becomes_windows_ais_default_with_a_note(capsys):
+def test_an_inherited_model_quietly_becomes_windows_ais_default(capsys):
+    """default_model is shared by every provider, so an Ollama name there is no mistake."""
     from cli.main import _resolve_model
 
     assert _resolve_model("windows-ai", "moondream") == "accessible"
+    assert capsys.readouterr().err == ""
+
+
+def test_a_model_asked_for_that_isnt_a_kind_stops_before_the_run(capsys):
+    """A typo in --model must not run a whole batch as some other kind."""
+    from cli.main import _resolve_model
+
+    with pytest.raises(SystemExit) as caught:
+        _resolve_model("windows-ai", "detailled", explicit="detailled")
+    assert caught.value.code == 2
     err = capsys.readouterr().err
-    assert "moondream" in err and "accessible, detailed, brief, diagram" in err
+    assert "detailled" in err and "accessible, detailed, brief, diagram" in err
+
+
+def test_a_kind_inherited_by_another_provider_gives_way_to_its_default(capsys):
+    """A workspace last described with Windows AI, rerun with --provider ollama."""
+    from cli.main import _resolve_model
+
+    assert _resolve_model("ollama", "accessible") is None
+    assert _resolve_model("apple", "brief") == "system"
+    assert _resolve_model("ollama", "brief", explicit="brief") == "brief", "asked for, so sent"
 
 
 def test_windows_ai_ignores_a_prompt_and_says_so(capsys):

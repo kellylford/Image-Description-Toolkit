@@ -34,6 +34,8 @@ __all__ = [
     "capabilities_for",
     "display_name",
     "list_providers",
+    "can_chat",
+    "chat_providers",
     "supports_attachments",
     "supported_attachments",
     "attachment_wildcard",

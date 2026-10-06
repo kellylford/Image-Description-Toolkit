@@ -342,49 +342,61 @@ class HelperProcess:
     """One ``idt-windows-ai --serve``, started on demand and shared by every request.
 
     Started lazily, so a PC that never selects this provider starts nothing, and the cost stays
-    off a GUI's UI thread at startup. ``ensure_running`` re-spawns a helper that died, so a crash
-    mid-batch costs one picture, not the rest of the run.
+    off a GUI's UI thread at startup. A helper that died is started again for the next request,
+    so a crash mid-batch costs one picture, not the rest of the run.
 
-    Requests are serialised: the model handles one at a time anyway. Answers are read by a
-    thread into a queue, so a request can time out; a helper that times out is stopped, so a
-    late answer can never be taken for the next request's.
+    Two locks. ``_request_lock`` takes requests one at a time (the model handles one at a time
+    anyway) and is held while a request waits for its answer. ``_state_lock`` guards which
+    process is running and is only ever held briefly, so :meth:`stop` and :meth:`is_running`
+    never wait behind a picture: stopping closes the helper, and the request waiting on it
+    returns at once, saying it was stopped. A GUI's Stop, and exit, can't hang on a describe.
+
+    Answers are read by a thread into a queue, so a request can time out; a helper that times
+    out is stopped, so a late answer can never be taken for the next request's.
 
     Nothing can be orphaned: the helper exits when its stdin closes, which happens when this
     process stops it or ends, however it ends.
     """
 
     def __init__(self) -> None:
-        self._lock = threading.RLock()
+        self._request_lock = threading.Lock()
+        self._state_lock = threading.Lock()
         self._proc: Optional[subprocess.Popen] = None
         self._answers: "queue.Queue[Optional[str]]" = queue.Queue()
         self._next_id = 0
+        self._stopped = False   # set by stop(), so a request it cut short can say so
 
     def is_running(self) -> bool:
-        with self._lock:
+        with self._state_lock:
             return self._proc is not None and self._proc.poll() is None
 
+    def _start_locked(self) -> subprocess.Popen:
+        """The running helper, started if need be. Call with ``_state_lock`` held."""
+        if self._proc is not None and self._proc.poll() is None:
+            return self._proc
+        self._close_locked()
+        command = _helper_command()
+        if not command:
+            raise WindowsAIError(_NO_HELPER_HINT, setup=True)
+        try:
+            # stderr goes nowhere: the helper reports everything on stdout, and an unread
+            # stderr pipe that filled up would wedge it mid-batch.
+            proc = subprocess.Popen(
+                command + ["--serve"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
+                bufsize=1, creationflags=_CREATE_NO_WINDOW,
+            )
+        except OSError as exc:
+            raise WindowsAIError(f"Couldn't start the Windows AI helper: {exc}", setup=True)
+        self._proc = proc
+        self._answers = queue.Queue()
+        threading.Thread(target=self._read_answers, args=(proc, self._answers),
+                         name="windows-ai-helper-reader", daemon=True).start()
+        return proc
+
     def ensure_running(self) -> None:
-        with self._lock:
-            if self.is_running():
-                return
-            self._stop_locked()
-            command = _helper_command()
-            if not command:
-                raise WindowsAIError(_NO_HELPER_HINT, setup=True)
-            try:
-                # stderr goes nowhere: the helper reports everything on stdout, and an unread
-                # stderr pipe that filled up would wedge it mid-batch.
-                self._proc = subprocess.Popen(
-                    command + ["--serve"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                    stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                    bufsize=1, creationflags=_CREATE_NO_WINDOW,
-                )
-            except OSError as exc:
-                self._proc = None
-                raise WindowsAIError(f"Couldn't start the Windows AI helper: {exc}", setup=True)
-            self._answers = queue.Queue()
-            threading.Thread(target=self._read_answers, args=(self._proc, self._answers),
-                             name="windows-ai-helper-reader", daemon=True).start()
+        with self._state_lock:
+            self._start_locked()
 
     @staticmethod
     def _read_answers(proc: subprocess.Popen, answers: "queue.Queue[Optional[str]]") -> None:
@@ -399,46 +411,68 @@ class HelperProcess:
     def request(self, kind: str, mime_type: str, image_bytes: bytes,
                 timeout: float = DESCRIBE_TIMEOUT_SECONDS) -> str:
         """Describe one picture; return the description or raise :class:`WindowsAIError`."""
-        with self._lock:
-            self.ensure_running()
-            self._next_id += 1
-            request_id = self._next_id
+        with self._request_lock:
+            with self._state_lock:
+                self._stopped = False
+                proc = self._start_locked()
+                answers = self._answers
+                self._next_id += 1
+                request_id = self._next_id
             line = json.dumps({
                 "id": request_id, "kind": kind, "mime": mime_type,
                 "image": base64.b64encode(image_bytes).decode("ascii"),
             })
             try:
-                self._proc.stdin.write(line + "\n")  # type: ignore[union-attr]
-                self._proc.stdin.flush()  # type: ignore[union-attr]
+                proc.stdin.write(line + "\n")  # type: ignore[union-attr]
+                proc.stdin.flush()  # type: ignore[union-attr]
             except (OSError, ValueError) as exc:
-                self._stop_locked()
-                raise WindowsAIError(f"The Windows AI helper stopped unexpectedly: {exc}", status_code=503)
+                raise self._gone(proc, f"The Windows AI helper stopped unexpectedly: {exc}")
             try:
-                answer = self._answers.get(timeout=timeout)
+                answer = answers.get(timeout=timeout)
             except queue.Empty:
-                self._stop_locked()
+                self.stop()
                 raise WindowsAIError(
-                    f"Windows AI didn't describe the picture within {timeout:.0f} seconds.", timeout=True)
+                    f"Windows AI timed out: no description after {timeout:.0f} seconds.", timeout=True)
             if answer is None:
-                self._stop_locked()
-                raise WindowsAIError("The Windows AI helper stopped unexpectedly.", status_code=503)
-            try:
-                response = json.loads(answer)
-            except json.JSONDecodeError:
-                self._stop_locked()
-                raise WindowsAIError(f"The Windows AI helper gave an answer IDT can't read: {answer.strip()[:200]}",
-                                     status_code=503)
-            if response.get("id") not in (request_id, 0):
-                # Can't happen with one request at a time and a helper stopped on timeout; if it
-                # ever does, the stream is out of step, so start again.
-                self._stop_locked()
-                raise WindowsAIError("The Windows AI helper answered a different request.", status_code=503)
-            if response.get("ok"):
-                return str(response.get("text") or "")
-            raise error_for_code(str(response.get("code") or ""),
-                                 str(response.get("message") or "Windows AI couldn't describe the picture."))
+                raise self._gone(proc, "The Windows AI helper stopped unexpectedly.")
+            return self._read_answer(answer, request_id)
 
-    def _stop_locked(self) -> None:
+    def _gone(self, proc: subprocess.Popen, message: str) -> WindowsAIError:
+        """The error for a helper that went away mid-request: retryable if it died, not if it
+        was stopped on purpose (a GUI's Stop, or exit), which a retry would only undo."""
+        with self._state_lock:
+            if self._proc is proc:
+                # Its output has ended, though it may not have quite exited yet: done with it,
+                # so the next request starts another rather than write to this one.
+                self._close_locked()
+            elif self._stopped:
+                return WindowsAIError("Windows AI was stopped before it finished the picture.")
+        return WindowsAIError(message, status_code=503)
+
+    def _read_answer(self, answer: str, request_id: int) -> str:
+        try:
+            response = json.loads(answer)
+        except json.JSONDecodeError:
+            response = None
+        if not isinstance(response, dict):
+            self.stop()
+            raise WindowsAIError(f"The Windows AI helper gave an answer IDT can't read: {answer.strip()[:200]}",
+                                 status_code=503)
+        if response.get("id") not in (request_id, 0):
+            # Can't happen with one request at a time and a helper stopped on timeout; if it
+            # ever does, the stream is out of step, so start again.
+            self.stop()
+            raise WindowsAIError("The Windows AI helper answered a different request.", status_code=503)
+        if response.get("ok"):
+            text = str(response.get("text") or "").strip()
+            if not text:
+                # Never stored as a description; another attempt usually gives one.
+                raise WindowsAIError("Windows AI returned an empty description.", status_code=503)
+            return text
+        raise error_for_code(str(response.get("code") or ""),
+                             str(response.get("message") or "Windows AI couldn't describe the picture."))
+
+    def _close_locked(self) -> None:
         proc, self._proc = self._proc, None
         if proc is None:
             return
@@ -454,9 +488,12 @@ class HelperProcess:
             proc.wait()
 
     def stop(self) -> None:
-        """Stop the helper. Safe to call repeatedly."""
-        with self._lock:
-            self._stop_locked()
+        """Stop the helper, at once, even while a request waits on it: that request then
+        raises, saying it was stopped. Safe to call repeatedly and from any thread."""
+        with self._state_lock:
+            if self._proc is not None:
+                self._stopped = True
+            self._close_locked()
 
 
 #: The process-wide helper. One is right: requests are handled one at a time anyway, so a
@@ -490,8 +527,18 @@ def normalise_kind(model: Optional[str]) -> str:
     return kind
 
 
+#: The most IDT sends the helper, which takes up to 20 MB; base64 adds a third on the way.
+#: Larger pictures are scaled down first: the model sees at most 4096 pixels on a side anyway.
+MAX_IMAGE_BYTES = 4_000_000
+FIT_LONG_EDGE = 4096
+
+
 def _as_supported_image(image_bytes: bytes, mime_type: str):
-    """The picture in a type the helper accepts: as it is, or converted to JPEG."""
+    """The picture in a type and size the helper accepts: as it is, or converted to JPEG,
+    scaled down if it is over :data:`MAX_IMAGE_BYTES`."""
+    from idt_core.converter import fit_image
+
+    image_bytes, mime_type = fit_image(image_bytes, mime_type, MAX_IMAGE_BYTES, FIT_LONG_EDGE)
     if mime_type in SUPPORTED_IMAGE_MIMES:
         return image_bytes, mime_type
     from PIL import Image

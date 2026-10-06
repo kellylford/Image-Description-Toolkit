@@ -55,6 +55,12 @@ for line in sys.stdin:
         sys.exit(3)
     if step == "sleep":
         time.sleep(30)
+    if step == "array":
+        print("[]", flush=True)
+        continue
+    if step == "empty":
+        print(json.dumps({"id": request["id"], "ok": True, "text": "  "}), flush=True)
+        continue
     if step == "garbage":
         print("<html>not json</html>", flush=True)
         continue
@@ -313,7 +319,9 @@ def test_a_helper_that_takes_too_long_is_stopped_and_reported_as_a_timeout(helpe
     assert not windows_ai.helper().is_running()
 
 
-@pytest.mark.parametrize("step,fragment", [("garbage", "can't read"), ("wrong_id", "different request")])
+@pytest.mark.parametrize("step,fragment", [
+    ("garbage", "can't read"), ("array", "can't read"), ("wrong_id", "different request"),
+])
 def test_an_answer_out_of_step_restarts_the_helper(helper, step, fragment):
     helper.configure(serve=[step])
     with pytest.raises(WindowsAIError, match=fragment) as caught:
@@ -420,5 +428,97 @@ def test_idt_describe_records_the_kind_and_no_prompt(helper, tmp_path, monkeypat
     description = item.descriptions[-1]
     assert (description.provider, description.model, description.prompt_name) == ("windows-ai", "brief", "none")
     assert description.text == "brief description 1"
-    assert workspace.defaults.prompt_name != "none"
+    assert workspace.defaults.prompt_name == "detailed", "the workspace's own prompt is left alone"
     assert [r["kind"] for r in helper.requests()] == ["brief"]
+
+
+def test_an_empty_description_is_never_returned(helper):
+    helper.configure(serve=["empty"])
+    with pytest.raises(WindowsAIError, match="empty description") as caught:
+        WindowsAIProvider().describe(JPEG, "image/jpeg", "")
+    assert caught.value.status_code == 503
+
+
+def test_a_large_picture_is_scaled_down_rather_than_refused(helper):
+    import os as _os
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.frombytes("RGB", (3000, 3000), _os.urandom(3000 * 3000 * 3)).save(out, format="PNG")
+    assert len(out.getvalue()) > windows_ai.MAX_IMAGE_BYTES
+    WindowsAIProvider().describe(out.getvalue(), "image/png", "")
+    request = helper.requests()[0]
+    assert request["mime"] == "image/jpeg"
+    assert request["image_bytes"] * 3 / 4 <= windows_ai.MAX_IMAGE_BYTES
+
+
+def test_stop_doesnt_wait_for_a_picture_and_the_request_says_it_was_stopped(helper):
+    """A GUI's Stop, and exit, must not hang behind a describe that takes minutes."""
+    import threading
+    import time
+
+    helper.configure(serve=["sleep"])
+    outcome = {}
+
+    def describe():
+        try:
+            WindowsAIProvider().describe(JPEG, "image/jpeg", "")
+        except WindowsAIError as exc:
+            outcome["error"] = exc
+
+    worker = threading.Thread(target=describe)
+    worker.start()
+    deadline = time.time() + 10
+    while not helper.requests() and time.time() < deadline:
+        time.sleep(0.05)
+    started = time.time()
+    assert windows_ai.helper().is_running(), "checking must not wait for the picture either"
+    windows_ai.shutdown_helper()
+    worker.join(10)
+    assert time.time() - started < 8
+    assert "stopped before it finished" in str(outcome["error"])
+    assert outcome["error"].status_code is None, "stopped on purpose: not to be retried"
+
+
+# ---------------------------------------------------------------------------
+# guideme
+# ---------------------------------------------------------------------------
+
+
+def test_guideme_running_the_command_prints_no_prompt_note(capsys):
+    from types import SimpleNamespace
+
+    from cli.main import _resolve_prompt
+
+    assert _resolve_prompt(SimpleNamespace(prompt="none", prompt_text=None), None, "windows-ai") == ("none", "")
+    assert capsys.readouterr().err == ""
+
+
+def test_guideme_command_has_no_prompt_for_windows_ai():
+    from cli.guide import _build_command
+
+    parts = _build_command("dir", "C:/pics", "windows-ai", "brief", "none", True, False, {})
+    assert "--prompt" not in parts
+    assert parts[parts.index("--model") + 1] == "brief"
+
+
+def test_guideme_declining_to_prepare_doesnt_claim_it_is_ready(helper, monkeypatch, capsys):
+    from cli import guide
+
+    helper.configure(state="NotReady")
+    monkeypatch.setattr(guide, "get_yes_no", lambda *a, **k: False)
+    assert guide._check_windows_ai()
+    out = capsys.readouterr().out
+    assert "when the first picture is described" in out
+    assert "is ready" not in out
+    assert helper.starts("--prepare") == 0
+
+
+def test_guideme_reads_each_kind_once(monkeypatch, capsys):
+    from cli import guide
+
+    seen = {}
+    monkeypatch.setattr(guide, "get_choice", lambda _q, labels, **k: seen.setdefault("labels", labels) and "BACK")
+    guide._step_model("windows-ai")
+    assert seen["labels"][0] == "Accessible  (recommended)"

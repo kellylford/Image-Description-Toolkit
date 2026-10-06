@@ -431,19 +431,9 @@ def fit_image(image_bytes: bytes, mime_type: str) -> Tuple[bytes, str]:
     A 24 or 48 MP phone JPEG, or a large PNG scan, is over the limit and
     would otherwise fail on every attempt.
     """
-    if len(image_bytes) <= MAX_IMAGE_BYTES:
-        return image_bytes, mime_type
-    import io
+    from idt_core.converter import fit_image as _fit
 
-    from PIL import Image
-
-    img = Image.open(io.BytesIO(image_bytes))
-    if img.mode != "RGB":
-        img = img.convert("RGB")
-    img.thumbnail((FIT_LONG_EDGE, FIT_LONG_EDGE), Image.Resampling.LANCZOS)
-    out = io.BytesIO()
-    img.save(out, format="JPEG", quality=85)
-    return out.getvalue(), "image/jpeg"
+    return _fit(image_bytes, mime_type, MAX_IMAGE_BYTES, FIT_LONG_EDGE)
 
 
 def image_block(image_bytes: bytes, mime_type: str) -> dict:

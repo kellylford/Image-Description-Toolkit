@@ -291,12 +291,14 @@ def _check_windows_ai() -> bool:
     if report.get("state") != "Ready":
         print("Windows needs to get its image description model ready first. The first time,")
         print("it may download it, which can take a few minutes.")
-        if get_yes_no("Get it ready now?", default=True):
-            try:
-                prepare()
-            except WindowsAIError as exc:
-                print(f"Warning: {exc}")
-                return get_yes_no("Continue anyway?", default=False)
+        if not get_yes_no("Get it ready now?", default=True):
+            print("Windows will get it ready when the first picture is described.")
+            return True
+        try:
+            prepare()
+        except WindowsAIError as exc:
+            print(f"Warning: {exc}")
+            return get_yes_no("Continue anyway?", default=False)
     print("Windows AI is ready on this PC. No API key needed, and descriptions never leave it.")
     return True
 
@@ -361,7 +363,7 @@ def _choose_api_model(provider: str) -> str:
     labels = []
     for entry in entries:
         text = entry.display()
-        if entry.id != text:
+        if entry.id.lower() != text.lower():
             text = f"{text}  [{entry.id}]"
         if entry.recommended:
             text += "  (recommended)"
@@ -478,17 +480,18 @@ def _step_metadata(provider: str = "") -> tuple[bool, bool]:
     _header("Step 6: Metadata Options")
 
     if provider == "windows-ai":
-        # The details are added to the prompt, and Windows AI takes none: say so before asking.
-        print("Windows AI takes no prompt, so photo details can't shape its descriptions.")
-        print("They can still be read and kept with each description.")
+        # The details are added to the prompt, and Windows AI takes none: say so instead.
+        print("IDT can read EXIF data from your images (date taken, camera, GPS).")
+        print("Windows AI takes no prompt, so these details can't shape its descriptions,")
+        print("but they can still be kept with each description.")
         print()
-
-    print("IDT can read EXIF data from your images (date taken, camera, GPS)")
-    print("and inject it into the AI prompt as context.")
-    print()
-    print('Example: "Context: Munich, Germany  Sep 12, 2025  iPhone 14 Pro"')
-    print("This significantly improves description quality for photos with EXIF.")
-    print()
+    else:
+        print("IDT can read EXIF data from your images (date taken, camera, GPS)")
+        print("and inject it into the AI prompt as context.")
+        print()
+        print('Example: "Context: Munich, Germany  Sep 12, 2025  iPhone 14 Pro"')
+        print("This significantly improves description quality for photos with EXIF.")
+        print()
 
     extract = get_yes_no("Enable EXIF metadata extraction?", default=True)
     if not extract:
@@ -713,10 +716,8 @@ def run_guide() -> None:
                 print("Provider:   ", state["provider"])
                 print("Model:      ", state["model"])
                 print("Source:     ", state["source"])
-                if state["provider"] == "windows-ai":
-                    print("Prompt:     ", "not used (Windows AI describes with its", state["model"], "kind)")
-                else:
-                    print("Prompt:     ", state["prompt_name"])
+                from cli.main import _prompt_label
+                print("Prompt:     ", _prompt_label(state["provider"], state["model"], state["prompt_name"]))
                 meta_str = "yes" if state["extract_metadata"] else "no"
                 if state["extract_metadata"] and state["geocode"]:
                     meta_str += " + geocoding"

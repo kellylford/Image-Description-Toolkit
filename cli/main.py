@@ -51,7 +51,8 @@ def _set_console_title(title: str) -> None:
 # Provider factory                                                     #
 # ------------------------------------------------------------------ #
 
-def _resolve_model(provider: str, model: Optional[str]) -> Optional[str]:
+def _resolve_model(provider: str, model: Optional[str],
+                   explicit: Optional[str] = None) -> Optional[str]:
     """Deal with a configured default model that belongs to a different provider.
 
     ``default_model`` is global while ``--provider`` is per-run, so on a machine
@@ -69,33 +70,38 @@ def _resolve_model(provider: str, model: Optional[str]) -> Optional[str]:
       silently running a cheaper model than the user asked for. It warns and
       sends the name through unchanged.
 
-    * **windows-ai** has four fixed models, its description kinds. Any other name
-      can't be one of them, so it becomes the default kind, with a note when a
-      name was given (case is ignored: "Brief" is brief).
+    * **windows-ai** has four fixed models, its description kinds (case is
+      ignored: "Brief" is brief). A name passed with --model (``explicit``) that
+      isn't one is a mistake worth stopping for, before a whole batch runs as
+      something else; one inherited from config or the workspace belonged to
+      another provider, so it quietly becomes the default kind, as for apple.
+      The reverse holds too: a kind inherited by another provider is dropped,
+      so that provider uses its own default rather than ask for "accessible".
 
     Everything else is left alone: a wrong-looking model name elsewhere might
     simply be one this build has not heard of.
     """
-    if provider == "windows-ai":
-        from idt_core.providers.windows_ai import DEFAULT_MODEL, WINDOWS_AI_MODELS
+    from idt_core.providers.windows_ai import DEFAULT_MODEL as _KIND, WINDOWS_AI_MODELS
 
+    if provider == "windows-ai":
         kind = (model or "").strip().lower()
         if kind in WINDOWS_AI_MODELS:
             return kind
-        if kind:
-            print(
-                f"Note: Windows AI's models are its description kinds "
-                f"({', '.join(WINDOWS_AI_MODELS)}); {model!r} isn't one, so "
-                f"{DEFAULT_MODEL} is used. Pass --model to choose.",
-                file=sys.stderr,
-            )
-        return DEFAULT_MODEL
+        if explicit:
+            print(f"Error: Windows AI has no model {explicit!r}. Its models are the kinds of "
+                  f"description: {', '.join(WINDOWS_AI_MODELS)}.", file=sys.stderr)
+            sys.exit(2)
+        return _KIND
 
     if provider == "apple":
         from idt_core.providers.apple import APPLE_MODELS, DEFAULT_MODEL
 
         if model not in APPLE_MODELS:
             return DEFAULT_MODEL
+
+    if model and not explicit and model.strip().lower() in WINDOWS_AI_MODELS:
+        # Inherited from a Windows AI run (a workspace's saved model): a kind, not a model.
+        return None
 
     if provider == "claude-code" and model:
         from idt_core.providers.claude_code import CLAUDE_CODE_MODELS
@@ -196,7 +202,9 @@ def _resolve_prompt(args, project_config, provider: Optional[str] = None) -> tup
     if not _uses_prompt(provider):
         from idt_core.providers.windows_ai import PROMPT_NAME
 
-        if getattr(args, "prompt_text", None) or getattr(args, "prompt", None):
+        # PROMPT_NAME is what guideme passes on for this provider: not a prompt asked for.
+        asked = getattr(args, "prompt", None)
+        if getattr(args, "prompt_text", None) or (asked and asked != PROMPT_NAME):
             print(
                 "Note: Windows AI takes no prompt, so --prompt and --prompt-text are ignored. "
                 "Its models are the kinds of description: choose one with --model.",
@@ -485,7 +493,8 @@ def cmd_describe(args):
     _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
     model         = _resolve_model(provider_name,
-                                   args.model or _ws_model or user_cfg.default_model)
+                                   args.model or _ws_model or user_cfg.default_model,
+                                   explicit=args.model)
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
 
     # Resolve the effective copy setting: explicit --copy-originals/--no-copy-originals
@@ -826,7 +835,8 @@ def _cmd_describe_stdin(args):
     _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
     model         = _resolve_model(provider_name,
-                                   args.model or _ws_model or user_cfg.default_model)
+                                   args.model or _ws_model or user_cfg.default_model,
+                                   explicit=args.model)
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -984,7 +994,8 @@ def cmd_download(args):
         _ws_model = ws.defaults.model if ws.has_any_descriptions else ""
         provider_name = args.provider or _ws_provider or cfg.default_provider
         model = _resolve_model(provider_name,
-                               args.model or _ws_model or cfg.default_model)
+                               args.model or _ws_model or cfg.default_model,
+                               explicit=args.model)
         prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -1118,7 +1129,8 @@ def cmd_video(args):
         _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
         provider_name = args.provider or _ws_provider or user_cfg.default_provider
         model         = _resolve_model(provider_name,
-                                   args.model or _ws_model or user_cfg.default_model)
+                                   args.model or _ws_model or user_cfg.default_model,
+                                   explicit=args.model)
         prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
@@ -1784,15 +1796,15 @@ def _windows_ai_model_results() -> dict:
 
     if not is_available():
         return {"status": "unavailable", "models": [],
-                "error": "Windows AI needs a Copilot+ PC with Windows 11 24H2 or later, "
-                         "and the Windows AI helper IDT's installer adds"}
+                "error": "Windows AI needs a Copilot+ PC with Windows 11 24H2 or later. "
+                         "IDT's installer sets it up on one"}
     try:
         report = check_ready()
     except WindowsAIError as exc:
         return {"status": "unavailable", "models": [], "error": str(exc)}
     result = {"status": "ok", "models": list(WINDOWS_AI_MODELS)}
     if report.get("state") != "Ready":
-        result["note"] = "Windows will get the model ready (it may download it) on first use"
+        result["note"] = "Windows gets the model ready on first use, downloading it if need be"
     return result
 
 
@@ -2110,7 +2122,8 @@ def cmd_watch(args):
     _ws_model    = ws.defaults.model    if ws.has_any_descriptions else ""
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
     model         = _resolve_model(provider_name,
-                                   args.model or _ws_model or user_cfg.default_model)
+                                   args.model or _ws_model or user_cfg.default_model,
+                                   explicit=args.model)
     prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
