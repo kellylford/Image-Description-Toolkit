@@ -3991,6 +3991,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             # now, not when the whole extraction ends (#344,
                             # #345).
                             wx.CallAfter(_record_video, vp, frames, meta or {})
+                        else:
+                            # No error, but nothing to describe (a start past
+                            # the end, an unreadable stream): reported like a
+                            # failed video, not left out of the summary.
+                            reason = "no frames could be extracted"
+                            failed_videos.append((Path(vp).name, reason))
+                            wx.CallAfter(_video_failed, Path(vp).name, reason)
                     except ExtractionCancelled:
                         logger.info(f"Extraction of {Path(vp).name} stopped partway; "
                                     "it will be extracted again on the next run")
@@ -4186,13 +4193,19 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 self._flush_checkpoints()
                 self._save_bundle_with_progress()
                 self.refresh_image_list()
-                if frame_count == 0 and failed_videos:
-                    name, reason = failed_videos[0]
+                if frame_count == 0 and results:
+                    # Every video gave no frames: some failed, or opened but
+                    # yielded nothing (a start time past the end, an
+                    # unreadable stream). Not "already have descriptions",
+                    # which is untrue for those (#352).
+                    detail = ""
+                    if failed_videos:
+                        name, reason = failed_videos[0]
+                        detail = f"\n\nFirst failure: {name}: {reason}"
                     show_warning(
                         self,
                         f"No frames could be extracted from {len(results)} video(s), "
-                        f"so there was nothing to describe.\n\nFirst failure: "
-                        f"{name}: {reason}")
+                        f"so there was nothing to describe.{detail}")
                 else:
                     show_info(self, "All images already have descriptions.")
                 self.image_list.SetFocus()
@@ -4224,7 +4237,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._extraction_last_paint = now
         dlg = self.batch_progress_dialog
         if dlg:
-            wx.CallAfter(dlg.set_extraction, done, total, name)
+            wx.CallAfter(self._apply_extraction_progress, dlg, done, total, name)
+
+    def _apply_extraction_progress(self, dlg, done: int, total: int, name: str) -> None:
+        # Main thread. The window may have been closed or destroyed (a
+        # cancelled close destroys it) since this was posted (#352).
+        if dlg and dlg is self.batch_progress_dialog:
+            dlg.set_extraction(done, total, name)
 
     def _check_mlx_model_ready(self, provider: str, model: str) -> bool:
         """Check if an MLX model is ready to use; warn the user if not yet downloaded.
@@ -6472,14 +6491,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # handler returns, so re-dispatching the event itself raised on its
             # first attribute access and the completion was lost (a finished
             # batch left "paused", unsaved, and offered for resume).
-            snapshot = SimpleNamespace(
-                input_dir=event.input_dir,
-                output_dir=event.output_dir,
-                worker=source,
-                halted=getattr(event, 'halted', None),
-                halted_files=list(getattr(event, 'halted_files', None) or ()),
-                halted_streak=getattr(event, 'halted_streak', False),
-            )
+            snapshot = self._completion_snapshot(event, source)
 
             # Delivered when the save finishes (_save_bundle_with_progress).
             # Not a timer: timers don't fire while a save pumps events.
@@ -6501,13 +6513,25 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # video finishing just now is recorded (and, for a halted batch,
             # queued for the resume) before the resume question below.
             run = self._pipeline_run_of(source)
-            if run is not None and getattr(run, 'closing', False):
+            if getattr(source, 'stopped_by_close', False):
                 # The close stopped it (its last image just finished while
-                # "save changes?" is open). Not "Batch complete", and no save
-                # inside the question: quitting writes what's done, and a
-                # cancelled close turns this into a Stop that says so.
+                # "save changes?" is open, or while the close waits for the
+                # extraction thread). Not "Batch complete", no save inside the
+                # question, and batch_state kept so the next open offers to
+                # resume; a cancelled close turns this into a Stop that says
+                # so. Marked on the worker, not read from the run: extraction
+                # usually hands back first and ends the run (#352).
                 logger.info(f"Batch stopped by closing finished its last image ({event.input_dir})")
-                run.set()
+                if run is not None:
+                    run.set()
+                if getattr(event, 'halted', None):
+                    # It halted on that last image (signed out, or a streak).
+                    # Requeue what the halt says was never really tried, so a
+                    # quit's resume includes it; a cancelled close delivers
+                    # this completion normally, with the halt's own message.
+                    self._requeue_halted(getattr(event, 'halted_files', None),
+                                         checkpoint=True)
+                    source.close_halt = self._completion_snapshot(event, source)
                 self._flush_checkpoints()
                 return
             if run is not None:
@@ -6695,11 +6719,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if halted:
             # The images whose failures halted the batch were never really
             # tried: put them back in the queue so resuming describes them.
-            for halted_file in getattr(event, 'halted_files', None) or ():
-                item = self.workspace.items.get(halted_file)
-                if item is not None:
-                    item.processing_state = "pending"
-                    item.processing_error = None
+            self._requeue_halted(getattr(event, 'halted_files', None))
 
         # Phase 3: Clear batch state on successful completion
         if self.workspace.batch_state and not halted:
@@ -6763,7 +6783,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Return keyboard focus to image list
         self.image_list.SetFocus()
 
-        self.SetStatusText("Batch stopped: provider refused the request" if halted
+        refusals_halt = bool(halted) and getattr(event, 'halted_refusals', False)
+        self.SetStatusText("Batch stopped: the provider declined many images" if refusals_halt
+                           else "Batch stopped: provider refused the request" if halted
                            else "Batch complete", 0)
         self._batch_active = False
         self.refresh_image_list()
@@ -6784,7 +6806,37 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     f"First failure: {name}: {reason}")
             show_warning(self, "\n\n".join(parts))
 
-        if halted:
+        if halted and getattr(event, 'halted_refusals', False):
+            # The provider declined image after image (Apple's guardrails
+            # with this prompt). Not "every remaining image would fail": the
+            # declined ones stay failed, and the rest may well work, so offer
+            # to carry on, and say what would help them.
+            message = (
+                "Batch stopped: the provider declined many images in a row.\n\n"
+                f"{halted}\n\n"
+                "The declined images are marked X in the image list. Describing "
+                "them again with a different prompt style (Process > Describe All "
+                "Undescribed) may work.\n\n"
+                # A halt skips the end-of-batch warning, so say it here.
+                + (f"Frames could not be extracted from {len(video_failures)} "
+                   "video(s); the next batch tries them again.\n\n"
+                   if video_failures else ""))
+            state = self.workspace.batch_state
+            rest = (any(it.processing_state in ("pending", "paused")
+                        for it in self.workspace.items.values())
+                    or bool(self._unextracted_batch_videos(state)))
+            if not rest:
+                # The declined images were the last of the batch: nothing to
+                # carry on with, so no question whose Yes does nothing.
+                self.workspace.batch_state = None
+                show_info(self, message.rstrip())
+            elif ask_yes_no(
+                    self,
+                    message + "Choose Yes to carry on with the rest of this batch. "
+                    "Choose No to carry on later: reopening this workspace offers "
+                    "to resume it."):
+                self.resume_batch_processing()
+        elif halted:
             # Offer to resume exactly this batch (same images, provider and
             # prompt), not Describe All Undescribed, which would widen a folder
             # batch to the whole workspace and skip a Redescribe batch. The
@@ -6803,6 +6855,24 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_workflow_failed(self, event):
         """Handle workflow failures"""
+        worker = getattr(event, 'worker', None)
+        if worker is not None and worker is self.batch_worker:
+            # The describe batch itself crashed. Stop the frame extraction
+            # feeding it (it extracted the rest of the library for a batch
+            # that was gone) and let go of the dead worker, so a new run isn't
+            # refused as "already running". batch_state stays: reopening
+            # offers to resume what was left (#352).
+            run = self._pipeline_run_of(worker)
+            if run is not None:
+                run.announced = True       # this handler says what happened
+                run.set()
+            self.batch_worker = None
+            self.processing_items.clear()
+            self._batch_active = False
+            self._close_progress_dialog()
+            self._flush_checkpoints()
+            doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
+            self.update_window_title("ImageDescriber", doc_name)
         # Ensure main window has focus before showing error dialog
         self.Raise()
         self.SetFocus()
@@ -7153,9 +7223,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if self.batch_progress:
             current = self.batch_progress['current']
             total = self.batch_progress['total']
-            percentage = int((current / total) * 100)
             doc_name = Path(self.workspace_file).name if self.workspace_file else "Untitled"
-            self.SetTitle(f"{percentage}%, {current} of {total} - ImageDescriber - {doc_name}")
+            if getattr(self.batch_worker, 'queue_open', False):
+                # Still extracting: no percentage of a total that is still
+                # growing, as on_batch_progress and the paused title do (#352).
+                self.SetTitle(f"{current} of {total} so far, extracting videos"
+                              f" - ImageDescriber - {doc_name}")
+            else:
+                percentage = int((current / total) * 100) if total else 0
+                self.SetTitle(f"{percentage}%, {current} of {total}"
+                              f" - ImageDescriber - {doc_name}")
 
         # Unpause items
         for item in self.workspace.items.values():
@@ -7376,6 +7453,42 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self.refresh_image_list()
         self.image_list.SetFocus()
 
+    def _end_close_stopped_batch(self, worker) -> None:
+        """A cancelled close stopped this batch's worker: end the batch as a
+        Stop, or, if its last image halted it, deliver that halt (its reason,
+        and the offer to resume), which the close had held back (#352)."""
+        held = getattr(worker, 'close_halt', None)
+        if held is not None:
+            worker.close_halt = None
+            self.on_workflow_complete(held)
+        else:
+            self.on_stop_batch()
+
+    @staticmethod
+    def _completion_snapshot(event, source):
+        """A copy of a batch completion event that outlives it (wx deletes a
+        posted event's C++ object once its handler returns)."""
+        return SimpleNamespace(
+            input_dir=event.input_dir,
+            output_dir=event.output_dir,
+            worker=source,
+            halted=getattr(event, 'halted', None),
+            halted_files=list(getattr(event, 'halted_files', None) or ()),
+            halted_streak=getattr(event, 'halted_streak', False),
+            halted_refusals=getattr(event, 'halted_refusals', False),
+        )
+
+    def _requeue_halted(self, files, checkpoint: bool = False) -> None:
+        """Put the images a halt says were never really tried back in the
+        resume queue (checkpointed when no full save follows)."""
+        for halted_file in files or ():
+            item = self.workspace.items.get(halted_file)
+            if item is not None:
+                item.processing_state = "pending"
+                item.processing_error = None
+                if checkpoint:
+                    self._checkpoint_item(halted_file)
+
     def _pipeline_run_of(self, worker):
         """The run still extracting frames for this describe worker, or None."""
         run = self._run_cancel
@@ -7411,13 +7524,28 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             return
 
         total = batch_state.get('total_queued', len(pending_items))
+        # The manifest's total lags while videos add frames (the checkpoint
+        # writer refreshes it every 25 items or 30 s), so after a crash it
+        # could read "0 of 1 completed, 3 remaining" (#352). Each item's own
+        # sidecar has its queue position, and the queue is described in
+        # order, so the pending items are its tail: the last of them marks
+        # how long the queue really got.
+        positions = [item.batch_queue_position for item in pending_items
+                     if isinstance(item.batch_queue_position, int)]
+        if positions:
+            total = max(total, max(positions) + 1)
+        total = max(total, len(pending_items))
         completed = max(0, total - len(pending_items))
 
         def count(n, word):
             return f"{n} {word}" + ("" if n == 1 else "s")
-        remaining = count(len(pending_items), "image")
+        parts = []
+        if pending_items:
+            parts.append(count(len(pending_items), "image"))
         if videos:
-            remaining += f", and {count(len(videos), 'video')} to extract frames from"
+            parts.append(f"{count(len(videos), 'video')} to extract frames from")
+        # Not "0 images, and 3 videos…" when only videos are left (#352).
+        remaining = ", and ".join(parts)
         progress = (f"Progress: {completed} of {count(total, 'image')} completed\n"
                     if total else "")
 
@@ -9779,6 +9907,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Stop all background workers. Shares the inventory with the
         # "Stop All Processing" menu command; the previous inline version here
         # omitted the directory scan worker, so quitting mid-scan left it running.
+        # Marked before it is stopped, so its completion (which can arrive
+        # after the extraction run has ended) knows the close stopped it.
+        closing_worker = self.batch_worker
+        if closing_worker is not None and closing_worker.is_alive():
+            # Not one that already finished on its own: its completion, still
+            # queued, is a real completion (or halt), not a close's stop.
+            closing_worker.stopped_by_close = True
         workers_stopped = self._stop_all_workers()
         if workers_stopped:
             logger.info(f"Stopped workers: {', '.join(workers_stopped)}")
@@ -9841,6 +9976,16 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Staying after all: the run cancelled above becomes a normal
             # Stop. A flag left set here silenced every later Stop for the rest
             # of the session.
+            if closing_worker is not None:
+                closing_worker.stopped_by_close = False
+            if closing_run is None and closing_worker is not None \
+                    and self.batch_worker is closing_worker:
+                # A describe batch with no extraction: the close stopped its
+                # worker, so this is a Stop. Without it the worker's completion
+                # announced "Batch complete" for a batch that was stopped.
+                if closed_dialog and closed_dialog is not self.batch_progress_dialog:
+                    closed_dialog.Destroy()
+                self._end_close_stopped_batch(closing_worker)
             if closing_run is not None:
                 closing_run.closing = False
                 run_worker = getattr(closing_run, 'worker', None)
@@ -9854,7 +9999,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     if closed_dialog and closed_dialog is not self.batch_progress_dialog:
                         closed_dialog.Destroy()
                     if run_worker is not None and self.batch_worker is run_worker:
-                        self.on_stop_batch()
+                        self._end_close_stopped_batch(run_worker)
                     elif not getattr(closing_run, 'announced', False):
                         # Its completion was never handled; nothing else
                         # will say the batch stopped.

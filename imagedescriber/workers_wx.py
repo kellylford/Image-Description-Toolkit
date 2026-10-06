@@ -81,6 +81,12 @@ RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 #: Ollama not running. Large enough that a few bad files in a row don't trip it.
 SAME_FAILURE_STREAK = 10
 
+#: Consecutive images the provider declined (per-image refusals, which the
+#: identical-failure rule ignores). A few dozen similar photos can each be
+#: refused; this many in a row is the prompt itself being refused on every
+#: image, and the batch stops rather than fail the whole library (#352).
+REFUSAL_STREAK = 25
+
 
 _TIMESTAMP_TAIL = re.compile(r"\s*-\s*\(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(,\d+)?\)\s*$")
 _HEX_ADDRESS = re.compile(r"\b0x[0-9a-fA-F]+\b")
@@ -118,6 +124,18 @@ def _failure_signature(exc: BaseException):
         probe = probe.__cause__ or probe.__context__
     text = _TIMESTAMP_TAIL.sub("", str(exc))
     return (_provider_error_kind(exc), None, _normalise_failure_text(text))
+
+
+def _is_per_image_failure(exc: BaseException) -> bool:
+    """True if `exc`, or anything it was raised from, says the provider
+    declined this one image (``per_image``) rather than failed."""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if getattr(exc, "per_image", False) is True:
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
 
 
 def _provider_error_kind(exc: BaseException):
@@ -257,9 +275,13 @@ class WorkflowCompleteEventData(WorkflowCompleteEvent):
     halted_files: the images that failed that way (one for a run-fatal kind,
         the whole streak for repeated identical failures). They were not
         really tried, so they go back in the resume queue.
+    halted_refusals: halted because the provider declined REFUSAL_STREAK images
+        in a row. Those were really tried and declined, and would be declined
+        again with the same prompt, so they stay failed (halted_files is
+        empty) and a resume carries on from the next image.
     """
     def __init__(self, input_dir, output_dir, worker=None, halted=None,
-                 halted_files=None, halted_streak=False):
+                 halted_files=None, halted_streak=False, halted_refusals=False):
         WorkflowCompleteEvent.__init__(self)
         self.input_dir = input_dir
         self.output_dir = output_dir
@@ -267,13 +289,15 @@ class WorkflowCompleteEventData(WorkflowCompleteEvent):
         self.halted = halted
         self.halted_files = list(halted_files or [])
         self.halted_streak = halted_streak   # halted on identical failures
+        self.halted_refusals = halted_refusals
 
 
 class WorkflowFailedEventData(WorkflowFailedEvent):
     """Event data for workflow failure"""
-    def __init__(self, error):
+    def __init__(self, error, worker=None):
         WorkflowFailedEvent.__init__(self)
         self.error = error
+        self.worker = worker   # the BatchProcessingWorker that crashed, if one
 
 
 class FilesDiscoveredEventData(FilesDiscoveredEvent):
@@ -362,6 +386,7 @@ class ProcessingWorker(threading.Thread):
         self.result_error = None
         self.result_kind = None   # ErrorKind of a provider failure, if known
         self.result_signature = None   # see _failure_signature
+        self.result_per_image = False   # see _is_per_image_failure
         # The BatchProcessingWorker this image belongs to, or None. Carried on
         # the failure event so the window can tell batch images from a single
         # image, a follow-up question or a rename, and from a batch that has
@@ -458,6 +483,7 @@ class ProcessingWorker(threading.Thread):
             self.result_error = str(e)
             self.result_kind = _provider_error_kind(e)
             self.result_signature = _failure_signature(e)
+            self.result_per_image = _is_per_image_failure(e)
             evt = ProcessingFailedEventData(file_path=self.file_path, error=str(e),
                                             kind=self.result_kind, batch=self.batch)
             wx.PostEvent(self.parent_window, evt)
@@ -1143,6 +1169,12 @@ class BatchProcessingWorker(threading.Thread):
         self._queue_open = queue_open
         self._closing_note = None
 
+        # Set by the window, not here: on_close marks a worker it stops
+        # (stopped_by_close), and a halt arriving during that close is kept
+        # for the cancelled close to deliver (close_halt).
+        self.stopped_by_close = False
+        self.close_halt = None
+
     def add_files(self, paths) -> None:
         """Append images to an open queue (main thread)."""
         with self._queue_cond:
@@ -1227,7 +1259,9 @@ class BatchProcessingWorker(threading.Thread):
             halted = None
             halted_files = []
             halted_streak = False
+            halted_refusals = False
             streak, streak_key = [], None
+            refusals = []
             i = 0
             while True:
                 # Phase 2: Check if stopped
@@ -1312,9 +1346,17 @@ class BatchProcessingWorker(threading.Thread):
                 completed += 1
 
                 # Track a run of identical failures (same kind, same message).
+                # A refusal of one image (Apple's safety guardrails) neither
+                # counts nor breaks the run: ten such photos in a row (a
+                # trip's worth of the same scene) halted the whole batch as if
+                # the provider were down (#352).
                 if worker.result_ok:
                     streak = []
+                    refusals = []
+                elif getattr(worker, 'result_per_image', False):
+                    refusals.append(file_path)
                 else:
+                    refusals = []
                     key = worker.result_signature
                     if streak and streak_key != key:
                         streak = []
@@ -1328,19 +1370,33 @@ class BatchProcessingWorker(threading.Thread):
                 # images in a row with an identical error halt it too; that
                 # costs a resume, not the images.
                 fatal = not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS
-                if fatal or len(streak) >= SAME_FAILURE_STREAK:
+                refused_out = not fatal and len(refusals) >= REFUSAL_STREAK
+                if fatal or refused_out or len(streak) >= SAME_FAILURE_STREAK:
                     halted = worker.result_error or "The provider refused the request."
-                    # A run-fatal halt requeues just that image (the window
-                    # never counted it as a failure); a streak requeues the
-                    # whole streak (each one was counted).
-                    halted_streak = not fatal
-                    halted_files = list(streak) if halted_streak else [file_path]
+                    if refused_out:
+                        # Declined, not untried: the same prompt declines
+                        # them again, so requeueing them made every resume
+                        # halt on the same images. They stay failed; resume
+                        # carries on from the next image.
+                        halted_refusals = True
+                        halted_files = []
+                    else:
+                        # A run-fatal halt requeues just that image (the
+                        # window never counted it as a failure); a streak
+                        # requeues the whole streak (each one was counted).
+                        halted_streak = not fatal
+                        halted_files = list(streak) if halted_streak else [file_path]
                     if run_log:
-                        why = (f"({worker.result_kind})" if fatal else
-                               f"({len(streak)} images in a row failed identically)")
-                        run_log.warning(
-                            f"run halted after {completed} images: every remaining "
-                            f"image would fail the same way {why}")
+                        if refused_out:
+                            run_log.warning(
+                                f"run halted after {completed} images: the provider "
+                                f"declined {len(refusals)} images in a row")
+                        else:
+                            why = (f"({worker.result_kind})" if fatal else
+                                   f"({len(streak)} images in a row failed identically)")
+                            run_log.warning(
+                                f"run halted after {completed} images: every remaining "
+                                f"image would fail the same way {why}")
                     break
 
             elapsed = time.time() - start_time
@@ -1358,6 +1414,7 @@ class BatchProcessingWorker(threading.Thread):
                 halted=halted,
                 halted_files=halted_files,
                 halted_streak=halted_streak,
+                halted_refusals=halted_refusals,
             )
             wx.PostEvent(self.parent_window, evt)
 
@@ -1392,7 +1449,8 @@ class BatchProcessingWorker(threading.Thread):
                 run_log.error(f"batch aborted: {error_msg}")
 
             # Post failure event
-            evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}")
+            evt = WorkflowFailedEventData(error=f"Batch processing failed: {str(e)}",
+                                          worker=self)
             wx.PostEvent(self.parent_window, evt)
         finally:
             if run_log:
