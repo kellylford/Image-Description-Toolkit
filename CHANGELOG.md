@@ -1,4 +1,4 @@
-## [Unreleased]
+## [4.7.0] - 2026-10-06
 
 ### ✨ Improvements
 
