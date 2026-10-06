@@ -69,9 +69,28 @@ def _resolve_model(provider: str, model: Optional[str]) -> Optional[str]:
       silently running a cheaper model than the user asked for. It warns and
       sends the name through unchanged.
 
+    * **windows-ai** has four fixed models, its description kinds. Any other name
+      can't be one of them, so it becomes the default kind, with a note when a
+      name was given (case is ignored: "Brief" is brief).
+
     Everything else is left alone: a wrong-looking model name elsewhere might
     simply be one this build has not heard of.
     """
+    if provider == "windows-ai":
+        from idt_core.providers.windows_ai import DEFAULT_MODEL, WINDOWS_AI_MODELS
+
+        kind = (model or "").strip().lower()
+        if kind in WINDOWS_AI_MODELS:
+            return kind
+        if kind:
+            print(
+                f"Note: Windows AI's models are its description kinds "
+                f"({', '.join(WINDOWS_AI_MODELS)}); {model!r} isn't one, so "
+                f"{DEFAULT_MODEL} is used. Pass --model to choose.",
+                file=sys.stderr,
+            )
+        return DEFAULT_MODEL
+
     if provider == "apple":
         from idt_core.providers.apple import APPLE_MODELS, DEFAULT_MODEL
 
@@ -120,6 +139,24 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
             print(f"Error: {exc}", file=sys.stderr)
             sys.exit(1)
 
+    if provider == "windows-ai":
+        from idt_core.providers.windows_ai import DEFAULT_MODEL, WindowsAIProvider, prepare
+        try:
+            provider_obj = WindowsAIProvider(model=model or DEFAULT_MODEL)
+            # The model may need downloading the first time. Done here, once, with a
+            # message, rather than silently inside the first image's request.
+            from idt_core.providers.windows_ai import readiness
+            if readiness().get("state") != "Ready":
+                print("Getting Windows' image description model ready "
+                      "(the first time, Windows may download it)...", file=sys.stderr)
+                prepare()
+            return provider_obj
+        except RuntimeError as exc:
+            # Not Windows, not a Copilot+ PC, the helper missing, or the feature turned off.
+            # Each carries its own fix, so the message is printed as-is.
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+
     if provider == "ollama":
         from idt_core.providers.ollama import OllamaProvider, DEFAULT_MODEL
         return OllamaProvider(model=model or DEFAULT_MODEL, host=ollama_host)
@@ -129,16 +166,43 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         return OpenAIProvider(model=model or DEFAULT_MODEL)
 
     print(f"Unknown provider: {provider!r}", file=sys.stderr)
-    print("Valid providers: anthropic, apple, claude-code, ollama, openai", file=sys.stderr)
+    print("Valid providers: anthropic, apple, claude-code, ollama, openai, windows-ai", file=sys.stderr)
     sys.exit(1)
 
 
-def _resolve_prompt(args, project_config) -> tuple[str, str]:
+def _uses_prompt(provider: Optional[str]) -> bool:
+    """False for a provider that takes no prompt (Windows AI, whose models are fixed kinds of
+    description). Its runs record no prompt and must not change a workspace's saved one."""
+    return provider != "windows-ai"
+
+
+def _prompt_label(provider: Optional[str], model: Optional[str], prompt_name: str) -> str:
+    """The prompt as a run reports it before starting."""
+    if not _uses_prompt(provider):
+        return f"not used (Windows AI describes with its {model} kind)"
+    return prompt_name
+
+
+def _resolve_prompt(args, project_config, provider: Optional[str] = None) -> tuple[str, str]:
     """
     Return (prompt_name, prompt_text).
     Priority: --prompt-text > --prompt > project default > user config default.
+
+    For a provider that takes no prompt, returns its recorded name and no text, and warns once
+    if a prompt was asked for explicitly rather than silently ignoring it.
     """
     from idt_core.config import UserConfig, BUILT_IN_PROMPTS, DEFAULT_PROMPT_NAME
+
+    if not _uses_prompt(provider):
+        from idt_core.providers.windows_ai import PROMPT_NAME
+
+        if getattr(args, "prompt_text", None) or getattr(args, "prompt", None):
+            print(
+                "Note: Windows AI takes no prompt, so --prompt and --prompt-text are ignored. "
+                "Its models are the kinds of description: choose one with --model.",
+                file=sys.stderr,
+            )
+        return (PROMPT_NAME, "")
 
     if getattr(args, "prompt_text", None):
         return ("custom", args.prompt_text)
@@ -168,10 +232,13 @@ def _resolve_prompt(args, project_config) -> tuple[str, str]:
 def _provider_args(p: argparse.ArgumentParser) -> None:
     """Add the standard provider/model/ollama-host arguments."""
     p.add_argument(
-        "--provider", choices=["anthropic", "apple", "claude-code", "ollama", "openai"],
+        "--provider", choices=["anthropic", "apple", "claude-code", "ollama", "openai", "windows-ai"],
         help="AI provider (default: from config, else ollama). "
              "claude-code uses your Claude subscription via the claude CLI; "
-             "apple runs Apple Intelligence on this Mac (macOS 27)",
+             "apple runs Apple Intelligence on this Mac (macOS 27); "
+             "windows-ai runs Windows' own model on a Copilot+ PC (its models are "
+             "the description kinds accessible, detailed, brief and diagram, and it "
+             "takes no prompt)",
     )
     p.add_argument("--model", metavar="NAME", help="Model name")
     p.add_argument(
@@ -419,7 +486,7 @@ def cmd_describe(args):
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
     model         = _resolve_model(provider_name,
                                    args.model or _ws_model or user_cfg.default_model)
-    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
+    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
 
     # Resolve the effective copy setting: explicit --copy-originals/--no-copy-originals
     # flag for this run overrides the workspace's stored preference.
@@ -446,7 +513,7 @@ def cmd_describe(args):
         total_items = len(ws.media_items())
         print(f"Images:     {total_items} in workspace")
         print(f"Provider:   {provider_name}  model: {model}")
-        print(f"Prompt:     {prompt_name}")
+        print(f"Prompt:     {_prompt_label(provider_name, model, prompt_name)}")
         if args.extract_metadata:
             gcstr = " + geocoding" if args.geocode else ""
             print(f"Metadata:   EXIF extraction enabled{gcstr}")
@@ -461,7 +528,8 @@ def cmd_describe(args):
 
     # Save prompt/geocode now; provider+model only saved after a successful run
     # so a completely-failed run doesn't poison the workspace with a bad provider.
-    ws.defaults.prompt_name = prompt_name
+    if _uses_prompt(provider_name):
+        ws.defaults.prompt_name = prompt_name
     ws.geocode_enabled = bool(args.geocode)
     ws.save_manifest()
 
@@ -759,7 +827,7 @@ def _cmd_describe_stdin(args):
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
     model         = _resolve_model(provider_name,
                                    args.model or _ws_model or user_cfg.default_model)
-    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
+    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
     # Add each stdin image to the workspace (idempotent), mirroring its position
@@ -779,7 +847,8 @@ def _cmd_describe_stdin(args):
         print(f"Images:    {len(items)} from stdin")
         print()
 
-    ws.defaults.prompt_name = prompt_name
+    if _uses_prompt(provider_name):
+        ws.defaults.prompt_name = prompt_name
     ws.geocode_enabled = bool(args.geocode)
     ws.save_manifest()
 
@@ -916,7 +985,7 @@ def cmd_download(args):
         provider_name = args.provider or _ws_provider or cfg.default_provider
         model = _resolve_model(provider_name,
                                args.model or _ws_model or cfg.default_model)
-        prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
+        prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
         if not args.quiet:
@@ -1050,14 +1119,15 @@ def cmd_video(args):
         provider_name = args.provider or _ws_provider or user_cfg.default_provider
         model         = _resolve_model(provider_name,
                                    args.model or _ws_model or user_cfg.default_model)
-        prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
+        prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
         provider = _make_provider(provider_name, model, args.ollama_host)
 
         if not args.quiet:
             print(f"Describing {total_frames} frames with {provider_name} / {model}...")
             print()
 
-        ws.defaults.prompt_name = prompt_name
+        if _uses_prompt(provider_name):
+            ws.defaults.prompt_name = prompt_name
         ws.save_manifest()
 
         options = RunOptions(
@@ -1609,6 +1679,7 @@ def cmd_models(args):
     idt models --provider anthropic — list Claude models for this account
     idt models --provider claude-code — Claude on your subscription
     idt models --provider apple     — Apple Intelligence on this Mac
+    idt models --provider windows-ai — Windows AI on this Copilot+ PC
     idt models --refresh            — ignore the cache and ask the APIs now
     idt models --all                — skip the OpenAI chat-model filter
     """
@@ -1647,6 +1718,11 @@ def cmd_models(args):
     if not args.provider or args.provider == "apple":
         results["apple"] = _apple_model_results()
 
+    # Windows AI: the same question for a Copilot+ PC -- Windows, the helper, the NPU,
+    # the feature switched on. Its "models" are its four description kinds.
+    if not args.provider or args.provider == "windows-ai":
+        results["windows-ai"] = _windows_ai_model_results()
+
     if args.json_out:
         print(json.dumps(results, indent=2))
         return
@@ -1658,6 +1734,8 @@ def cmd_models(args):
             print(f"\n{provider} ({len(models)} models available):")
             for m in models:
                 print(f"    {m}")
+            if info.get("note"):
+                print(f"    ({info['note']})")
         elif status in ("live", "cached"):
             freshness = "from the API" if status == "live" else "cached"
             print(f"\n{provider} ({len(models)} models, {freshness}):")
@@ -1696,6 +1774,26 @@ def _claude_code_model_results() -> dict:
     except ClaudeCodeError as exc:
         return {"status": "unavailable", "models": [], "error": str(exc)}
     return {"status": "ok", "models": list(CLAUDE_CODE_MODELS)}
+
+
+def _windows_ai_model_results() -> dict:
+    """``idt models`` entry for Windows AI: whether this PC can run it."""
+    from idt_core.providers.windows_ai import (
+        WINDOWS_AI_MODELS, WindowsAIError, check_ready, is_available,
+    )
+
+    if not is_available():
+        return {"status": "unavailable", "models": [],
+                "error": "Windows AI needs a Copilot+ PC with Windows 11 24H2 or later, "
+                         "and the Windows AI helper IDT's installer adds"}
+    try:
+        report = check_ready()
+    except WindowsAIError as exc:
+        return {"status": "unavailable", "models": [], "error": str(exc)}
+    result = {"status": "ok", "models": list(WINDOWS_AI_MODELS)}
+    if report.get("state") != "Ready":
+        result["note"] = "Windows will get the model ready (it may download it) on first use"
+    return result
 
 
 def _apple_model_results() -> dict:
@@ -2013,17 +2111,18 @@ def cmd_watch(args):
     provider_name = args.provider or _ws_provider or user_cfg.default_provider
     model         = _resolve_model(provider_name,
                                    args.model or _ws_model or user_cfg.default_model)
-    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults)
+    prompt_name, prompt_text = _resolve_prompt(args, ws.defaults, provider_name)
     provider = _make_provider(provider_name, model, args.ollama_host)
 
     if not args.quiet:
         print(f"Watching:  {source}")
         print(f"Workspace: {ws.path}")
         print(f"Provider:  {provider_name}  model: {model}")
-        print(f"Interval:  {args.interval}s  prompt: {prompt_name}")
+        print(f"Interval:  {args.interval}s  prompt: {_prompt_label(provider_name, model, prompt_name)}")
         print("Press Ctrl+C to stop.\n")
 
-    ws.defaults.prompt_name = prompt_name
+    if _uses_prompt(provider_name):
+        ws.defaults.prompt_name = prompt_name
     ws.save_manifest()
     options = RunOptions(
         prompt_name=prompt_name,
@@ -2415,6 +2514,8 @@ Supported providers:
   openai     GPT-4o (requires OPENAI_API_KEY)
   ollama     Local models via Ollama (no API key)
   apple      Apple Intelligence on this Mac (macOS 27, no API key)
+  claude-code  Claude on your Claude subscription, via the claude CLI
+  windows-ai Windows AI on a Copilot+ PC (no API key; describes only, no prompt)
         """,
     )
 
@@ -2647,7 +2748,8 @@ Supported providers:
         help="Show available AI models for each provider",
     )
     p_models.add_argument("--provider",
-                          choices=["anthropic", "apple", "claude-code", "ollama", "openai"],
+                          choices=["anthropic", "apple", "claude-code", "ollama", "openai",
+                                   "windows-ai"],
                           help="Show only this provider")
     p_models.add_argument("--ollama-host", metavar="URL",
                           default="http://localhost:11434")
