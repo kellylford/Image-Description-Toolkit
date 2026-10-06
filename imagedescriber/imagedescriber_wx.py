@@ -4898,11 +4898,18 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 it.batch_queue_position = i
 
         # Store batch_state so resume works
+        try:
+            from ai_providers import provider_uses_prompt
+        except ImportError:
+            from imagedescriber.ai_providers import provider_uses_prompt
+        takes_prompt = provider_uses_prompt(options['provider'])
         self._preparing_state = self.workspace.batch_state = {
             "provider": options['provider'],
             "model": options['model'],
-            "prompt_style": options.get('prompt_style', 'default'),
-            "custom_prompt": options.get('custom_prompt'),
+            # "none" for a provider that takes no prompt, so the workspace and the
+            # resume question don't name a style it never saw.
+            "prompt_style": options.get('prompt_style', 'default') if takes_prompt else "none",
+            "custom_prompt": options.get('custom_prompt') if takes_prompt else "",
             "geocode_enabled": options.get('geocode_enabled', False),
             # Resume reads it back, so a resumed batch embeds as this one did.
             "embed_after_process": options.get('embed_after_process', False),
@@ -6288,10 +6295,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # Show the worker's own message, so the progress dialog says what
             # it is waiting for rather than looking frozen. It was MLX only,
             # with MLX's wording, until there were three such providers. Only
-            # theirs: a download posts count-zero events too.
+            # the workers' startup statuses: a download posts count-zero events
+            # too. Marked on the event, not read from _batch_provider, which a
+            # resumed batch doesn't set.
             if (hasattr(event, 'total') and event.total > 0 and
-                    getattr(event, 'message', '') and
-                    getattr(self, '_batch_provider', '').lower() in ('mlx', 'apple', 'windows-ai') and
+                    getattr(event, 'startup_status', False) and
                     self.batch_progress_dialog and
                     not self.batch_progress_dialog.IsBeingDeleted()):
                 self.batch_progress_dialog.update_progress(
@@ -6901,8 +6909,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 from ai_providers import provider_uses_prompt
             except ImportError:
                 from imagedescriber.ai_providers import provider_uses_prompt
-            remedy = ("a different prompt style"
-                      if provider_uses_prompt(getattr(self, '_batch_provider', '') or '')
+            # The batch's own provider: _batch_provider isn't set on resume.
+            batch_provider = getattr(getattr(event, 'worker', None), 'provider', '') or ''
+            remedy = ("a different prompt style" if provider_uses_prompt(batch_provider)
                       else "a different provider")
             message = (
                 "Batch stopped: the provider declined many images in a row.\n\n"
@@ -8584,10 +8593,6 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_error(self, "Processing worker not available")
             return
 
-        # Ask user to confirm
-        if not ask_yes_no(self, "Generate a descriptive name for this image using AI?\n\nThis will use your default AI provider."):
-            return
-
         # Use a special prompt for generating names
         rename_prompt = "Generate a short, descriptive filename for this image (2-5 words, no file extension). Be specific and concise."
 
@@ -8596,6 +8601,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             'provider': self.config.get('default_provider', 'ollama'),
             'model': self.config.get('default_model', 'llama3.2-vision'),
         }
+
         try:
             from ai_providers import provider_uses_prompt, provider_key
         except ImportError:
@@ -8606,6 +8612,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             show_warning(self, f"{_display_provider(provider_key(options['provider']))} can't suggest "
                                "a name, because it takes no prompt. Choose another default provider "
                                "in Tools, Configure Settings to use auto-rename.")
+            return
+
+        # Ask user to confirm
+        if not ask_yes_no(self, "Generate a descriptive name for this image using AI?\n\nThis will use your default AI provider."):
             return
 
         self.SetStatusText("Generating name with AI...", 0)

@@ -52,12 +52,16 @@ def picture(tmp_path):
 @pytest.fixture
 def pc(monkeypatch):
     """A ready Copilot+ PC. Returns a function that installs a helper with given outcomes."""
-    state = {"state": "Ready", "prepared": 0}
+    state = {"state": "Ready", "prepared": 0, "prepare_fails": None}
 
     def check_ready(force=False):
         return {"state": state["state"]}
 
     def prepare():
+        if state["state"] == "Ready":
+            return {"state": "Ready"}
+        if state["prepare_fails"]:
+            raise state["prepare_fails"]
         state["prepared"] += 1
         state["state"] = "Ready"
         return {"state": "Ready"}
@@ -101,6 +105,37 @@ def test_a_pc_without_the_model_gets_it_prepared_first(pc, picture):
     WindowsAIProvider().describe_image(picture, "", "detailed")
     assert pc.state["prepared"] == 1
     assert helper.kinds == ["detailed"]
+
+
+def test_a_model_that_cant_be_got_ready_stops_the_batch_at_once(pc, picture):
+    """Getting it ready can take 15 minutes; a retry must not double that, on every picture."""
+    pc.state["state"] = "NotReady"
+    pc.state["prepare_fails"] = WindowsAIError(
+        "Windows couldn't get its image description model ready. It may still be downloading.",
+        code="not_ready", status_code=503)
+    helper = pc("never asked")
+    err = _fails(picture)
+    assert err.kind == ErrorKind.UNAVAILABLE
+    assert "still be downloading" in str(err), "the reason reaches the person"
+    assert helper.kinds == []
+
+
+def test_a_model_windows_dropped_after_being_ready_is_got_ready_again(pc, picture, monkeypatch):
+    """The Ready report is cached for the process; a not_ready answer means it went stale."""
+    asked_afresh = []
+    cached = windows_ai.check_ready
+
+    def check_ready(force=False):
+        if force:
+            asked_afresh.append(True)
+            pc.state["state"] = "NotReady"
+        return cached(force)
+
+    monkeypatch.setattr(windows_ai, "check_ready", check_ready)
+    helper = pc(error_for_code("not_ready", "The model isn't ready."), "Described after all.")
+    assert WindowsAIProvider().describe_image(picture, "", "brief") == "Described after all."
+    assert asked_afresh and pc.state["prepared"] == 1
+    assert len(helper.kinds) == 2
 
 
 @pytest.mark.parametrize("code", ["not_supported", "disabled_by_user", "blocked_by_policy"])

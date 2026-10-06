@@ -258,8 +258,7 @@ def test_prompt_editor_matches_the_shared_provider_list(frame):
     dlg = prompt_editor_dialog.PromptEditorDialog(frame)
     try:
         labels = _labels(dlg.provider_combo)
-        # Testing a prompt needs a provider that takes one.
-        assert labels == [key for key, _ in ai_providers.provider_picker_choices(needs_prompt=True)]
+        assert labels == [key for key, _ in ai_providers.provider_picker_choices()]
         assert ("mlx" in labels) == _mlx_can_run()
     finally:
         dlg.Destroy()

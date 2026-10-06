@@ -91,18 +91,19 @@ def test_processing_options_offers_the_kinds_and_says_the_prompt_isnt_used(frame
         assert _ids(dlg.model_combo) == KINDS
         config = dlg.get_config()
         assert (config["provider"], config["model"]) == ("windows-ai", "accessible")
-        assert "Takes no prompt" in dlg.model_desc_text.GetValue()
-        assert dlg.prompt_choice.GetName() == "Prompt style, not used by Windows AI"
-        assert dlg.custom_prompt_input.GetName() == "Custom prompt override, not used by Windows AI"
-        assert dlg.prompt_box.GetLabel() == "Prompt Style, not used by Windows AI"
+        assert dlg.model_desc_text.GetValue().endswith("| Takes no prompt")
+        # The labels, which are what a screen reader on Windows names these controls by.
+        assert dlg.prompt_label.GetLabel() == "P&rompt style (not used by Windows AI):"
+        assert dlg.custom_prompt_label.GetLabel() == (
+            "Enter a c&ustom prompt to override the selected style (not used by Windows AI):")
         # Still there and still reachable from the keyboard.
         assert dlg.prompt_choice.IsEnabled() and dlg.custom_prompt_input.IsEnabled()
 
         # And back: the note goes as soon as the provider takes a prompt.
         dlg.provider_choice.SetStringSelection("Claude")
         dlg.populate_models_for_provider()
-        assert dlg.prompt_choice.GetName() == "Prompt style"
-        assert dlg.prompt_box.GetLabel() == "Prompt Style"
+        assert dlg.prompt_label.GetLabel() == "P&rompt style:"
+        assert dlg.custom_prompt_label.GetLabel() == "Enter a c&ustom prompt to override the selected style:"
         assert not set(_ids(dlg.model_combo)) & set(KINDS)
     finally:
         dlg.Destroy()
@@ -111,12 +112,13 @@ def test_processing_options_offers_the_kinds_and_says_the_prompt_isnt_used(frame
 def test_processing_options_opens_on_a_configured_windows_ai_default(frame):
     import dialogs_wx
 
-    config = {"default_provider": "windows-ai", "provider": "windows-ai", "default_model": "brief"}
+    # Shaped like the real settings, which have default_provider and no "provider".
+    config = {"default_provider": "windows-ai", "default_model": "brief"}
     dlg = dialogs_wx.ProcessingOptionsDialog(config, cached_ollama_models=[], parent=frame)
     try:
         assert dlg.provider_choice.GetStringSelection() == "Windows AI"
         assert dlg.get_config()["model"] == "brief"
-        assert dlg.prompt_choice.GetName() == "Prompt style, not used by Windows AI"
+        assert "not used by Windows AI" in dlg.prompt_label.GetLabel()
     finally:
         dlg.Destroy()
 
@@ -132,6 +134,9 @@ def test_a_followup_to_a_windows_ai_description_uses_another_provider(frame):
         values = dlg.get_values()
         assert values["provider"] == "ollama"
         assert values["model"] != "accessible"
+        # It still says what the description was made with.
+        labels = [w.GetLabel() for w in dlg.GetChildren() if isinstance(w, wx.StaticText)]
+        assert "Original: Windows AI - accessible" in labels
     finally:
         dlg.Destroy()
 
@@ -164,12 +169,14 @@ def test_idt_chat_doesnt_offer_it(frame):
     assert "windows-ai" not in chat_app_wx.ProviderDialog._provider_names()
 
 
-def test_the_prompt_editor_doesnt_offer_it(frame):
+def test_the_prompt_editor_keeps_a_windows_ai_default_provider(frame):
+    """Its provider picker is the default-provider setting, saved with the prompts: leaving
+    Windows AI out of it turned a Windows AI default into Ollama on the next save."""
     import prompt_editor_dialog
 
     dlg = prompt_editor_dialog.PromptEditorDialog(frame)
     try:
-        assert "windows-ai" not in _strings(dlg.provider_combo)
+        assert dlg.provider_combo.SetStringSelection("windows-ai")
     finally:
         dlg.Destroy()
 
@@ -198,6 +205,25 @@ def test_one_picture_records_no_prompt(frame):
     assert (worker.prompt_style, worker.custom_prompt) == ("none", "")
     other = workers_wx.ProcessingWorker(frame, "x.jpg", "ollama", "moondream", "narrative", "Be poetic")
     assert (other.prompt_style, other.custom_prompt) == ("narrative", "Be poetic")
+
+
+@pytest.mark.parametrize("given,recorded", [("Brief", "brief"), ("minicpm-v4.6", "accessible"), ("", "accessible")])
+def test_what_is_recorded_as_the_model_is_the_kind_that_ran(frame, given, recorded):
+    """The settings' default model belongs to whichever provider was last chosen."""
+    import workers_wx
+
+    assert workers_wx.ProcessingWorker(frame, "x.jpg", "windows-ai", given, "narrative").model == recorded
+    assert workers_wx.BatchProcessingWorker(frame, ["a.jpg"], "windows-ai", given, "narrative").model == recorded
+    assert workers_wx.ProcessingWorker(frame, "x.jpg", "ollama", "minicpm-v4.6", "narrative").model == "minicpm-v4.6"
+
+
+def test_the_startup_notice_is_given_only_when_there_is_a_wait(monkeypatch):
+    import workers_wx
+
+    monkeypatch.setattr(windows_ai, "readiness", lambda force=False: {"state": "Ready"})
+    assert not workers_wx._windows_ai_needs_preparing()
+    monkeypatch.setattr(windows_ai, "readiness", lambda force=False: {"state": "NotReady"})
+    assert workers_wx._windows_ai_needs_preparing()
 
 
 def test_a_batch_records_no_prompt(frame):

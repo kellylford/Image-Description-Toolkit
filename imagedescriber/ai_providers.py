@@ -2067,6 +2067,17 @@ class AppleProvider(AIProvider):
         return result.text
 
 
+def windows_ai_kind(model: str) -> str:
+    """The description kind a Windows AI model name means. A name that isn't a kind came from
+    another provider (the settings' default model), and can only have meant the default."""
+    from idt_core.providers.windows_ai import DEFAULT_MODEL, normalise_kind
+
+    try:
+        return normalise_kind(model)
+    except ValueError:
+        return DEFAULT_MODEL
+
+
 class WindowsAIProvider(AIProvider):
     """Windows AI: Windows' own on-device model on a Copilot+ PC.
 
@@ -2097,46 +2108,58 @@ class WindowsAIProvider(AIProvider):
         from idt_core.providers.windows_ai import WINDOWS_AI_MODELS
         return list(WINDOWS_AI_MODELS)
 
-    # One retry. The helper drops and restarts the model after an internal error, and a helper
-    # that died is restarted, so a second attempt often works; each costs seconds, but one that
-    # times out costs minutes, so not more than one.
+    # One retry, for the helper restarting the model or itself (503), or a timeout (the
+    # contract every adapter keeps): a second attempt usually works. Getting the model ready,
+    # which can take many minutes, is decided here instead, so the retry can't multiply it:
+    # a model that can't be made ready stops the batch.
     @retry_on_api_error(max_retries=1, base_delay=1.0, max_delay=10.0)
     def describe_image(self, image_path: str, prompt: str, model: str) -> str:
         from idt_core.converter import load_for_api
         from idt_core.providers.windows_ai import (
-            DEFAULT_MODEL, WindowsAIError, WindowsAIProvider as _CoreProvider, check_ready,
-            normalise_kind, prepare,
+            WindowsAIProvider as _CoreProvider, WindowsAIError, check_ready, prepare,
         )
 
+        kind = windows_ai_kind(model)
+        core = _CoreProvider(model=kind, check=False)
+        image_bytes, mime_type = load_for_api(Path(image_path))
         try:
-            kind = normalise_kind(model)
-        except ValueError:
-            # A model from another provider, carried over in the settings. The kinds are the
-            # only models there are, so this can only have meant the default.
-            kind = DEFAULT_MODEL
+            # Cheap once the model is ready (the report is cached); the first time on a PC
+            # without it, Windows downloads it here, which can take minutes.
+            prepare()
+        except WindowsAIError as exc:
+            # Not a Copilot+ PC, turned off, no helper, or the model can't be got ready: no
+            # picture can be described until the person acts, so the batch stops, with the
+            # reason (UNAVAILABLE keeps the message; a server error's wording would drop it).
+            raise_provider_error(provider="Windows AI", kind=ErrorKind.UNAVAILABLE, message=str(exc))
         try:
-            core = _CoreProvider(model=kind)
-            if check_ready().get("state") != "Ready":
-                # The first picture on a PC without the model yet: Windows downloads it,
-                # which can take minutes, longer than one picture is given.
-                prepare()
-            image_bytes, mime_type = load_for_api(Path(image_path))
-            result = core.describe(image_bytes, mime_type, prompt)
+            try:
+                result = core.describe(image_bytes, mime_type, prompt)
+            except WindowsAIError as exc:
+                if exc.code != "not_ready":
+                    raise
+                # Ready once, not now: Windows dropped or is updating the model. Get it ready
+                # again, then try this picture once more.
+                try:
+                    check_ready(force=True)
+                    prepare()
+                except WindowsAIError as again:
+                    raise_provider_error(provider="Windows AI", kind=ErrorKind.UNAVAILABLE,
+                                         message=str(again))
+                result = core.describe(image_bytes, mime_type, prompt)
         except WindowsAIError as exc:
             status = exc.status_code
             if exc.timeout:
                 kind_of_error = ErrorKind.TIMEOUT
             elif exc.setup:
-                # Not a Copilot+ PC, the features turned off, a policy, the helper missing:
-                # nothing works until the person acts, so a batch stops.
                 kind_of_error = ErrorKind.UNAVAILABLE
             elif isinstance(status, int) and 500 <= status < 600:
-                # The helper restarted the model or itself; another attempt usually works.
-                # Read from the status, never the wording (issue #228).
+                # The helper restarted the model or itself, or gave an empty answer. Read from
+                # the status, never the wording (issue #228).
                 kind_of_error = ErrorKind.SERVER_ERROR
             else:
-                # Including a refusal of this one picture (per_image, which the batch reads
-                # from the exception this is raised from).
+                # A refusal of this one picture (per_image, which the batch reads from the
+                # exception this is raised from), or a stop: not retried, and the helper's
+                # own words kept.
                 kind_of_error = ErrorKind.UNKNOWN
             raise_provider_error(provider="Windows AI", kind=kind_of_error,
                                  status_code=status, message=str(exc))
