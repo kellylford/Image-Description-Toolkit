@@ -118,7 +118,7 @@ public class ProtocolTests
         var ex = Refused(Request(image: huge, id: 6));
         Assert.Equal(Codes.TooLarge, ex.Code);
         Assert.Equal(6, ex.Id);
-        Assert.Contains("the limit is 20 MB", ex.Message);
+        Assert.Contains("more than 20 MB", ex.Message);
     }
 
     [Fact]
@@ -141,13 +141,6 @@ public class ProtocolTests
     [InlineData(0u, 0u, 1u, 1u)]
     public void ScaledSize_FitsTheLongerSide_KeepingShape(uint w, uint h, uint ew, uint eh) =>
         Assert.Equal((ew, eh), Protocol.ScaledSize(w, h));
-
-    [Theory]
-    [InlineData("accessible", "AccessibleDescription")]
-    [InlineData("detailed", "DetailedDescription")]
-    [InlineData("brief", "BriefDescription")]
-    [InlineData("diagram", "DiagramDescription")]
-    public void EachKind_NamesItsApiKind(string kind, string api) => Assert.Equal(api, Protocol.ApiKindName(kind));
 
     [Theory]
     [InlineData("Complete", null)]

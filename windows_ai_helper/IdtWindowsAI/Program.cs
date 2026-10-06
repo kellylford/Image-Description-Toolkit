@@ -45,6 +45,7 @@ try
 
         case "--prepare":
         {
+            AnnounceDownload();
             var failure = await Describer.PrepareAsync();
             Line(Protocol.Readiness(true, Describer.ReadyState(), failure?.Message));
             return failure is null ? 0 : 1;
@@ -94,11 +95,13 @@ int Relaunch()
     start.Environment[RelaunchedVariable] = "1";
     try
     {
+        // If this process is killed, the job's handle closes and Windows ends the child too, so
+        // it can't be left holding the caller's pipes. The child is untied for the moment between
+        // starting and joining; a kill in exactly that moment is the one way it can outlive this.
         using var job = KillOnCloseJob.Create();
         using var child = System.Diagnostics.Process.Start(start)!;
-        // If this process is killed, the job's handle closes and Windows ends the child too, so
-        // it can't be left holding the caller's pipes.
-        job?.Add(child);
+        if (job is null || !job.Add(child))
+            Console.Error.WriteLine("Note: couldn't tie the restarted helper to this one; if this is ended, end idt-windows-ai too.");
         child.WaitForExit();
         return child.ExitCode;
     }
@@ -120,16 +123,16 @@ static async Task<int> DescribeForPeopleAsync(string[] rest)
     }
     var path = Path.GetFullPath(rest[0]);
     var kinds = rest.Length > 1 ? rest.Skip(1).ToArray() : [Protocol.Kinds[0]];
-    var extension = Path.GetExtension(path).ToLowerInvariant();
-    var mime = extension switch
-    {
-        ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".bmp" => "image/bmp",
-        ".gif" => "image/gif", ".tif" or ".tiff" => "image/tiff", _ => $"image/{extension.TrimStart('.')}",
-    };
     byte[] image;
     try { image = await File.ReadAllBytesAsync(path); }
     catch (Exception ex) { Console.Error.WriteLine($"Can't read {path}: {ex.Message}"); return 1; }
 
+    if (!MimeFor(path, out var mime))
+    {
+        Console.Error.WriteLine($"{Path.GetFileName(path)}: the helper reads JPEG, PNG, BMP, GIF or TIFF pictures, named with their usual extension.");
+        return 1;
+    }
+    AnnounceDownload();
     using var describer = new Describer();
     var status = 0;
     foreach (var kind in kinds)
@@ -156,6 +159,24 @@ static async Task<int> DescribeForPeopleAsync(string[] rest)
         Line("");
     }
     return status;
+}
+
+static bool MimeFor(string path, out string mime)
+{
+    mime = Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".jpg" or ".jpeg" => "image/jpeg", ".png" => "image/png", ".bmp" => "image/bmp",
+        ".gif" => "image/gif", ".tif" or ".tiff" => "image/tiff", _ => "",
+    };
+    return mime.Length > 0;
+}
+
+// Getting the model ready can take minutes the first time, with nothing else to show for it.
+// On stderr, so a caller reading the JSON on stdout never sees it.
+static void AnnounceDownload()
+{
+    if (Describer.ReadyState() == "NotReady")
+        Console.Error.WriteLine("Getting Windows' image description model ready. The first time, this can take a few minutes.");
 }
 
 static void Line(string text) => Console.Out.Write(text + "\n");

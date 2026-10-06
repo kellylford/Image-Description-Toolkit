@@ -68,7 +68,13 @@ public sealed class Describer : IDisposable
         using (bitmap)
         using (var image = ImageBuffer.CreateForSoftwareBitmap(bitmap))
         {
-            var kind = Enum.Parse<ImageDescriptionKind>(Protocol.ApiKindName(request.Kind));
+            var kind = request.Kind switch
+            {
+                "detailed" => ImageDescriptionKind.DetailedDescription,
+                "brief" => ImageDescriptionKind.BriefDescription,
+                "diagram" => ImageDescriptionKind.DiagramDescription,
+                _ => ImageDescriptionKind.AccessibleDescription,
+            };
             var result = await _generator.DescribeAsync(image, kind, new ContentFilterOptions());
             var status = result.Status.ToString();
             if (Protocol.CodeForStatus(status) is { } code) throw new ProtocolException(request.Id, code, Protocol.MessageForStatus(status));

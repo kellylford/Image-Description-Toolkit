@@ -43,6 +43,11 @@ the only choice. In IDT the kinds are the provider's models.
 downloaded), `NotSupportedOnCurrentSystem` (not a Copilot+ PC, or Windows too old) or
 `DisabledByUser`. `NoIdentity` means the helper isn't installed as a package.
 
+**From Git Bash, describing fails.** Started directly from Git Bash, `--describe` and `--serve`
+answer every picture with `internal_error` ("InternalError"), reproducibly; from cmd, PowerShell
+or Python (which is how IDT starts it) the same picture is described. The cause isn't known. Test
+from cmd or PowerShell.
+
 ## The protocol
 
 `--serve` reads one request per line and answers each in order, one line per answer, each

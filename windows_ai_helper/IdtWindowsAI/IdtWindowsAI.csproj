@@ -13,11 +13,14 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
-    <!-- Trim the parts of .NET this doesn't use: 23 MB a package rather than 116, which matters
-         because IDT's installer carries one per architecture. "partial" trims only what is
-         marked safe to trim (the .NET libraries); the Windows Runtime projections and this
-         app's own code are kept whole. Those projections report IL2104 ("produced trim
-         warnings") for themselves; with them untrimmed it doesn't apply, so it is not an error. -->
+    <!-- Trim the parts of .NET this doesn't use: about 48 MB a package rather than 116, which
+         matters because IDT's installer carries one per architecture. "partial" trims only what
+         is marked safe to trim (the .NET libraries); the Windows Runtime projections and this
+         app's own code are kept whole (see TrimmerRootAssembly below). "partial" also hides the
+         trim-analysis warnings, so a build that trimming has broken still builds cleanly: a
+         change here must be re-tested on a Copilot+ PC. Kept whole, two of the projections still
+         report IL2104 ("produced trim warnings") about themselves, which TreatWarningsAsErrors
+         would make a failed build; it says nothing about this app, so it is silenced. -->
     <PublishTrimmed>true</PublishTrimmed>
     <TrimMode>partial</TrimMode>
     <NoWarn>$(NoWarn);IL2104</NoWarn>

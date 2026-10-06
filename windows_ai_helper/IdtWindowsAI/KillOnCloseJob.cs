@@ -26,7 +26,11 @@ internal sealed class KillOnCloseJob : IDisposable
         return new KillOnCloseJob(handle);
     }
 
-    public void Add(System.Diagnostics.Process process) => AssignProcessToJobObject(_handle, process.Handle);
+    /// <summary>Puts a process in the job. False if Windows refused.
+    /// It has to be done to the child after it starts: a packaged app started through its
+    /// command doesn't inherit its starter's job, so putting this process in the job first
+    /// leaves the child outside it (tried on a Copilot+ PC, 10/6/2026).</summary>
+    public bool Add(System.Diagnostics.Process process) => AssignProcessToJobObject(_handle, process.Handle);
 
     public void Dispose()
     {

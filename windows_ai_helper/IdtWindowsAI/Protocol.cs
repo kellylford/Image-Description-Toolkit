@@ -117,7 +117,7 @@ public static class Protocol
     }
 
     private static ProtocolException TooLarge(int id, long bytes) =>
-        new(id, Codes.TooLarge, $"The picture is {bytes / (1024.0 * 1024):0.0} MB; the limit is {MaxImageBytes / (1024 * 1024)} MB.");
+        new(id, Codes.TooLarge, $"The picture is more than {MaxImageBytes / (1024 * 1024)} MB, the most the helper takes.");
 
     /// <summary>The size a picture is decoded at: as it is, or scaled down to fit
     /// <see cref="MaxSide"/> on its longer side, keeping its shape.</summary>
@@ -130,14 +130,6 @@ public static class Protocol
     }
 
     /// <summary>The name of a kind in Microsoft.Windows.AI.Imaging.ImageDescriptionKind.</summary>
-    public static string ApiKindName(string kind) => kind switch
-    {
-        "detailed" => "DetailedDescription",
-        "brief" => "BriefDescription",
-        "diagram" => "DiagramDescription",
-        _ => "AccessibleDescription",
-    };
-
     public static string Success(int id, string kind, string text, double seconds) =>
         new JsonObject { ["id"] = id, ["ok"] = true, ["kind"] = kind, ["text"] = text, ["seconds"] = Math.Round(seconds, 2) }.ToJsonString(Readable);
 
