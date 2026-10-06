@@ -18,7 +18,7 @@ What the package needs, found by trying each on a Copilot+ PC:
 - **The `systemAIModels` capability** in its manifest.
 - **`MaxVersionTested` of 10.0.26226.0 or later.** Older values give "Not declared by app".
 - **Windows App Runtime 1.8**, which the manifest depends on. Many PCs have it already; IDT's
-  installer is to add it where it's missing.
+  installer adds it where it's missing.
 - **To be started as `idt-windows-ai`**, the command the package adds, so Windows runs it with
   the package's identity. IDT always starts it that way. Started as `IdtWindowsAI.exe` from its
   folder, as a person might, it has no identity; it notices and starts itself again through
@@ -88,6 +88,7 @@ Needs the .NET 10 SDK. From this folder:
 .\build_helper.ps1                  # this PC's architecture, into out\<arch>
 .\build_helper.ps1 -Arch x64        # or arm64
 .\build_helper.ps1 -Register        # and install it for this user (needs Developer Mode)
+.\build_helper.ps1 -Pack            # and pack it into dist\IdtWindowsAI_<arch>.msix
 dotnet test IdtWindowsAI.Tests      # the protocol tests: run anywhere, no NPU needed
 ```
 
@@ -98,6 +99,21 @@ certificate's subject exactly.
 `-Register` installs the folder *in place*: the registered helper runs from `out\<arch>`, so
 the next build replaces the installed files. Rebuild with `-Register` again, and not while the
 helper is running.
+
+## Releasing
+
+The Windows build workflow (`.github/workflows/build-windows.yml`) builds both architectures with
+`-Pack`, the package version set to IDT's own and the publisher set to the signing
+certificate's subject, then signs the two `.msix` files with the same Azure signing as IDT's
+exes. The installer carries the one for the PC's architecture to `{app}\windows_ai` and, if the
+"Set up Windows AI" task is ticked (offered on Windows 11 24H2 and later), runs
+`install_windows_ai.ps1` as the person installing. That adds the Windows App Runtime 1.8 if the
+PC doesn't have it (Microsoft's own installer, downloaded and checked for Microsoft's signature,
+about 100 MB), then the helper package. Its log is `idt_windows_ai_setup.log` in the person's
+Temp folder. Uninstalling IDT removes the helper package; the runtime stays, as other apps use it.
+
+A pull request's build isn't signed, so its installer can't install the helper: it says so and
+installs the rest. To test signing before merging, run the workflow on the branch by hand.
 
 **Size.** The build is self-contained (nothing to install first) and trimmed: about 48 MB per
 architecture rather than 116. Trimming must leave the Windows Runtime projections whole; trimmed,
@@ -111,6 +127,8 @@ the project. A trimming change needs re-testing on a Copilot+ PC: CI can't catch
 - `IdtWindowsAI\Server.cs`: the `--serve` loop and its capped line reader. Plain C#, tested.
 - `IdtWindowsAI\Describer.cs`: the only code that calls Windows' AI API.
 - `IdtWindowsAI\Program.cs`: the command-line modes, and restarting with identity.
+- `install_windows_ai.ps1`: what IDT's installer runs to set Windows AI up, and with `-Remove`
+  to take it away.
 - `IdtWindowsAI\KillOnCloseJob.cs`: the Windows job that ties a restarted copy to its starter.
 - `IdtWindowsAI\AppxManifest.xml`: the package manifest, with placeholders the build fills.
 - `IdtWindowsAI.Tests\`: protocol and serve-loop tests, run in CI by `.github/workflows/windows-ai-helper.yml`.
