@@ -8,6 +8,26 @@ using Microsoft.Windows.AI.Imaging;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
 
+// Started as DescribeTrial.exe from its folder, it has no package identity, and the API refuses
+// anything without one. So it starts itself again through its command, describe-trial, which
+// Windows runs as the package, and passes on what that prints.
+if (!HasIdentity())
+{
+    var alias = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        @"Microsoft\WindowsApps\describe-trial.exe");
+    if (!File.Exists(alias))
+    {
+        Console.WriteLine("The trial isn't installed as a package, and it only works as one. Register it with:");
+        Console.WriteLine($"  powershell Add-AppxPackage -Register \"{Path.Combine(AppContext.BaseDirectory, "AppxManifest.xml")}\"");
+        return 1;
+    }
+    var start = new System.Diagnostics.ProcessStartInfo(alias) { UseShellExecute = false };
+    foreach (var a in args) start.ArgumentList.Add(a);
+    using var again = System.Diagnostics.Process.Start(start)!;
+    again.WaitForExit();
+    return again.ExitCode;
+}
+
 if (args.Length == 0)
 {
     Console.WriteLine("Usage: describe-trial <picture> [Accessible|Brief|Detailed|Diagram ...]");
@@ -58,6 +78,12 @@ catch (Exception ex)
 {
     Console.WriteLine($"Failed: {ex.GetType().Name} 0x{ex.HResult:X8}: {ex.Message}");
     return 1;
+}
+
+static bool HasIdentity()
+{
+    try { _ = Windows.ApplicationModel.Package.Current.Id; return true; }
+    catch (InvalidOperationException) { return false; }
 }
 
 static string Identity()

@@ -13,6 +13,9 @@
     <WindowsPackageType>MSIX</WindowsPackageType>
     <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
+    <!-- The SDK's start-up hook for unpackaged apps runs before Main and crashes without package
+         identity; packaged, it isn't needed. Off, so Main can see the problem and fix it. -->
+    <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
   </PropertyGroup>
   <ItemGroup>
     <None Include="AppxManifest.xml" CopyToOutputDirectory="PreserveNewest" />
