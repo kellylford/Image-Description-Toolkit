@@ -179,7 +179,9 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
 def _uses_prompt(provider: Optional[str]) -> bool:
     """False for a provider that takes no prompt (Windows AI, whose models are fixed kinds of
     description). Its runs record no prompt and must not change a workspace's saved one."""
-    return provider != "windows-ai"
+    from idt_core.providers.registry import uses_prompt
+
+    return provider is None or uses_prompt(provider)
 
 
 def _prompt_label(provider: Optional[str], model: Optional[str], prompt_name: str) -> str:

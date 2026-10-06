@@ -66,9 +66,39 @@ except ImportError:
 # import would restore the old behaviour of storing API errors as descriptions,
 # which is precisely the bug this guards (issue #230). Fail loudly instead.
 try:
-    from ai_providers import is_provider_error, ErrorKind            # frozen mode
+    from ai_providers import (                                         # frozen mode
+        is_provider_error, ErrorKind, provider_uses_prompt, windows_ai_kind,
+    )
 except ImportError:
-    from imagedescriber.ai_providers import is_provider_error, ErrorKind   # dev mode
+    from imagedescriber.ai_providers import (                          # dev mode
+        is_provider_error, ErrorKind, provider_uses_prompt, windows_ai_kind,
+    )
+
+
+def _prompt_for(provider: str, prompt_style: str, custom_prompt: str):
+    """The prompt a run records: "none" and no text for a provider that takes no prompt
+    (Windows AI), so a description never claims a prompt style its model never saw."""
+    if provider and not provider_uses_prompt(provider):
+        return "none", ""
+    return prompt_style, custom_prompt
+
+
+def _model_for(provider: str, model: str) -> str:
+    """The model a run records: for Windows AI, the kind that will actually run (a model name
+    from another provider, from the settings, runs as the default kind)."""
+    if (provider or "").lower() == "windows-ai":
+        return windows_ai_kind(model)
+    return model
+
+
+def _windows_ai_needs_preparing() -> bool:
+    """True when Windows AI's model isn't ready yet, so the first picture will wait for it."""
+    try:
+        from idt_core.providers.windows_ai import readiness
+
+        return readiness().get("state") != "Ready"
+    except Exception:                                       # noqa: BLE001
+        return False   # the describe itself reports what's wrong
 
 #: Failure kinds that every remaining image in a batch would hit too: the
 #: provider is signed out, refused the credentials, or is not set up. A batch
@@ -368,9 +398,8 @@ class ProcessingWorker(threading.Thread):
         self.parent_window = parent_window
         self.file_path = file_path
         self.provider = provider
-        self.model = model
-        self.prompt_style = prompt_style
-        self.custom_prompt = custom_prompt
+        self.model = _model_for(provider, model)
+        self.prompt_style, self.custom_prompt = _prompt_for(provider, prompt_style, custom_prompt)
         self.api_key = api_key
         self.geocode = geocode
         
@@ -414,7 +443,11 @@ class ProcessingWorker(threading.Thread):
                     prompt_text = "Describe this image."
             
             # Emit progress
-            self._post_progress(f"Processing with {self.provider} {self.model}...")
+            if self.provider == 'windows-ai' and _windows_ai_needs_preparing():
+                self._post_progress("Getting Windows AI's model ready. The first time, "
+                                    "this can take a few minutes.")
+            else:
+                self._post_progress(f"Processing with {self.provider} {self.model}...")
 
             # Extract metadata from image
             metadata = self._extract_metadata(self.file_path)
@@ -1144,9 +1177,8 @@ class BatchProcessingWorker(threading.Thread):
         self.parent_window = parent_window
         self.file_paths = list(file_paths)
         self.provider = provider
-        self.model = model
-        self.prompt_style = prompt_style
-        self.custom_prompt = custom_prompt
+        self.model = _model_for(provider, model)
+        self.prompt_style, self.custom_prompt = _prompt_for(provider, prompt_style, custom_prompt)
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
         self.progress_offset = progress_offset
@@ -1243,6 +1275,7 @@ class BatchProcessingWorker(threading.Thread):
                     current=0,
                     total=total
                 )
+                evt.startup_status = True
                 wx.PostEvent(self.parent_window, evt)
 
             # Apple Intelligence: the first image also pays for starting the
@@ -1255,7 +1288,27 @@ class BatchProcessingWorker(threading.Thread):
                     current=0,
                     total=total
                 )
+                evt.startup_status = True
                 wx.PostEvent(self.parent_window, evt)
+
+            # Windows AI: only when the model isn't ready, which is the only time
+            # there is a wait worth saying. It is got ready here, before the first
+            # image, so the message stays up for exactly as long as the wait.
+            if self.provider.lower() == 'windows-ai' and _windows_ai_needs_preparing():
+                evt = ProgressUpdateEventData(
+                    file_path="",
+                    message="Getting Windows AI's model ready. The first time, this can "
+                            "take a few minutes.",
+                    current=0,
+                    total=total
+                )
+                evt.startup_status = True
+                wx.PostEvent(self.parent_window, evt)
+                try:
+                    from idt_core.providers.windows_ai import prepare
+                    prepare()
+                except Exception:                           # noqa: BLE001
+                    pass   # the first image reports it, and stops the batch
 
             halted = None
             halted_files = []

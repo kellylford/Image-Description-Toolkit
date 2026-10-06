@@ -72,8 +72,10 @@ from idt_core.providers.registry import display_name as _display_provider  # noq
 # .lower(): that only works while every label is its key in title case.
 try:
     from ai_providers import provider_key as _provider_key  # frozen mode
+    from ai_providers import provider_uses_prompt as _uses_prompt
 except ImportError:
     from imagedescriber.ai_providers import provider_key as _provider_key  # dev mode
+    from imagedescriber.ai_providers import provider_uses_prompt as _uses_prompt
 
 
 def set_accessible_name(widget, name):
@@ -401,6 +403,16 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
                      "once via 'sudo fm license'")
         return " | ".join(parts)
 
+    if provider == "windows-ai":
+        from idt_core.providers import catalog
+
+        entry = catalog.model_entry(provider, model_id)
+        # The catalog entry already says where it runs and what it costs; add
+        # that the prompt below isn't used.
+        parts = [entry.description] if entry.description else []
+        parts.append("Takes no prompt")
+        return " | ".join(parts)
+
     if provider == "claude-code":
         from idt_core.providers import catalog
 
@@ -458,6 +470,13 @@ class FollowupQuestionDialog(wx.Dialog):
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
         )
         
+        # A follow-up question is a prompt. A description made by a provider
+        # that takes none (Windows AI) is followed up with another provider,
+        # chosen afresh: carrying its kind over as a model would mean nothing.
+        # What the description was made with, for the "Original:" line.
+        self._made_with = (original_provider, original_model)
+        if original_provider and not _uses_prompt(original_provider):
+            original_provider, original_model = "", ""
         self.original_provider = original_provider
         self.original_model = original_model
         self.config = config
@@ -472,8 +491,8 @@ class FollowupQuestionDialog(wx.Dialog):
                 from ai_providers import provider_picker_choices
             except ImportError:
                 from imagedescriber.ai_providers import provider_picker_choices
-            available_providers = [key for key, _ in provider_picker_choices()]
-        self.available_providers = available_providers
+            available_providers = [key for key, _ in provider_picker_choices(needs_prompt=True)]
+        self.available_providers = [p for p in available_providers if _uses_prompt(p)]
         self.question = ""
         self.selected_provider = original_provider
         self.selected_model = original_model
@@ -506,18 +525,19 @@ class FollowupQuestionDialog(wx.Dialog):
         model_sizer = wx.StaticBoxSizer(model_box, wx.VERTICAL)
         
         # Show original model with friendly display name for Claude models
+        made_with_provider, made_with_model = self._made_with
         try:
             from ai_providers import format_claude_model_for_display
             original_model_display = (
-                format_claude_model_for_display(self.original_model)
-                if self.original_provider.lower() == 'claude'
-                else self.original_model
+                format_claude_model_for_display(made_with_model)
+                if (made_with_provider or '').lower() == 'claude'
+                else made_with_model
             )
         except Exception:
-            original_model_display = self.original_model
+            original_model_display = made_with_model
         original_label = wx.StaticText(
             self,
-            label=f"Original: {_display_provider(self.original_provider)} - {original_model_display}"
+            label=f"Original: {_display_provider(made_with_provider)} - {original_model_display}"
         )
         original_label.SetFont(original_label.GetFont().MakeItalic())
         model_sizer.Add(original_label, 0, wx.ALL, 5)
@@ -533,7 +553,9 @@ class FollowupQuestionDialog(wx.Dialog):
         if self.original_provider and self.original_provider not in provider_choices:
             provider_choices.insert(0, self.original_provider)
         self.provider_choice = wx.Choice(self, choices=provider_choices)
-        self.provider_choice.SetStringSelection(self.original_provider)
+        if not self.provider_choice.SetStringSelection(self.original_provider or "") \
+                and self.provider_choice.GetCount():
+            self.provider_choice.SetSelection(0)
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
         provider_sizer.Add(self.provider_choice, 1, wx.EXPAND)
@@ -1006,6 +1028,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         prompt_sizer = wx.StaticBoxSizer(prompt_box, wx.VERTICAL)
         
         prompt_label = wx.StaticText(panel, label="P&rompt style:")
+        self.prompt_label = prompt_label
         prompt_sizer.Add(prompt_label, 0, wx.ALL, 5)
         
         self.prompt_choice = wx.Choice(panel, choices=[])
@@ -1021,7 +1044,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         custom_prompt_box = wx.StaticBox(panel, label="Custom Prompt (Optional)")
         custom_prompt_sizer = wx.StaticBoxSizer(custom_prompt_box, wx.VERTICAL)
         
-        custom_prompt_label = wx.StaticText(
+        custom_prompt_label = self.custom_prompt_label = wx.StaticText(
             panel,
             label="Enter a c&ustom prompt to override the selected style:"
         )
@@ -1084,7 +1107,25 @@ class ProcessingOptionsDialog(wx.Dialog):
                 model_id = self.model_combo.GetStringSelection()
         text = _get_model_description_text(provider, model_id)
         self.model_desc_text.ChangeValue(text)
+        self._show_prompt_use(provider)
     
+    def _show_prompt_use(self, provider: str) -> None:
+        """Say on the prompt controls when the chosen provider won't use them.
+
+        They stay enabled -- disabled controls drop out of the tab order, and a
+        screen reader user would lose them without knowing why -- but their
+        labels say so, and the run records the prompt as none. The labels, not
+        the controls' names: on Windows a screen reader names a choice or edit
+        box from the label before it, and SetName never reaches it.
+        """
+        if not hasattr(self, 'prompt_label'):
+            return
+        note = "" if _uses_prompt(provider) else f" (not used by {_display_provider(provider)})"
+        self.prompt_label.SetLabel("P&rompt style" + note + ":")
+        self.custom_prompt_label.SetLabel(
+            "Enter a c&ustom prompt to override the selected style" + note + ":")
+        self.prompt_label.GetParent().Layout()
+
     def _select_model_id(self, model_id) -> bool:
         """Select the entry whose API id is ``model_id``. True if one matched.
 
@@ -1142,7 +1183,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                 else:
                     self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
-            elif provider in ("openai", "claude", "claude-code", "apple"):
+            elif provider in ("openai", "claude", "claude-code", "apple", "windows-ai"):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 try:
@@ -1156,7 +1197,11 @@ class ProcessingOptionsDialog(wx.Dialog):
                 # Claude list -- and selected it -- the moment the user switched
                 # provider in this dialog.
                 configured = self.config.get('default_model', '')
-                configured_provider = str(self.config.get('provider', '')).lower()
+                # The settings call it default_provider; 'provider' is what some
+                # callers pass. Reading only 'provider' meant the configured model
+                # was never reselected from the real settings.
+                configured_provider = str(self.config.get('provider')
+                                          or self.config.get('default_provider', '')).lower()
                 keep = [configured] if configured_provider == provider else []
 
                 entries = list_models(provider, keep=keep)

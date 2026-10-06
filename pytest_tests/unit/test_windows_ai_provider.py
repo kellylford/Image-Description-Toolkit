@@ -522,3 +522,11 @@ def test_guideme_reads_each_kind_once(monkeypatch, capsys):
     monkeypatch.setattr(guide, "get_choice", lambda _q, labels, **k: seen.setdefault("labels", labels) and "BACK")
     guide._step_model("windows-ai")
     assert seen["labels"][0] == "Accessible  (recommended)"
+
+
+def test_only_windows_ai_takes_no_prompt():
+    from idt_core.providers import registry
+
+    assert not registry.uses_prompt("windows-ai") and not registry.uses_prompt("Windows AI")
+    assert [p for p in registry.list_providers() if not registry.uses_prompt(p)] == ["windows-ai"]
+    assert registry.uses_prompt("something-new"), "an unknown provider is assumed to take a prompt"

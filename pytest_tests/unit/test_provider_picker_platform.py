@@ -293,7 +293,7 @@ def test_prompt_editor_lists_mlx_models_where_mlx_runs(frame, monkeypatch):
 
     monkeypatch.setattr(
         ai_providers, "provider_picker_choices",
-        lambda title_case=True: [("ollama", "Ollama"), ("openai", "OpenAI"),
+        lambda title_case=True, needs_prompt=False: [("ollama", "Ollama"), ("openai", "OpenAI"),
                                  ("claude", "Claude"), ("mlx", "MLX")],
     )
     monkeypatch.setattr(ai_providers.MLXProvider, "is_available", lambda self: True)

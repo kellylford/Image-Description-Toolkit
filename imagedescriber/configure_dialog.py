@@ -506,8 +506,8 @@ class ConfigureDialog(wx.Dialog):
                     "file": "image_describer",
                     "path": ["default_provider"],
                     "type": "choice",
-                    "choices": ["ollama", "openai", "claude", "claude-code", "apple"],
-                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys, claude-code uses your Claude subscription through the Claude Code app (sign in with 'claude auth login'), and apple runs Apple Intelligence on this Mac (macOS 27; accept the terms once with 'sudo fm license')."
+                    "choices": ["ollama", "openai", "claude", "claude-code", "apple", "windows-ai"],
+                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys, claude-code uses your Claude subscription through the Claude Code app (sign in with 'claude auth login'), apple runs Apple Intelligence on this Mac (macOS 27; accept the terms once with 'sudo fm license'), and windows-ai runs Windows' own model on a Copilot+ PC (it takes no prompt; its models are kinds of description)."
                 },
                 "default_model": {
                     "file": "image_describer",

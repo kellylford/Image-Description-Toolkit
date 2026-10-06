@@ -2067,6 +2067,107 @@ class AppleProvider(AIProvider):
         return result.text
 
 
+def windows_ai_kind(model: str) -> str:
+    """The description kind a Windows AI model name means. A name that isn't a kind came from
+    another provider (the settings' default model), and can only have meant the default."""
+    from idt_core.providers.windows_ai import DEFAULT_MODEL, normalise_kind
+
+    try:
+        return normalise_kind(model)
+    except ValueError:
+        return DEFAULT_MODEL
+
+
+class WindowsAIProvider(AIProvider):
+    """Windows AI: Windows' own on-device model on a Copilot+ PC.
+
+    A thin adapter over ``idt_core.providers.windows_ai``, which owns the packaged helper that
+    reaches the model, its readiness and the protocol. Needs no key and no account, and pictures
+    never leave the PC. Its models are kinds of description and it takes no prompt: the prompt
+    passed here is ignored, and the workers record it as "none".
+    """
+
+    def __init__(self):
+        self.last_usage = None
+
+    def get_provider_name(self) -> str:
+        return "Windows AI"
+
+    def is_available(self) -> bool:
+        """True on Windows 11 24H2 or later with the helper installed. Whether this PC is a
+        Copilot+ PC is checked at first use, where the error can say so: that costs a process."""
+        try:
+            from idt_core.providers.windows_ai import is_available
+            return is_available()
+        except Exception:                                   # noqa: BLE001
+            return False
+
+    def get_available_models(self) -> List[str]:
+        if not self.is_available():
+            return []
+        from idt_core.providers.windows_ai import WINDOWS_AI_MODELS
+        return list(WINDOWS_AI_MODELS)
+
+    # One retry, for the helper restarting the model or itself (503), or a timeout (the
+    # contract every adapter keeps): a second attempt usually works. Getting the model ready,
+    # which can take many minutes, is decided here instead, so the retry can't multiply it:
+    # a model that can't be made ready stops the batch.
+    @retry_on_api_error(max_retries=1, base_delay=1.0, max_delay=10.0)
+    def describe_image(self, image_path: str, prompt: str, model: str) -> str:
+        from idt_core.converter import load_for_api
+        from idt_core.providers.windows_ai import (
+            WindowsAIProvider as _CoreProvider, WindowsAIError, check_ready, prepare,
+        )
+
+        kind = windows_ai_kind(model)
+        core = _CoreProvider(model=kind, check=False)
+        image_bytes, mime_type = load_for_api(Path(image_path))
+        try:
+            # Cheap once the model is ready (the report is cached); the first time on a PC
+            # without it, Windows downloads it here, which can take minutes.
+            prepare()
+        except WindowsAIError as exc:
+            # Not a Copilot+ PC, turned off, no helper, or the model can't be got ready: no
+            # picture can be described until the person acts, so the batch stops, with the
+            # reason (UNAVAILABLE keeps the message; a server error's wording would drop it).
+            raise_provider_error(provider="Windows AI", kind=ErrorKind.UNAVAILABLE, message=str(exc))
+        try:
+            try:
+                result = core.describe(image_bytes, mime_type, prompt)
+            except WindowsAIError as exc:
+                if exc.code != "not_ready":
+                    raise
+                # Ready once, not now: Windows dropped or is updating the model. Get it ready
+                # again, then try this picture once more.
+                try:
+                    check_ready(force=True)
+                    prepare()
+                except WindowsAIError as again:
+                    raise_provider_error(provider="Windows AI", kind=ErrorKind.UNAVAILABLE,
+                                         message=str(again))
+                result = core.describe(image_bytes, mime_type, prompt)
+        except WindowsAIError as exc:
+            status = exc.status_code
+            if exc.timeout:
+                kind_of_error = ErrorKind.TIMEOUT
+            elif exc.setup:
+                kind_of_error = ErrorKind.UNAVAILABLE
+            elif isinstance(status, int) and 500 <= status < 600:
+                # The helper restarted the model or itself, or gave an empty answer. Read from
+                # the status, never the wording (issue #228).
+                kind_of_error = ErrorKind.SERVER_ERROR
+            else:
+                # A refusal of this one picture (per_image, which the batch reads from the
+                # exception this is raised from), or a stop: not retried, and the helper's
+                # own words kept.
+                kind_of_error = ErrorKind.UNKNOWN
+            raise_provider_error(provider="Windows AI", kind=kind_of_error,
+                                 status_code=status, message=str(exc))
+
+        self.last_usage = None   # no tokens: nothing to count or pay for
+        return result.text
+
+
 # ---------------------------------------------------------------------------
 # Global provider instances
 # ---------------------------------------------------------------------------
@@ -2077,6 +2178,7 @@ _openai_provider = OpenAIProvider()
 _claude_provider = ClaudeProvider()
 _claude_code_provider = ClaudeCodeProvider()
 _apple_provider = AppleProvider()
+_windows_ai_provider = WindowsAIProvider()
 _mlx_provider = MLXProvider()
 
 
@@ -2102,6 +2204,9 @@ def get_available_providers() -> Dict[str, AIProvider]:
     if _apple_provider.is_available():
         providers['apple'] = _apple_provider
 
+    if _windows_ai_provider.is_available():
+        providers['windows-ai'] = _windows_ai_provider
+
     if _mlx_provider.is_available():
         providers['mlx'] = _mlx_provider
 
@@ -2117,14 +2222,16 @@ _PICKER_PROVIDERS = (
     ("claude", "Claude"),
     ("claude-code", "Claude Code"),
     ("apple", "Apple Intelligence"),
+    ("windows-ai", "Windows AI"),
     ("mlx", "MLX"),
 )
 
 #: Providers hidden from pickers when they cannot run on this machine. MLX
 #: needs Apple Silicon; Claude Code needs the `claude` CLI installed; Apple
-#: Intelligence needs macOS 27 on Apple Silicon. All three are settled outside
-#: this app -- unlike a missing API key, nothing in a dialog can fix them.
-_GATED_PROVIDERS = ("mlx", "claude-code", "apple")
+#: Intelligence needs macOS 27 on Apple Silicon; Windows AI needs Windows 11
+#: 24H2 and its helper. All are settled outside this app -- unlike a missing
+#: API key, nothing in a dialog can fix them.
+_GATED_PROVIDERS = ("mlx", "claude-code", "apple", "windows-ai")
 
 
 def provider_key(value: str) -> str:
@@ -2150,7 +2257,19 @@ def provider_key(value: str) -> str:
     return {"ollama cloud": "ollama_cloud"}.get(canonical, canonical)
 
 
-def provider_picker_choices(title_case: bool = True) -> List[tuple]:
+def provider_uses_prompt(provider: str) -> bool:
+    """True if a prompt shapes this provider's descriptions (a picker label or key).
+
+    False for Windows AI, which takes none: its descriptions record the prompt
+    as "none", and a picker for something that is only a prompt (a follow-up
+    question, chat, a prompt test, a rename) leaves it out.
+    """
+    from idt_core.providers.registry import uses_prompt
+
+    return uses_prompt(provider_key(provider))
+
+
+def provider_picker_choices(title_case: bool = True, needs_prompt: bool = False) -> List[tuple]:
     """``[(key, label), ...]`` for a provider picker, minus what cannot run here.
 
     Every ImageDescriber provider dropdown goes through this. They used to
@@ -2168,6 +2287,10 @@ def provider_picker_choices(title_case: bool = True) -> List[tuple]:
     Ollama is always listed even when the daemon is down — unlike MLX, it is
     installable on this machine, and hiding it would tell someone their setup
     is impossible when it is merely not running yet.
+
+    ``needs_prompt`` is for pickers whose whole job is a prompt -- chat, a
+    follow-up question, testing a prompt: it leaves out providers that take
+    none (Windows AI), which would answer with a description of the picture.
     """
     try:
         available = set(get_available_providers())
@@ -2186,6 +2309,8 @@ def provider_picker_choices(title_case: bool = True) -> List[tuple]:
         # hide the provider and leave the user with no way to discover it.
         if key in _GATED_PROVIDERS and key not in available:
             continue
+        if needs_prompt and not provider_uses_prompt(key):
+            continue
         out.append((key, label if title_case else key))
     return out
 
@@ -2199,5 +2324,6 @@ def get_all_providers() -> Dict[str, AIProvider]:
         'claude': _claude_provider,
         'claude-code': _claude_code_provider,
         'apple': _apple_provider,
+        'windows-ai': _windows_ai_provider,
         'mlx': _mlx_provider,
     }

@@ -102,7 +102,8 @@ def _picker_providers():
     """
     from ai_providers import provider_picker_choices
 
-    picker = [key for key, _ in provider_picker_choices()]
+    # needs_prompt, as ChatDialog asks: chat leaves out providers that take no prompt.
+    picker = [key for key, _ in provider_picker_choices(needs_prompt=True)]
     assert picker, "provider picker returned no providers"
     return picker
 
