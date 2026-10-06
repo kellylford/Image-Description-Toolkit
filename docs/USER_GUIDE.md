@@ -1396,7 +1396,7 @@ Windows 11 can describe images with Windows' own on-device model on a Copilot+ P
 
 **Setup**
 
-The installer does it. It adds a small helper that lets IDT reach Windows' model, and the Windows App Runtime that the helper needs if your PC doesn't already have it (a download of about 100 MB from Microsoft). Then check it:
+The installer does it, on a PC with an NPU. It adds a small helper that lets IDT reach Windows' model, and the Windows App Runtime that the helper needs if your PC doesn't already have it (a download of about 100 MB from Microsoft). Then check it:
 
 ```bash
 idt models --provider windows-ai
@@ -1419,7 +1419,7 @@ Choose one with `--model` or in the model list. Because there is no prompt, the 
 
 Photos, quickly and privately. A description takes about two to four seconds on a Snapdragon X Elite, and the accessible descriptions are detailed and accurate. It is less good with screenshots: it reads the text but guesses at the rest.
 
-**If it declines an image.** Windows' content filter declines some pictures, and it declines pictures that are mostly text. It says so, and the run carries on. A different kind won't help; a different provider (or OCR, for text) will.
+**If it declines an image.** Windows' content filter declines some pictures, and it declines pictures that are mostly text. It says so, and the run carries on. A different kind won't help; a different provider (or OCR, for text) will. Windows' model also fails on some pictures at one size and not another, so IDT tries those again at smaller sizes, and most are then described.
 
 **CLI examples**
 
