@@ -64,7 +64,7 @@ idt update
 ## Features
 
 - **Two Powerful Applications**: GUI for visual workflow, CLI for automation
-- **Multiple AI Providers**: Ollama (local), OpenAI, Claude (API key), Claude Code (your Claude Pro/Max subscription, no API key), Apple Intelligence (on-device on macOS 27, no API key)
+- **Multiple AI Providers**: Ollama (local), OpenAI, Claude (API key), Claude Code (your Claude Pro/Max subscription, no API key), Apple Intelligence (on-device on macOS 27, no API key), Windows AI (on-device on Copilot+ PCs, no API key)
 - **Batch Processing**: Process directories of images automatically
 - **Video Frame Extraction**: Extract and describe frames from videos
 - **Integrated Viewer**: Browse and monitor workflows in real-time (built into GUI)

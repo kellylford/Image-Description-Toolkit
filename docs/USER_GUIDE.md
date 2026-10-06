@@ -30,6 +30,7 @@ IDT includes three standalone applications that share the same AI provider infra
 | OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
 | Claude Code (your Claude subscription) | `claude-code` | `claude-code` | Cloud | No — sign in to Claude Code | Windows, macOS |
 | Apple Intelligence (on-device) | `apple` | `apple` | Local | No | macOS 27+, Apple Silicon |
+| Windows AI (on-device) | `windows-ai` | `windows-ai` | Local | No | Windows 11 24H2+, Copilot+ PC |
 | MLX (Apple Silicon) | — | `mlx` | Local | No | ImageDescriber only, macOS Apple Silicon |
 
 ---
@@ -1158,6 +1159,7 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 > | `openai` | `openai` | Same name in both |
 > | `claude-code` | `claude-code` | Same name in both; shown as "Claude Code" in pickers |
 > | `apple` | `apple` | Same name in both; shown as "Apple Intelligence" in pickers |
+> | `windows-ai` | `windows-ai` | Same name in both; shown as "Windows AI" in pickers |
 > | — | `ollama_cloud` | GUI only; remote Ollama server |
 > | — | `mlx` | GUI only; Apple Silicon local models |
 
@@ -1379,6 +1381,54 @@ idt chat --provider apple
 **Limits compared with the cloud providers:** no PDF attachments in chat (the model takes images and text only), no web search in chat, only the one model, and a much smaller context window (about 4,096 tokens). Because everything runs locally, there is no rate limit and no bill.
 
 ---
+
+### Windows AI — On This PC (Copilot+ PCs)
+
+Windows 11 can describe images with Windows' own on-device model on a Copilot+ PC, and IDT uses it as a provider. The model runs on the PC's NPU: nothing is uploaded, and it needs no API key, no account and no internet connection, and costs nothing however many images you describe. It is for describing images, in `idt describe` and ImageDescriber; it can't chat.
+
+**CLI and GUI provider name:** `windows-ai` (shown as **Windows AI** in pickers)
+
+**What you need**
+
+- A Copilot+ PC (one with an NPU) running Windows 11 24H2 or later.
+- Windows' AI features turned on (they are unless you or your organization turned them off).
+- IDT installed with the installer, with **Set up Windows AI** ticked. It is ticked by default on Windows 11 24H2 and later.
+
+**Setup**
+
+The installer does it. It adds a small helper that lets IDT reach Windows' model, and the Windows App Runtime that the helper needs if your PC doesn't already have it (a download of about 100 MB from Microsoft). Then check it:
+
+```bash
+idt models --provider windows-ai
+```
+
+That lists the models when the PC is ready, and says what is wrong when it is not: not a Copilot+ PC, Windows too old, or the AI features turned off. The first time, Windows may need to download its model; IDT says so and waits. That can take a few minutes, once.
+
+**Models**
+
+The model takes no prompt. Instead it offers four kinds of description, and these are its models:
+
+- `accessible` (the default): a long description written for people who are blind or have low vision.
+- `detailed`: a long description.
+- `brief`: a sentence.
+- `diagram`: for charts and diagrams.
+
+Choose one with `--model` or in the model list. Because there is no prompt, the prompt style and custom prompt are not used: the CLI says so if you pass `--prompt`, ImageDescriber's prompt controls say "not used by Windows AI", and descriptions record the prompt as `none`. Photo details such as the date and place can't shape these descriptions either.
+
+**What it is good at**
+
+Photos, quickly and privately. A description takes about two to four seconds on a Snapdragon X Elite, and the accessible descriptions are detailed and accurate. It is less good with screenshots: it reads the text but guesses at the rest.
+
+**If it declines an image.** Windows' content filter declines some pictures, and it declines pictures that are mostly text. It says so, and the run carries on. A different kind won't help; a different provider (or OCR, for text) will.
+
+**CLI examples**
+
+```bash
+idt describe C:\Photos --provider windows-ai
+idt describe C:\Photos --provider windows-ai --model brief
+```
+
+**Not available in:** chat (IDT Chat, `idt chat`, ImageDescriber's chat), follow-up questions and auto-rename. All of these send a prompt, and Windows AI takes none.
 
 ### MLX — Apple Silicon Local (ImageDescriber only, macOS)
 
@@ -1677,6 +1727,7 @@ The first time you send a message it asks for a provider and model. Two provider
 
 - **Ollama** works with no setup as long as Ollama is running.
 - **apple** runs Apple Intelligence on the Mac itself. No API key, no account, no cost, and images never leave the machine; needs macOS 27 on Apple Silicon and a one-time `sudo fm license`. See [Apple Intelligence — On This Mac](#apple-intelligence--on-this-mac-macos-27-and-later).
+- **Windows AI** isn't offered: it describes images but can't chat.
 - **claude-code** uses your Claude Pro or Max subscription through the Claude Code app. Sign in once with `claude auth login`; the provider is only listed when Claude Code is installed. See [Claude Code — Your Claude Subscription](#claude-code--your-claude-subscription-windows-and-macos).
 
 **claude** and **openai** need an API key — see [Setting Up API Keys](#setting-up-api-keys).
