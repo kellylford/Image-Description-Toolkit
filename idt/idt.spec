@@ -54,6 +54,7 @@ a = Analysis(
         'cli',
         'cli.main',
         'cli.guide',
+        'cli.prompt_use',
 
         # ---- idt_core engine ----
         'idt_core',
