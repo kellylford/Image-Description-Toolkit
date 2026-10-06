@@ -595,6 +595,11 @@ class WindowsAIProvider(BaseProvider):
             img.load()
         except Exception:                                   # noqa: BLE001
             raise first   # not a picture PIL reads: nothing to resize
+        # The copy is saved without EXIF, so turn a phone photo upright first, or the copy
+        # would reach Windows on its side.
+        from PIL import ImageOps
+
+        img = ImageOps.exif_transpose(img)
         if img.mode != "RGB":
             img = img.convert("RGB")
         for edge in RETRY_LONG_EDGES:

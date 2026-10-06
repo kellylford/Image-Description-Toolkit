@@ -577,3 +577,43 @@ def test_a_different_failure_at_a_smaller_size_is_reported_as_itself(helper):
     with pytest.raises(WindowsAIError) as caught:
         WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
     assert caught.value.code == "content_filtered"
+
+
+def test_a_sideways_phone_photo_is_sent_upright_at_a_smaller_size(helper, tmp_path, monkeypatch):
+    """Re-encoding drops EXIF, so the smaller copy must be turned upright before it is sent."""
+    from PIL import Image
+
+    img = Image.new("RGB", (3000, 2000), (200, 30, 30))   # stored landscape...
+    exif = img.getexif()
+    exif[0x0112] = 6                                       # ...shown portrait (rotate 90)
+    out = io.BytesIO()
+    img.save(out, format="JPEG", exif=exif)
+    sent = []
+    real_request = windows_ai._helper.request
+
+    def capture(kind, mime, data, timeout=windows_ai.DESCRIBE_TIMEOUT_SECONDS):
+        sent.append(data)
+        return real_request(kind, mime, data, timeout)
+
+    monkeypatch.setattr(windows_ai._helper, "request", capture)
+    helper.configure(serve=["code:internal_error", "ok"])
+    WindowsAIProvider().describe(out.getvalue(), "image/jpeg", "")
+    width, height = Image.open(io.BytesIO(sent[1])).size
+    assert height > width, "the retried copy is portrait, as the photo is shown"
+
+
+def test_fit_image_turns_a_sideways_photo_upright():
+    import os as _os
+
+    from PIL import Image
+
+    from idt_core.converter import fit_image
+
+    img = Image.frombytes("RGB", (3000, 2000), _os.urandom(3000 * 2000 * 3))
+    exif = img.getexif()
+    exif[0x0112] = 6
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=95, exif=exif)
+    data, mime = fit_image(out.getvalue(), "image/jpeg", 500_000, 1000)
+    width, height = Image.open(io.BytesIO(data)).size
+    assert height > width
