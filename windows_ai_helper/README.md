@@ -20,8 +20,10 @@ What the package needs, found by trying each on a Copilot+ PC:
 - **Windows App Runtime 1.8**, which the manifest depends on. Many PCs have it already; IDT's
   installer is to add it where it's missing.
 - **To be started as `idt-windows-ai`**, the command the package adds, so Windows runs it with
-  the package's identity. Started as `IdtWindowsAI.exe` from its folder, it has no identity; it
-  notices and starts itself again through `idt-windows-ai`.
+  the package's identity. IDT always starts it that way. Started as `IdtWindowsAI.exe` from its
+  folder, as a person might, it has no identity; it notices and starts itself again through
+  `idt-windows-ai`, inside a Windows job that ends the second copy whenever the first ends, so
+  killing the first never leaves the second running.
 
 ## Using it
 
@@ -43,8 +45,10 @@ downloaded), `NotSupportedOnCurrentSystem` (not a Copilot+ PC, or Windows too ol
 
 ## The protocol
 
-`--serve` reads one request per line and answers each in order, one line per answer. It exits
-when its input closes, so it ends with IDT however IDT ends.
+`--serve` reads one request per line and answers each in order, one line per answer, each
+ending in a line feed alone (no carriage return). Blank lines get no answer. It exits when its input closes, so it ends
+with IDT however IDT ends; a describe already running finishes first, so IDT also has its own
+timeout. There is no handshake: IDT runs `--check` first, which reports the `protocol` version.
 
 ```
 {"id": 7, "kind": "accessible", "mime": "image/jpeg", "image": "<base64>"}
@@ -52,8 +56,11 @@ when its input closes, so it ends with IDT however IDT ends.
 {"id": 7, "ok": false, "code": "content_filtered", "message": "..."}
 ```
 
-`mime` is one of image/jpeg, png, bmp, gif or tiff; IDT converts anything else to JPEG first. The
-failure codes are the contract with IDT, which decides what each means for a batch:
+`mime` is one of image/jpeg, png, bmp, gif or tiff; IDT converts anything else to JPEG first.
+`id` must be a whole number and is echoed in the answer; it is 0 in an answer to a request whose
+id couldn't be read (not JSON, a repeated key, an id that isn't a whole number, or a line too
+long to read). A picture can be at most 20 MB; IDT sends at most about 4 MB. The failure codes
+are the contract with IDT, which decides what each means for a batch:
 
 | Code | Meaning |
 |---|---|
@@ -64,8 +71,9 @@ failure codes are the contract with IDT, which decides what each means for a bat
 | `disabled_by_user` | Windows' AI features are turned off in Settings |
 | `not_ready` | The model couldn't be made ready (often still downloading) |
 | `unsupported_format`, `decode_failed` | The picture's type isn't accepted, or its bytes aren't a picture of that type |
-| `bad_request` | The request itself was malformed: not JSON, an unknown kind, bad base64 |
-| `internal_error` | Anything else Windows or the helper reports |
+| `too_large` | The picture, or the whole request line, is over the 20 MB limit |
+| `bad_request` | The request itself was malformed: not JSON, a repeated key, an id that isn't a whole number, a field of the wrong type, an unknown kind, bad base64 |
+| `internal_error` | Anything else Windows or the helper reports. The helper then drops the model and starts it afresh for the next picture |
 
 ## Building
 
@@ -82,13 +90,25 @@ dotnet test IdtWindowsAI.Tests      # the protocol tests: run anywhere, no NPU n
 in to `AppxManifest.xml`. For a signed release, the publisher must equal the signing
 certificate's subject exactly.
 
+`-Register` installs the folder *in place*: the registered helper runs from `out\<arch>`, so
+the next build replaces the installed files. Rebuild with `-Register` again, and not while the
+helper is running.
+
+**Size.** The build is self-contained (nothing to install first) and trimmed: about 48 MB per
+architecture rather than 116. Trimming must leave the Windows Runtime projections whole; trimmed,
+every description fails with `internal_error` ("InternalError"), because the model is reached by
+Windows Runtime activation the trimmer can't follow. They are listed as `TrimmerRootAssembly` in
+the project. A trimming change needs re-testing on a Copilot+ PC: CI can't catch this.
+
 ## Files
 
-- `IdtWindowsAI\Protocol.cs`: requests, responses, failure codes and messages. Plain C#, tested.
+- `IdtWindowsAI\Protocol.cs`: requests, responses, limits, failure codes and messages. Plain C#, tested.
+- `IdtWindowsAI\Server.cs`: the `--serve` loop and its capped line reader. Plain C#, tested.
 - `IdtWindowsAI\Describer.cs`: the only code that calls Windows' AI API.
 - `IdtWindowsAI\Program.cs`: the command-line modes, and restarting with identity.
+- `IdtWindowsAI\KillOnCloseJob.cs`: the Windows job that ties a restarted copy to its starter.
 - `IdtWindowsAI\AppxManifest.xml`: the package manifest, with placeholders the build fills.
-- `IdtWindowsAI.Tests\`: protocol tests, run in CI by `.github/workflows/windows-ai-helper.yml`.
+- `IdtWindowsAI.Tests\`: protocol and serve-loop tests, run in CI by `.github/workflows/windows-ai-helper.yml`.
 
 ## Measured on a Copilot+ PC
 

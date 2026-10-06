@@ -1,5 +1,6 @@
-// The only file that calls Windows' AI API. Everything it decides about results goes through
-// Protocol, which is tested; this is the thin part that can only run on a Copilot+ PC.
+// The only file that calls Windows' AI API. What it decides about results goes through Protocol,
+// which is tested; this is the thin part that can only run on a Copilot+ PC.
+using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.Graphics.Imaging;
 using Microsoft.Windows.AI;
 using Microsoft.Windows.AI.ContentSafety;
@@ -11,10 +12,6 @@ namespace IdtWindowsAI;
 
 public sealed class Describer : IDisposable
 {
-    /// <summary>The longest side a picture is decoded at. The model works on far less; this
-    /// keeps a huge photo from costing gigabytes of memory on the way in.</summary>
-    private const uint MaxSide = 4096;
-
     private ImageDescriptionGenerator? _generator;
 
     public static string ReadyState() => ImageDescriptionGenerator.GetReadyState().ToString();
@@ -34,7 +31,8 @@ public sealed class Describer : IDisposable
     }
 
     /// <summary>Describes one picture. Returns the description, or throws
-    /// <see cref="ProtocolException"/> with the code to answer with.</summary>
+    /// <see cref="ProtocolException"/> with the code to answer with. Anything else it throws is
+    /// unexpected; the caller should then <see cref="Reset"/>.</summary>
     public async Task<string> DescribeAsync(Protocol.DescribeRequest request)
     {
         if (_generator is null)
@@ -47,25 +45,20 @@ public sealed class Describer : IDisposable
         try
         {
             using var stream = new InMemoryRandomAccessStream();
-            using (var writer = new DataWriter(stream))
-            {
-                writer.WriteBytes(request.Image);
-                await writer.StoreAsync();
-                writer.DetachStream();
-            }
+            await stream.WriteAsync(request.Image.AsBuffer());
             stream.Seek(0);
             var decoder = await BitmapDecoder.CreateAsync(stream);
-            var scale = Math.Min(1.0, (double)MaxSide / Math.Max(decoder.PixelWidth, decoder.PixelHeight));
+            var (width, height) = Protocol.ScaledSize(decoder.PixelWidth, decoder.PixelHeight);
             var transform = new BitmapTransform
             {
-                ScaledWidth = (uint)Math.Max(1, Math.Round(decoder.PixelWidth * scale)),
-                ScaledHeight = (uint)Math.Max(1, Math.Round(decoder.PixelHeight * scale)),
+                ScaledWidth = width,
+                ScaledHeight = height,
                 InterpolationMode = BitmapInterpolationMode.Fant,
             };
             bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied,
                 transform, ExifOrientationMode.RespectExifOrientation, ColorManagementMode.DoNotColorManage);
         }
-        catch (Exception ex) when (ex is not ProtocolException)
+        catch (Exception ex)
         {
             // The decoder's own messages are often empty; say what failed.
             throw new ProtocolException(request.Id, Codes.DecodeFailed,
@@ -73,22 +66,23 @@ public sealed class Describer : IDisposable
         }
 
         using (bitmap)
+        using (var image = ImageBuffer.CreateForSoftwareBitmap(bitmap))
         {
-            var image = ImageBuffer.CreateForSoftwareBitmap(bitmap);
-            var result = await _generator.DescribeAsync(image, KindFor(request.Kind), new ContentFilterOptions());
+            var kind = Enum.Parse<ImageDescriptionKind>(Protocol.ApiKindName(request.Kind));
+            var result = await _generator.DescribeAsync(image, kind, new ContentFilterOptions());
             var status = result.Status.ToString();
             if (Protocol.CodeForStatus(status) is { } code) throw new ProtocolException(request.Id, code, Protocol.MessageForStatus(status));
             return result.Description;
         }
     }
 
-    private static ImageDescriptionKind KindFor(string kind) => kind switch
+    /// <summary>Drops the model after an unexpected failure, so the next request starts it
+    /// afresh rather than reusing one that may be broken (the NPU reset, say).</summary>
+    public void Reset()
     {
-        "detailed" => ImageDescriptionKind.DetailedDescription,
-        "brief" => ImageDescriptionKind.BriefDescription,
-        "diagram" => ImageDescriptionKind.DiagramDescription,
-        _ => ImageDescriptionKind.AccessibleDescription,
-    };
+        try { _generator?.Dispose(); } catch { /* it may already be gone */ }
+        _generator = null;
+    }
 
-    public void Dispose() => _generator?.Dispose();
+    public void Dispose() => Reset();
 }

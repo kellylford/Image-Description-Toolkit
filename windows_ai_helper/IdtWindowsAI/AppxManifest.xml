@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The helper's package. build_helper.ps1 fills in $ARCH$ (x64 or arm64) and $PUBLISHER$, which
+<!-- The helper's package. build_helper.ps1 fills in $ARCH$ (x64 or arm64), $VERSION$ (from the project) and $PUBLISHER$, which
      must equal the signing certificate's subject exactly or the signed package won't install.
      What Windows' AI APIs need, from Microsoft's docs and confirmed on a Copilot+ PC:
      the systemAIModels capability, and MaxVersionTested 10.0.26226.0 or later ("Not declared by

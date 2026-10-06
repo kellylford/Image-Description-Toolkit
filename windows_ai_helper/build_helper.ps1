@@ -36,6 +36,7 @@ $project = Join-Path $PSScriptRoot 'IdtWindowsAI\IdtWindowsAI.csproj'
 $out = Join-Path $PSScriptRoot "out\$Arch"
 [xml]$csproj = Get-Content -LiteralPath $project
 $version = ($csproj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
+if (-not $version) { throw "IdtWindowsAI.csproj has no <Version>; the package needs one." }
 # A package version has four parts.
 $packageVersion = "$version.0"
 

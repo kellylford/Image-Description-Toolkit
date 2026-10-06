@@ -63,9 +63,28 @@ public class ProtocolTests
         Assert.Equal(0, ex.Id);
     }
 
+    [Theory]
+    [InlineData("seven")]
+    [InlineData(7.5)]
+    [InlineData(3000000000.0)]
+    public void AnIdThatIsntAWholeNumber_IsABadRequest(object id)
+    {
+        var ex = Refused(Request(id: id));
+        Assert.Equal(Codes.BadRequest, ex.Code);
+        Assert.Equal(0, ex.Id);
+    }
+
     [Fact]
-    public void ANonNumberId_IsTreatedAsZero_NotAnError() =>
-        Assert.Equal(0, Protocol.ParseRequest(Request(id: "seven")).Id);
+    public void AKindThatIsntText_IsABadRequest_NotSilentlyTheDefault()
+    {
+        var ex = Refused(Request(5, id: 4));
+        Assert.Equal(Codes.BadRequest, ex.Code);
+        Assert.Equal(4, ex.Id);
+    }
+
+    [Fact]
+    public void ARepeatedKey_IsABadRequest_NotAnInternalError() =>
+        Assert.Equal(Codes.BadRequest, Refused("""{"id":1,"id":2,"mime":"image/jpeg","image":"AAAA"}""").Code);
 
     [Fact]
     public void ImageJpg_IsReadAsJpeg() =>
@@ -92,11 +111,43 @@ public class ProtocolTests
         Assert.Equal(Codes.BadRequest, Refused(Request(image: image)).Code);
 
     [Fact]
-    public void APictureOverTheLimit_IsRefusedBeforeDecoding()
+    public void APictureOverTheLimit_IsTooLarge_RefusedOnItsBase64Length()
     {
-        var huge = Convert.ToBase64String(new byte[Protocol.MaxImageBytes + 1]);
-        Assert.Equal(Codes.UnsupportedFormat, Refused(Request(image: huge)).Code);
+        // Not valid base64 at all: refused on length before any decoding is tried.
+        var huge = new string('A', Protocol.MaxImageBase64Chars + 4);
+        var ex = Refused(Request(image: huge, id: 6));
+        Assert.Equal(Codes.TooLarge, ex.Code);
+        Assert.Equal(6, ex.Id);
+        Assert.Contains("the limit is 20 MB", ex.Message);
     }
+
+    [Fact]
+    public void Validate_ChecksPartsFromAnywhere_AndRefusesOversizeBytes()
+    {
+        var ok = Protocol.Validate(3, "Brief", "image/JPG", [1, 2, 3]);
+        Assert.Equal(("brief", "image/jpeg"), (ok.Kind, ok.Mime));
+        Assert.Equal(Codes.TooLarge, Assert.Throws<ProtocolException>(() =>
+            Protocol.Validate(3, null, "image/png", new byte[Protocol.MaxImageBytes + 1])).Code);
+        Assert.Contains("Use JPEG, PNG", Assert.Throws<ProtocolException>(() =>
+            Protocol.Validate(3, null, "image/webp", [1])).Message);
+    }
+
+    [Theory]
+    [InlineData(1000u, 800u, 1000u, 800u)]
+    [InlineData(8192u, 4096u, 4096u, 2048u)]
+    [InlineData(1000u, 9000u, 455u, 4096u)]
+    [InlineData(4096u, 4096u, 4096u, 4096u)]
+    [InlineData(100000u, 1u, 4096u, 1u)]
+    [InlineData(0u, 0u, 1u, 1u)]
+    public void ScaledSize_FitsTheLongerSide_KeepingShape(uint w, uint h, uint ew, uint eh) =>
+        Assert.Equal((ew, eh), Protocol.ScaledSize(w, h));
+
+    [Theory]
+    [InlineData("accessible", "AccessibleDescription")]
+    [InlineData("detailed", "DetailedDescription")]
+    [InlineData("brief", "BriefDescription")]
+    [InlineData("diagram", "DiagramDescription")]
+    public void EachKind_NamesItsApiKind(string kind, string api) => Assert.Equal(api, Protocol.ApiKindName(kind));
 
     [Theory]
     [InlineData("Complete", null)]

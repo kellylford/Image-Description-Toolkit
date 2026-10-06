@@ -13,6 +13,14 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
+    <!-- Trim the parts of .NET this doesn't use: 23 MB a package rather than 116, which matters
+         because IDT's installer carries one per architecture. "partial" trims only what is
+         marked safe to trim (the .NET libraries); the Windows Runtime projections and this
+         app's own code are kept whole. Those projections report IL2104 ("produced trim
+         warnings") for themselves; with them untrimmed it doesn't apply, so it is not an error. -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimMode>partial</TrimMode>
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
     <!-- Packaged: identity comes from the package's manifest, so the Windows App SDK's start-up
          hook for unpackaged apps isn't wanted. Left on, it crashes before Main whenever the exe is
          started without identity, which Program.cs instead handles by restarting itself. -->
@@ -21,8 +29,26 @@
     <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Its runtime, Microsoft.WindowsAppRuntime.1.8 8000.994.2142.0, is what AppxManifest.xml
-         depends on; keep the two in step. -->
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <!-- Kept whole by the trimmer. These reach the model through Windows Runtime activation,
+         which the trimmer can't see: trimmed, every description fails with InternalError
+         (found on a Copilot+ PC, 10/6/2026). -->
+    <TrimmerRootAssembly Include="Microsoft.Windows.SDK.NET" />
+    <TrimmerRootAssembly Include="WinRT.Runtime" />
+    <TrimmerRootAssembly Include="Microsoft.Windows.AI.Projection" />
+    <TrimmerRootAssembly Include="Microsoft.Windows.AI.Imaging.Projection" />
+    <TrimmerRootAssembly Include="Microsoft.Windows.AI.ContentSafety.Projection" />
+    <TrimmerRootAssembly Include="Microsoft.Windows.AI.Foundation.Projection" />
+    <TrimmerRootAssembly Include="Microsoft.Graphics.Imaging.Projection" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Only the parts of the Windows App SDK the helper uses: the AI APIs, the Foundation and Base
+         they need, and the Runtime the build requires alongside them. The whole SDK would also bring WinUI, WebView2 and the rest, more than
+         doubling the package for nothing. The runtime these come from,
+         Microsoft.WindowsAppRuntime.1.8 8000.994.2142.0, is what AppxManifest.xml depends on; keep
+         the versions in step (they match Microsoft.WindowsAppSDK 1.8.260921001). -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" Version="1.8.79" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Foundation" Version="1.8.260803002" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Base" Version="1.8.251216001" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="1.8.260921001" />
   </ItemGroup>
 </Project>

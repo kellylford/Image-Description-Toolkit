@@ -26,9 +26,20 @@ public static class Protocol
     /// to JPEG before it gets here.</summary>
     public static readonly string[] SupportedMimeTypes = ["image/jpeg", "image/png", "image/bmp", "image/gif", "image/tiff"];
 
-    /// <summary>Larger than any picture IDT sends (it resizes past 3.75 MB), small enough that a
-    /// bad request can't exhaust memory.</summary>
-    public const int MaxImageBytes = 50 * 1024 * 1024;
+    /// <summary>Far larger than any picture IDT sends (it resizes past 3.75 MB), and small enough
+    /// that the copies a request passes through on the way in stay a few hundred MB at most.</summary>
+    public const int MaxImageBytes = 20 * 1024 * 1024;
+
+    /// <summary>The longest base64 a picture within the limit can take.</summary>
+    public const int MaxImageBase64Chars = (MaxImageBytes + 2) / 3 * 4;
+
+    /// <summary>The longest request line read: the picture plus room for the other fields. A longer
+    /// line is refused as it is read, so it is never held in memory whole.</summary>
+    public const int MaxLineChars = MaxImageBase64Chars + 4096;
+
+    /// <summary>The longest side a picture is decoded at. The model works on far less; this keeps
+    /// a huge photo from costing gigabytes of memory.</summary>
+    public const uint MaxSide = 4096;
 
     /// <summary>Apostrophes and accents written as themselves, not as escapes: the output is
     /// valid JSON either way, and people read --check's.</summary>
@@ -43,44 +54,89 @@ public static class Protocol
         JsonObject request;
         try
         {
-            request = JsonNode.Parse(line) as JsonObject ?? throw new JsonException("not an object");
+            request = JsonNode.Parse(line) as JsonObject ?? throw new JsonException("it isn't an object");
+            // A repeated key surfaces only when the object is first read, as ArgumentException.
+            _ = request.Count;
+            _ = request["id"];
         }
-        catch (JsonException ex)
+        catch (Exception ex) when (ex is JsonException or ArgumentException)
         {
             throw new ProtocolException(0, Codes.BadRequest, $"The request isn't valid JSON: {ex.Message}");
         }
 
         var id = 0;
-        if (request["id"] is JsonValue idValue && idValue.TryGetValue(out int parsedId)) id = parsedId;
+        if (request["id"] is { } idNode)
+        {
+            if (idNode is not JsonValue idValue || !idValue.TryGetValue(out int parsedId))
+                throw new ProtocolException(0, Codes.BadRequest, "The request's id must be a whole number.");
+            id = parsedId;
+        }
 
-        var kind = (request["kind"]?.GetValueKind() == JsonValueKind.String ? request["kind"]!.GetValue<string>() : null)?.Trim().ToLowerInvariant()
-            ?? Kinds[0];
-        if (!Kinds.Contains(kind))
-            throw new ProtocolException(id, Codes.BadRequest, $"There's no description kind '{kind}'. The kinds are {string.Join(", ", Kinds)}.");
+        string? StringField(string name)
+        {
+            var node = request[name];
+            if (node is null) return null;
+            if (node.GetValueKind() != JsonValueKind.String)
+                throw new ProtocolException(id, Codes.BadRequest, $"The request's {name} must be text.");
+            return node.GetValue<string>();
+        }
 
-        var mime = (request["mime"]?.GetValueKind() == JsonValueKind.String ? request["mime"]!.GetValue<string>() : "")?.Trim().ToLowerInvariant() ?? "";
-        if (mime == "image/jpg") mime = "image/jpeg";
-        if (!SupportedMimeTypes.Contains(mime))
-            throw new ProtocolException(id, Codes.UnsupportedFormat,
-                mime.Length == 0 ? "The request didn't say what kind of picture it is." : $"Pictures of type {mime} can't be described.");
-
-        if (request["image"]?.GetValueKind() != JsonValueKind.String)
-            throw new ProtocolException(id, Codes.BadRequest, "The request has no picture.");
-        byte[] image;
+        var kind = StringField("kind");
+        var mime = StringField("mime");
+        var image = StringField("image") ?? throw new ProtocolException(id, Codes.BadRequest, "The request has no picture.");
+        if (image.Length > MaxImageBase64Chars)
+            throw TooLarge(id, (long)image.Length * 3 / 4);
+        byte[] bytes;
         try
         {
-            image = Convert.FromBase64String(request["image"]!.GetValue<string>());
+            bytes = Convert.FromBase64String(image);
         }
         catch (FormatException)
         {
             throw new ProtocolException(id, Codes.BadRequest, "The picture isn't valid base64.");
         }
-        if (image.Length == 0) throw new ProtocolException(id, Codes.BadRequest, "The picture is empty.");
-        if (image.Length > MaxImageBytes)
-            throw new ProtocolException(id, Codes.UnsupportedFormat, $"The picture is {image.Length / (1024 * 1024)} MB; the limit is {MaxImageBytes / (1024 * 1024)} MB.");
-
-        return new DescribeRequest(id, kind, mime, image);
+        return Validate(id, kind, mime, bytes);
     }
+
+    /// <summary>Checks a request's parts, wherever they came from, and normalises the kind and type.</summary>
+    public static DescribeRequest Validate(int id, string? kind, string? mime, byte[] image)
+    {
+        var k = (kind ?? Kinds[0]).Trim().ToLowerInvariant();
+        if (!Kinds.Contains(k))
+            throw new ProtocolException(id, Codes.BadRequest, $"There's no description kind '{kind}'. The kinds are {string.Join(", ", Kinds)}.");
+
+        var m = (mime ?? "").Trim().ToLowerInvariant();
+        if (m == "image/jpg") m = "image/jpeg";
+        if (!SupportedMimeTypes.Contains(m))
+            throw new ProtocolException(id, Codes.UnsupportedFormat,
+                m.Length == 0 ? "The request didn't say what type of picture it is." : $"Pictures of type {m} can't be described. Use JPEG, PNG, BMP, GIF or TIFF.");
+
+        if (image.Length == 0) throw new ProtocolException(id, Codes.BadRequest, "The picture is empty.");
+        if (image.Length > MaxImageBytes) throw TooLarge(id, image.Length);
+        return new DescribeRequest(id, k, m, image);
+    }
+
+    private static ProtocolException TooLarge(int id, long bytes) =>
+        new(id, Codes.TooLarge, $"The picture is {bytes / (1024.0 * 1024):0.0} MB; the limit is {MaxImageBytes / (1024 * 1024)} MB.");
+
+    /// <summary>The size a picture is decoded at: as it is, or scaled down to fit
+    /// <see cref="MaxSide"/> on its longer side, keeping its shape.</summary>
+    public static (uint Width, uint Height) ScaledSize(uint width, uint height)
+    {
+        var longer = Math.Max(width, height);
+        if (longer <= MaxSide || longer == 0) return (Math.Max(width, 1u), Math.Max(height, 1u));
+        var scale = (double)MaxSide / longer;
+        return ((uint)Math.Max(1, Math.Round(width * scale)), (uint)Math.Max(1, Math.Round(height * scale)));
+    }
+
+    /// <summary>The name of a kind in Microsoft.Windows.AI.Imaging.ImageDescriptionKind.</summary>
+    public static string ApiKindName(string kind) => kind switch
+    {
+        "detailed" => "DetailedDescription",
+        "brief" => "BriefDescription",
+        "diagram" => "DiagramDescription",
+        _ => "AccessibleDescription",
+    };
 
     public static string Success(int id, string kind, string text, double seconds) =>
         new JsonObject { ["id"] = id, ["ok"] = true, ["kind"] = kind, ["text"] = text, ["seconds"] = Math.Round(seconds, 2) }.ToJsonString(Readable);
@@ -148,9 +204,9 @@ public static class Codes
     public const string NotSupported = "not_supported";
     public const string DisabledByUser = "disabled_by_user";
     public const string NotReady = "not_ready";
-    public const string NoIdentity = "no_identity";
     public const string InternalError = "internal_error";
     public const string UnsupportedFormat = "unsupported_format";
+    public const string TooLarge = "too_large";
     public const string DecodeFailed = "decode_failed";
     public const string BadRequest = "bad_request";
 }
