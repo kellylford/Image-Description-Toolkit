@@ -4110,10 +4110,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 logger.error(f"Finishing frame extraction failed: {exc}", exc_info=exc)
                 self._end_run(cancel)
                 worker.close_queue()
-                if getattr(cancel, 'resume_when_stopped', False):
-                    # Its batch had halted and was waiting to resume: resume
-                    # now rather than leave the "Resuming…" window up.
-                    wx.CallAfter(self._resume_when_extraction_stopped)
+                resume = getattr(cancel, 'resume_when_stopped', False)
                 dlg = self.batch_progress_dialog
                 if dlg:
                     dlg.stop_extraction()
@@ -4122,6 +4119,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 else:
                     show_warning(self, "Frame extraction could not finish; describing "
                                        f"continues with the frames already extracted.\n\n{exc}")
+                if resume:
+                    # Its batch had halted and was waiting to resume: resume
+                    # now (after the warning, so nothing opens under it)
+                    # rather than leave the "Resuming…" window up.
+                    self._resume_when_extraction_stopped()
 
         def _finish_extraction(results):
             worker = getattr(cancel, 'worker', None)
@@ -10129,6 +10131,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             self.batch_progress_dialog = closed_dialog
                             closed_dialog.Show()
                             closed_dialog.Raise()
+                            closed_dialog.stats_list.SetFocus()
                     else:
                         if closed_dialog and closed_dialog is not self.batch_progress_dialog:
                             closed_dialog.Destroy()
