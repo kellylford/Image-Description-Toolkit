@@ -74,6 +74,32 @@ def _pil_to_jpeg_bytes(path: Path) -> tuple[bytes, str]:
     return _pil_image_to_jpeg_bytes(img)
 
 
+def fit_image(image_bytes: bytes, mime_type: str, max_bytes: int,
+              long_edge: int) -> tuple[bytes, str]:
+    """``(bytes, mime)`` no bigger than ``max_bytes``: unchanged when it already is, otherwise
+    scaled to ``long_edge`` on its longer side and saved as a JPEG.
+
+    For providers that take a picture's bytes inline and have a size limit. A 24 or 48 MP phone
+    JPEG, or a large PNG scan, is over most limits and would otherwise fail on every attempt.
+    """
+    if len(image_bytes) <= max_bytes:
+        return image_bytes, mime_type
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(image_bytes))
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    # Almost every photo fits at long_edge. One that doesn't (fine detail or noise compresses
+    # badly) is made smaller again until it does, rather than sent over the limit.
+    while True:
+        img.thumbnail((long_edge, long_edge), Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=85)
+        if out.tell() <= max_bytes or long_edge <= 256:
+            return out.getvalue(), "image/jpeg"
+        long_edge = int(long_edge * 0.75)
+
+
 def _pil_image_to_jpeg_bytes(img) -> tuple[bytes, str]:
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=92, optimize=True)

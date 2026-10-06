@@ -144,6 +144,14 @@ def _step_provider() -> str:
     if _apple_available():
         print("  apple     - Apple Intelligence on this Mac (no API key, works offline)")
         providers.append("apple")
+
+    # Windows AI likewise only where it could run: Windows on a Copilot+ PC with the helper.
+    from idt_core.providers.windows_ai import is_available as _windows_ai_available
+
+    if _windows_ai_available():
+        print("  windows-ai - Windows AI on this Copilot+ PC (no API key, works offline;")
+        print("               describes with a fixed kind of description, no prompt)")
+        providers.append("windows-ai")
     print()
     choice = get_choice("Which provider?", providers, default=1)
     return choice
@@ -162,6 +170,9 @@ def _step_api_key(provider: str) -> bool:
 
     if provider == "apple":
         return _check_apple()
+
+    if provider == "windows-ai":
+        return _check_windows_ai()
 
     env_var = {
         "anthropic": "ANTHROPIC_API_KEY",
@@ -266,6 +277,32 @@ def _check_apple() -> bool:
     return True
 
 
+def _check_windows_ai() -> bool:
+    """Windows AI replaces the API key step: the PC can run it or it can't, and the model may
+    need downloading once, which is offered here rather than left to the first image."""
+    from idt_core.providers.windows_ai import WindowsAIError, check_ready, prepare
+
+    try:
+        report = check_ready()
+    except WindowsAIError as exc:
+        print(f"Warning: {exc}")
+        print()
+        return get_yes_no("Continue anyway?", default=False)
+    if report.get("state") != "Ready":
+        print("Windows needs to get its image description model ready first. The first time,")
+        print("it may download it, which can take a few minutes.")
+        if not get_yes_no("Get it ready now?", default=True):
+            print("Windows will get it ready when the first picture is described.")
+            return True
+        try:
+            prepare()
+        except WindowsAIError as exc:
+            print(f"Warning: {exc}")
+            return get_yes_no("Continue anyway?", default=False)
+    print("Windows AI is ready on this PC. No API key needed, and descriptions never leave it.")
+    return True
+
+
 def _step_model(provider: str) -> str:
     _header("Step 3: Model")
 
@@ -293,7 +330,7 @@ def _step_model(provider: str) -> str:
         _ensure_ollama_model(choice, installed)
         return choice
 
-    if provider in ("anthropic", "openai", "claude-code", "apple"):
+    if provider in ("anthropic", "openai", "claude-code", "apple", "windows-ai"):
         return _choose_api_model(provider)
 
     return get_input("Enter model name")
@@ -313,7 +350,7 @@ def _choose_api_model(provider: str) -> str:
     from idt_core.providers import catalog
 
     label = {"anthropic": "Claude", "claude-code": "Claude Code",
-             "apple": "Apple Intelligence"}.get(provider, "OpenAI")
+             "apple": "Apple Intelligence", "windows-ai": "Windows AI"}.get(provider, "OpenAI")
     try:
         entries = catalog.cached_models(provider)
     except Exception:
@@ -326,7 +363,7 @@ def _choose_api_model(provider: str) -> str:
     labels = []
     for entry in entries:
         text = entry.display()
-        if entry.id != text:
+        if entry.id.lower() != text.lower():
             text = f"{text}  [{entry.id}]"
         if entry.recommended:
             text += "  (recommended)"
@@ -438,16 +475,23 @@ def _step_prompt() -> tuple[str, str]:
     return choice, all_prompts[choice]
 
 
-def _step_metadata() -> tuple[bool, bool]:
+def _step_metadata(provider: str = "") -> tuple[bool, bool]:
     """Returns (extract_metadata, geocode)."""
     _header("Step 6: Metadata Options")
 
-    print("IDT can read EXIF data from your images (date taken, camera, GPS)")
-    print("and inject it into the AI prompt as context.")
-    print()
-    print('Example: "Context: Munich, Germany  Sep 12, 2025  iPhone 14 Pro"')
-    print("This significantly improves description quality for photos with EXIF.")
-    print()
+    if provider == "windows-ai":
+        # The details are added to the prompt, and Windows AI takes none: say so instead.
+        print("IDT can read EXIF data from your images (date taken, camera, GPS).")
+        print("Windows AI takes no prompt, so these details can't shape its descriptions,")
+        print("but they can still be kept with each description.")
+        print()
+    else:
+        print("IDT can read EXIF data from your images (date taken, camera, GPS)")
+        print("and inject it into the AI prompt as context.")
+        print()
+        print('Example: "Context: Munich, Germany  Sep 12, 2025  iPhone 14 Pro"')
+        print("This significantly improves description quality for photos with EXIF.")
+        print()
 
     extract = get_yes_no("Enable EXIF metadata extraction?", default=True)
     if not extract:
@@ -529,13 +573,16 @@ def _build_command(
         parts.append("--preserve-alt-text" if extra.get("preserve_alt_text", True) else "--no-preserve-alt-text")
         if not extra.get("redescribe", True):
             parts.append("--no-redescribe")
-        parts += ["--provider", provider, "--model", model, "--prompt", prompt_name]
+        parts += ["--provider", provider, "--model", model]
+        if provider != "windows-ai":
+            parts += ["--prompt", prompt_name]
         if extra.get("limit"):
             parts += ["--max", str(extra["limit"])]
     else:
         parts += ["describe", source]
         parts += ["--provider", provider, "--model", model]
-        parts += ["--prompt", prompt_name]
+        if provider != "windows-ai":
+            parts += ["--prompt", prompt_name]
         if not extract_metadata:
             parts.append("--no-metadata")
         if geocode:
@@ -623,6 +670,16 @@ def run_guide() -> None:
                 step = 5
 
             elif step == 5:
+                if state["provider"] == "windows-ai":
+                    # No prompt to choose: the model chosen in step 3 is the kind of description.
+                    from idt_core.providers.windows_ai import PROMPT_NAME
+
+                    _header("Step 5: Prompt Style")
+                    print("Windows AI takes no prompt; the model you chose is the kind of description.")
+                    state["prompt_name"] = PROMPT_NAME
+                    state["prompt_text"] = ""
+                    step = 6
+                    continue
                 pname, ptext = _step_prompt()
                 if pname == "EXIT":
                     print("Exiting.")
@@ -635,7 +692,7 @@ def run_guide() -> None:
                 step = 6
 
             elif step == 6:
-                state["extract_metadata"], state["geocode"] = _step_metadata()
+                state["extract_metadata"], state["geocode"] = _step_metadata(state["provider"])
                 step = 7
 
             elif step == 7:
@@ -659,7 +716,8 @@ def run_guide() -> None:
                 print("Provider:   ", state["provider"])
                 print("Model:      ", state["model"])
                 print("Source:     ", state["source"])
-                print("Prompt:     ", state["prompt_name"])
+                from cli.main import _prompt_label
+                print("Prompt:     ", _prompt_label(state["provider"], state["model"], state["prompt_name"]))
                 meta_str = "yes" if state["extract_metadata"] else "no"
                 if state["extract_metadata"] and state["geocode"]:
                     meta_str += " + geocoding"

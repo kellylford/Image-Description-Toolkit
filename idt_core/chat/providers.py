@@ -559,11 +559,20 @@ def create_chat_provider(
     Resolves aliases through the capability registry, so ``anthropic`` and
     ``Claude`` both work.
     """
-    from ..providers.registry import capabilities_for
+    from ..providers.registry import can_chat, capabilities_for
 
     canonical = capabilities_for(provider).provider
     if canonical == "unknown":
         canonical = (provider or "").strip().lower()
+
+    if not can_chat(canonical):
+        # Said plainly rather than as "unknown chat provider": it is known, it just can't chat.
+        from ..providers.registry import display_name
+
+        raise ValueError(
+            f"{display_name(canonical)} describes pictures but can't chat. "
+            "Choose another provider for chat."
+        )
 
     if canonical == "mlx":
         # Imported here rather than at module scope so that the macOS-only

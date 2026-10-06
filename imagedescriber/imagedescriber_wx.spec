@@ -112,6 +112,7 @@ a = Analysis(
         'idt_core.providers.apple',
         'idt_core.providers.claude',
         'idt_core.providers.claude_code',
+        'idt_core.providers.windows_ai',
         'idt_core.providers.ollama',
         'idt_core.providers.openai_provider',
         # Capability registry — replaces the deleted models/provider_configs.py.

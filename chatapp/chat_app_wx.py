@@ -72,7 +72,7 @@ from idt_core.keys import (  # noqa: E402
 from idt_core.providers.registry import (  # noqa: E402
     attachment_wildcard,
     capabilities_for,
-    list_providers,
+    chat_providers,
     supports_attachments,
 )
 
@@ -261,7 +261,8 @@ class ProviderDialog(wx.Dialog):
 
     @classmethod
     def _provider_names(cls):
-        names = [p for p in list_providers() if p != "ollama cloud"]
+        # Only providers that can hold a conversation: Windows AI describes pictures and can't.
+        names = [p for p in chat_providers() if p != "ollama cloud"]
         if not cls._mlx_is_usable():
             names = [p for p in names if p != "mlx"]
         if not cls._claude_code_is_usable():

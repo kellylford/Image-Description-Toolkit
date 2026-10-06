@@ -307,3 +307,113 @@ def test_no_model_for_claude_code_does_not_warn(capsys):
 
     assert _resolve_model("claude-code", None) is None
     assert capsys.readouterr().err == ""
+
+
+# ---------------------------------------------------------------------------
+# Windows AI: its models are four fixed kinds of description, and it takes no
+# prompt. A wrong model name can only mean the default kind; a prompt can't be
+# used, so it is recorded as "none" and must not change a workspace's own.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("given,expected", [
+    ("accessible", "accessible"), ("Brief", "brief"), (" DIAGRAM ", "diagram"), (None, "accessible"),
+])
+def test_windows_ai_takes_its_kinds_whatever_their_case(capsys, given, expected):
+    from cli.main import _resolve_model
+
+    assert _resolve_model("windows-ai", given) == expected
+    assert capsys.readouterr().err == ""
+
+
+def test_an_inherited_model_quietly_becomes_windows_ais_default(capsys):
+    """default_model is shared by every provider, so an Ollama name there is no mistake."""
+    from cli.main import _resolve_model
+
+    assert _resolve_model("windows-ai", "moondream") == "accessible"
+    assert capsys.readouterr().err == ""
+
+
+def test_a_model_asked_for_that_isnt_a_kind_stops_before_the_run(capsys):
+    """A typo in --model must not run a whole batch as some other kind."""
+    from cli.main import _resolve_model
+
+    with pytest.raises(SystemExit) as caught:
+        _resolve_model("windows-ai", "detailled", explicit="detailled")
+    assert caught.value.code == 2
+    err = capsys.readouterr().err
+    assert "detailled" in err and "accessible, detailed, brief, diagram" in err
+
+
+def test_a_kind_inherited_by_another_provider_gives_way_to_its_default(capsys):
+    """A workspace last described with Windows AI, rerun with --provider ollama."""
+    from cli.main import _resolve_model
+
+    assert _resolve_model("ollama", "accessible") is None
+    assert _resolve_model("apple", "brief") == "system"
+    assert _resolve_model("ollama", "brief", explicit="brief") == "brief", "asked for, so sent"
+
+
+def test_windows_ai_ignores_a_prompt_and_says_so(capsys):
+    from cli.main import _resolve_prompt
+
+    args = _Args(prompt="narrative", prompt_text=None)
+    assert _resolve_prompt(args, None, "windows-ai") == ("none", "")
+    assert "takes no prompt" in capsys.readouterr().err
+
+
+def test_windows_ai_without_a_prompt_asked_for_is_silent(capsys):
+    from cli.main import _resolve_prompt
+
+    assert _resolve_prompt(_Args(prompt=None, prompt_text=None), None, "windows-ai") == ("none", "")
+    assert capsys.readouterr().err == ""
+
+
+def test_only_windows_ai_skips_the_prompt():
+    from cli.main import _prompt_label, _uses_prompt
+
+    assert not _uses_prompt("windows-ai")
+    assert all(_uses_prompt(p) for p in ("ollama", "claude", "openai", "apple", "claude-code", None))
+    assert _prompt_label("windows-ai", "brief", "none") == "not used (Windows AI describes with its brief kind)"
+    assert _prompt_label("ollama", "moondream", "narrative") == "narrative"
+
+
+def _windows_ai_pc(monkeypatch, available=True, report=None, error=None):
+    from idt_core.providers import windows_ai
+
+    def check_ready(force=False):
+        if error:
+            raise error
+        return report or {"state": "Ready"}
+
+    monkeypatch.setattr(windows_ai, "is_available", lambda: available)
+    monkeypatch.setattr(windows_ai, "check_ready", check_ready)
+
+
+def test_models_lists_the_kinds_on_a_ready_pc(monkeypatch, capsys):
+    _windows_ai_pc(monkeypatch)
+    out = _run(_Args(provider="windows-ai"), capsys)
+    for kind in ("accessible", "detailed", "brief", "diagram"):
+        assert kind in out
+    assert "first use" not in out
+
+
+def test_models_notes_a_model_not_yet_downloaded(monkeypatch, capsys):
+    _windows_ai_pc(monkeypatch, report={"state": "NotReady"})
+    out = _run(_Args(provider="windows-ai"), capsys)
+    assert "accessible" in out and "first use" in out
+
+
+def test_models_json_for_windows_ai_keeps_the_plain_id_list(monkeypatch, capsys):
+    _windows_ai_pc(monkeypatch, report={"state": "NotReady"})
+    data = json.loads(_run(_Args(provider="windows-ai", json_out=True), capsys))
+    assert data["windows-ai"]["models"] == ["accessible", "detailed", "brief", "diagram"]
+    assert data["windows-ai"]["status"] == "ok"
+
+
+def test_models_says_why_windows_ai_is_unavailable(monkeypatch, capsys):
+    from idt_core.providers.windows_ai import WindowsAIError
+
+    _windows_ai_pc(monkeypatch, available=False)
+    assert "Copilot+ PC" in _run(_Args(provider="windows-ai"), capsys)
+    _windows_ai_pc(monkeypatch, error=WindowsAIError("Windows' AI features are turned off", setup=True))
+    assert "turned off" in _run(_Args(provider="windows-ai"), capsys)

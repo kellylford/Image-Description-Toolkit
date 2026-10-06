@@ -34,6 +34,8 @@ __all__ = [
     "capabilities_for",
     "display_name",
     "list_providers",
+    "can_chat",
+    "chat_providers",
     "supports_attachments",
     "supported_attachments",
     "attachment_wildcard",
@@ -106,6 +108,11 @@ class ProviderCapabilities:
     #: unlike the limits above this one is our choice, not the API's. It keeps
     #: a stray multi-megabyte log from producing a prompt no model can take.
     max_text_bytes: Optional[int] = DEFAULT_MAX_TEXT_BYTES
+    #: Whether it can hold a conversation. False for a provider that only describes images
+    #: (Windows AI takes a picture and returns a description; it takes no prompt and can't
+    #: answer a question). Chat surfaces offer only providers with this set: see
+    #: :func:`chat_providers`.
+    chat: bool = True
 
     def size_limit_for(self, media_type: str) -> Optional[int]:
         """Upload limit for a MIME type, or None if none is documented."""
@@ -242,6 +249,15 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
         is_local=True,
         attachment_mime_types=_IMAGE_MIMES,
     ),
+    "windows-ai": ProviderCapabilities(
+        provider="windows-ai",
+        display_name="Windows AI",
+        # Windows' own model on a Copilot+ PC's NPU: no account, no key, no cost.
+        requires_api_key=False,
+        is_local=True,
+        # Describes pictures only: no prompt, no conversation, so no chat and no attachments.
+        chat=False,
+    ),
 }
 
 # Aliases for names the GUI and config files use for the same provider.
@@ -256,6 +272,9 @@ _ALIASES: Dict[str, str] = {
     "ollama_cloud": "ollama cloud",
     "ollamacloud": "ollama cloud",
     "open ai": "openai",
+    "windows ai": "windows-ai",
+    "windows_ai": "windows-ai",
+    "windowsai": "windows-ai",
 }
 
 _UNKNOWN = ProviderCapabilities(provider="unknown")
@@ -289,6 +308,17 @@ def display_name(provider_name: str) -> str:
 def list_providers() -> List[str]:
     """Canonical names of every registered provider."""
     return sorted(_REGISTRY)
+
+
+def can_chat(provider_name: str) -> bool:
+    """True if the provider can hold a conversation. Unknown names are given the benefit of the
+    doubt, as :func:`capabilities_for` gives them an all-default record."""
+    return capabilities_for(provider_name).chat
+
+
+def chat_providers() -> List[str]:
+    """Canonical names of the providers that can chat: what a chat surface should offer."""
+    return [name for name in list_providers() if _REGISTRY[name].chat]
 
 
 def supported_attachments(provider_name: str) -> List[str]:
