@@ -2465,7 +2465,7 @@ def test_waiting_for_frames_replaces_the_stale_current_image(frame, monkeypatch)
     """#352: while the worker waited for frames, the window kept showing the
     last image as the one being described."""
     f = frame
-    worker = _pipeline_running(f, monkeypatch)
+    _pipeline_running(f, monkeypatch)
     dlg = f.batch_progress_dialog
     dlg.update_progress(1, 1, image_name="a.jpg")
     times_before = list(f.batch_processing_times)
