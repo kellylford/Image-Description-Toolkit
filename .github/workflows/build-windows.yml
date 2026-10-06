@@ -68,6 +68,30 @@ jobs:
         cd BuildAndRelease/WinBuilds
         ./builditall_wx.bat
       shell: cmd
+
+    # Windows AI's helper (windows_ai_helper/), packed as an .msix per architecture for
+    # the installer. Windows only lets a package signed by a publisher it trusts be
+    # installed, and the package's Publisher must equal the signing certificate's subject
+    # exactly, character for character -- hence MSIX_PUBLISHER, copied from the subject of
+    # the signed exes (Verify signatures prints it). On a pull request nothing is signed,
+    # so that build's installer can't install the helper; it says so and carries on.
+    - name: Set up .NET for the Windows AI helper
+      uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: Build the Windows AI helper packages
+      shell: pwsh
+      env:
+        MSIX_PUBLISHER: 'CN=kelly ford, O=kelly ford, L=Madison, S=wi, C=US'
+      run: |
+        $version = (Get-Content VERSION -Raw).Trim()
+        # The package version's fourth number, unique to this build: Windows won't install a
+        # package over one of the same version with different contents (a rebuild).
+        $revision = [int]$env:GITHUB_RUN_NUMBER % 65536
+        foreach ($arch in 'x64', 'arm64') {
+          ./windows_ai_helper/build_helper.ps1 -Arch $arch -Publisher $env:MSIX_PUBLISHER -Version $version -Revision $revision -Pack
+        }
     
     # ------------------------------------------------------------------ #
     #  Code signing (Azure Trusted Signing via GitHub OIDC)                #
@@ -127,6 +151,19 @@ jobs:
         timestamp-rfc3161: http://timestamp.acs.microsoft.com
         timestamp-digest: SHA256
 
+    - name: Sign the Windows AI helper packages
+      if: env.SIGNING_ENABLED == 'true' && github.event_name != 'pull_request'
+      uses: azure/artifact-signing-action@v2.0.0
+      with:
+        endpoint: https://eus.codesigning.azure.net/
+        signing-account-name: kellylford
+        certificate-profile-name: kellyford-public
+        files-folder: ${{ github.workspace }}\windows_ai_helper\dist
+        files-folder-filter: msix
+        file-digest: SHA256
+        timestamp-rfc3161: http://timestamp.acs.microsoft.com
+        timestamp-digest: SHA256
+
     - name: Package for installer
       run: |
         cd BuildAndRelease/WinBuilds
@@ -166,7 +203,8 @@ jobs:
           "idt\dist\idt.exe",
           "imagedescriber\dist\ImageDescriber.exe",
           "chatapp\dist\IDTChat.exe"
-        ) + (Get-ChildItem "BuildAndRelease\WinBuilds\dist_all\*.exe" | ForEach-Object { $_.FullName })
+        ) + (Get-ChildItem "BuildAndRelease\WinBuilds\dist_all\*.exe" | ForEach-Object { $_.FullName }) `
+          + (Get-ChildItem "windows_ai_helper\dist\*.msix" | ForEach-Object { $_.FullName })
 
         $failed = $false
         foreach ($t in $targets) {

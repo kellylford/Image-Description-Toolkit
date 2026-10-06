@@ -11,6 +11,13 @@
 #define MyAppURL "https://github.com/kellylford/Image-Description-Toolkit"
 #define MyAppExeName "idt.exe"
 #define LicensePath SourcePath + "\\..\\..\\LICENSE"
+; Windows AI's helper packages, built and signed by the Windows build workflow
+; (windows_ai_helper\build_helper.ps1 -Pack). A local build without them makes an
+; installer without Windows AI, rather than failing.
+#define WindowsAIDir SourcePath + "\\..\\..\\windows_ai_helper\\dist"
+#if FileExists(WindowsAIDir + "\\IdtWindowsAI_x64.msix") && FileExists(WindowsAIDir + "\\IdtWindowsAI_arm64.msix")
+  #define WithWindowsAI
+#endif
 
 [Setup]
 ; NOTE: The value of AppId uniquely identifies this application.
@@ -103,6 +110,72 @@ begin
   end;
 end;
 
+{ Windows AI: Windows' own on-device image description, on a Copilot+ PC with Windows 11
+  24H2 or later. Offered where Windows is new enough; whether this PC is a Copilot+ PC is
+  for IDT to say when it is used, since only Windows' own API can tell. }
+function CanSetUpWindowsAI: Boolean;
+#ifdef WithWindowsAI
+var
+  Version: TWindowsVersion;
+begin
+  GetWindowsVersionEx(Version);
+  Result := Version.Build >= 26100;
+#else
+begin
+  Result := False;
+#endif
+end;
+
+{ By full path: a bare name is looked for in the current folder first. }
+function PowerShellExe: String;
+begin
+  Result := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+end;
+
+function WindowsAIArch: String;
+begin
+  if IsArm64 then
+    Result := 'arm64'
+  else
+    Result := 'x64';
+end;
+
+{ Packages are installed per user, so this runs as the person who started Setup, not as
+  the administrator it elevated to. The script does nothing on a PC without an NPU, and adds
+  the Windows App Runtime first if the PC doesn't have it. Failing here never fails Setup:
+  IDT works without Windows AI. }
+procedure SetUpWindowsAI;
+var
+  ResultCode: Integer;
+  Dir, Params, LogFile, Caption: String;
+  Done: Boolean;
+begin
+  Dir := ExpandConstant('{app}\windows_ai');
+  LogFile := ExpandConstant('{%TEMP}\idt_windows_ai_setup.log');
+  Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Dir + '\install_windows_ai.ps1"' +
+            ' -Package "' + Dir + '\IdtWindowsAI_' + WindowsAIArch + '.msix" -Arch ' + WindowsAIArch +
+            ' -Log "' + LogFile + '"';
+  Caption := WizardForm.StatusLabel.Caption;
+  WizardForm.StatusLabel.Caption := 'Setting up Windows AI. This can take a few minutes.';
+  Log('Setting up Windows AI: ' + PowerShellExe + ' ' + Params);
+  try
+    Done := ExecAsOriginalUser(PowerShellExe, Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+  except
+    Done := False;
+    Log('Windows AI setup could not start: ' + GetExceptionMessage);
+  end;
+  WizardForm.StatusLabel.Caption := Caption;
+  if Done then
+    Log('Windows AI set up')
+  else
+  begin
+    Log('Windows AI setup failed, code ' + IntToStr(ResultCode));
+    if not WizardSilent then
+      MsgBox('Windows AI couldn''t be set up. The rest of IDT works without it.' + #13#10#13#10 +
+             'What happened is in ' + LogFile, mbInformation, MB_OK);
+  end;
+end;
+
 procedure InitializeWizard;
 begin
   // Check if winget is available on this system
@@ -124,6 +197,9 @@ begin
     // Add to PATH if selected
     if WizardIsTaskSelected('addtopath') then
       EnvAddPath(ExpandConstant('{app}'));
+
+    if WizardIsTaskSelected('windowsai') then
+      SetUpWindowsAI;
     
     // Install Ollama via winget if selected
     if WizardIsTaskSelected('installollama') then
@@ -168,7 +244,19 @@ procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   Path: string;
   AppDir: string;
+  ResultCode: Integer;
 begin
+  // Before the files go: the script that removes the helper package is one of them. It
+  // removes it for every user, as whoever installed it may not be the administrator now.
+  if (CurUninstallStep = usUninstall) and
+     FileExists(ExpandConstant('{app}\windows_ai\install_windows_ai.ps1')) then
+  begin
+    Exec(PowerShellExe, '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+         ExpandConstant('{app}\windows_ai\install_windows_ai.ps1') + '" -Remove',
+         '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Log('Removing the Windows AI helper returned ' + IntToStr(ResultCode));
+  end;
+
   if CurUninstallStep = usPostUninstall then
   begin
     // Remove IDT_CONFIG_DIR environment variable
@@ -196,6 +284,7 @@ end;
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "addtopath"; Description: "Add to PATH (allows running 'idt' from any command prompt)"; GroupDescription: "System Integration:"; Flags: unchecked
 Name: "installollama"; Description: "Install Ollama and minicpm-v4.6 model via winget"; GroupDescription: "Dependencies:"; Flags: unchecked; Check: ShouldShowOllamaInstallTask
+Name: "windowsai"; Description: "Set up Windows AI, for descriptions on this PC if it is a Copilot+ PC"; GroupDescription: "Dependencies:"; Check: CanSetUpWindowsAI
 
 [Files]
 ; Main I DT CLI executable
@@ -208,6 +297,13 @@ Source: "dist_all\bin\ImageDescriber.exe"; DestDir: "{app}"; Flags: ignoreversio
 ; Standalone accessible chat client. Ships in the same installer so one update
 ; covers every app, per the update checker's single-feed design.
 Source: "dist_all\bin\IDTChat.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+#ifdef WithWindowsAI
+; Windows AI's helper, for this PC's architecture only, and the script that installs it.
+Source: "..\..\windows_ai_helper\dist\IdtWindowsAI_x64.msix"; DestDir: "{app}\windows_ai"; Flags: ignoreversion; Check: not IsArm64
+Source: "..\..\windows_ai_helper\dist\IdtWindowsAI_arm64.msix"; DestDir: "{app}\windows_ai"; Flags: ignoreversion; Check: IsArm64
+Source: "..\..\windows_ai_helper\install_windows_ai.ps1"; DestDir: "{app}\windows_ai"; Flags: ignoreversion
+#endif
 
 ; Configuration files (from scripts directory)
 Source: "..\..\scripts\*.json"; DestDir: "{app}\scripts"; Flags: ignoreversion recursesubdirs
