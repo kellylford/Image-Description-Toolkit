@@ -8584,6 +8584,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         if getattr(self, '_model_refresh_running', False):
             return
+        if os.environ.get("IDT_SKIP_STARTUP_MODEL_REFRESH"):
+            # Set by the test suite: every test that builds a window started
+            # this thread, which then changed the shared model catalog while
+            # later tests on the same worker ran (an intermittent
+            # test_model_refresh failure), and called the real Claude and
+            # OpenAI APIs on a machine with keys.
+            return
         self._model_refresh_running = True
 
         def work():

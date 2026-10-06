@@ -168,7 +168,7 @@ Reading, cheapest first:
 
 `keep=` names models that must survive every filter — pass the user's current selection, so a retired model cannot vanish and silently move them onto a different one.
 
-The cache lives in `~/.idt/models/<provider>.json`, one file per provider, keyed by a hash of the API key so switching accounts never serves the wrong entitlements. A corrupt, stale, foreign, or future-dated cache all read as "nothing cached", falling back to the curated list. `IDT_MODEL_CACHE_DIR` overrides the location (the test suite points it at a tmp_path).
+The cache lives in `~/.idt/models/<provider>.json`, one file per provider, keyed by a hash of the API key so switching accounts never serves the wrong entitlements. A corrupt, stale, foreign, or future-dated cache all read as "nothing cached", falling back to the curated list. `IDT_MODEL_CACHE_DIR` overrides the location (the test suite points it at a tmp_path). `IDT_SKIP_STARTUP_MODEL_REFRESH`, set to any non-empty value, stops ImageDescriber refreshing the model lists in the background (at startup and from Configure Settings); the test suite sets it in `pytest_tests/conftest.py`, because that thread outlived the test that started it and changed the shared catalog under later tests. Refresh AI Models still works.
 
 OpenAI's endpoint returns ~126 ids for a normal account, most of them not chat models. `openai_provider.filter_chat_model_ids()` is a pure function with a table test: it drops non-chat ids by **whole-token** match (never substring — that would hide a future `gpt-6-audio-native`) and collapses dated snapshots behind their base id, keeping the newest when no base exists. `idt models --all` bypasses it.
 

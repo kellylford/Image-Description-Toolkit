@@ -75,6 +75,12 @@ def offline_catalog(monkeypatch, wx_app):
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no network in tests")),
     )
     monkeypatch.setattr(chat_app_wx, "resolve_api_key", lambda _p: "test-key")
+    # Nothing is stale, so the refresh thread the dialog starts from its
+    # constructor only reads and returns. Refreshing, it could run after this
+    # test's teardown and set the shared catalog's failure marker under a
+    # later test on the same xdist worker (the intermittent test_model_refresh
+    # failure). The tests here drive _finish_catalog_refresh directly.
+    monkeypatch.setattr(catalog, "is_stale", lambda *_a, **_k: False)
     catalog.invalidate()
     yield
     catalog.invalidate()
