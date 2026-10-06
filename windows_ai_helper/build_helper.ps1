@@ -18,8 +18,14 @@ The package publisher. For a signed release it must equal the signing certificat
 exactly. The default is for unsigned development builds.
 
 .PARAMETER Version
-The package version, as three numbers (IDT's own version, for a release). Defaults to the
-project's <Version>. A release installs over the previous one only if this goes up.
+The version, as up to three numbers (IDT's own version, for a release; "4.8" means 4.8.0, and
+a suffix such as " beta" is dropped). Defaults to the project's <Version>.
+
+.PARAMETER Revision
+The package version's fourth number. Windows won't install a package over one of the same
+version with different contents, and every build's contents differ (the build stamps its
+commit into them), so a release build passes a number unique to the build (the workflow's run
+number). 0 to 65535.
 
 .PARAMETER Register
 Install the built layout for the current user (needs Developer Mode).
@@ -33,9 +39,11 @@ idt-windows-ai --check
 #>
 param(
     [ValidateSet('x64', 'arm64')]
-    [string]$Arch = $(if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64' -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64') { 'arm64' } else { 'x64' }),
+    [string]$Arch = $(if ((Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment').PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }),
     [string]$Publisher = 'CN=Image Description Toolkit Development',
     [string]$Version,
+    [ValidateRange(0, 65535)]
+    [int]$Revision = 0,
     [string]$Configuration = 'Release',
     [switch]$Register,
     [switch]$Pack
@@ -49,12 +57,15 @@ if (-not $Version) {
     $Version = ($csproj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
     if (-not $Version) { throw "IdtWindowsAI.csproj has no <Version>; the package needs one." }
 }
-# IDT's VERSION can carry a suffix ("4.8.0 beta"); a package version is numbers only.
-if ($Version -notmatch '^\s*(\d+)\.(\d+)\.(\d+)') { throw "Version '$Version' doesn't start with three numbers." }
-$packageVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3]).0"
+# IDT's VERSION can carry a suffix ("4.8.0 beta") or have two parts ("4.0"); a package
+# version is four numbers.
+if ($Version -notmatch '^\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?') { throw "Version '$Version' doesn't start with a number." }
+$numbers = @($Matches[1], $(if ($Matches[2]) { $Matches[2] } else { '0' }), $(if ($Matches[3]) { $Matches[3] } else { '0' }))
+$assemblyVersion = $numbers -join '.'
+$packageVersion = "$assemblyVersion.$Revision"
 
 if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
-dotnet publish $project -c $Configuration -r "win-$Arch" -o $out --nologo
+dotnet publish $project -c $Configuration -r "win-$Arch" -o $out --nologo "-p:Version=$assemblyVersion"
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $Arch." }
 
 $manifest = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'IdtWindowsAI\AppxManifest.xml') -Raw).
@@ -63,6 +74,8 @@ $manifest = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'IdtWindowsAI\App
     Replace('$PUBLISHER$', [Security.SecurityElement]::Escape($Publisher))
 Set-Content -LiteralPath (Join-Path $out 'AppxManifest.xml') -Value $manifest -Encoding UTF8
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'IdtWindowsAI\Assets') -Destination (Join-Path $out 'Assets') -Recurse -Force
+# Debug symbols are for development, not for every installed copy.
+Get-ChildItem -LiteralPath $out -Filter *.pdb | Remove-Item -Force
 
 Write-Host "Built the Windows AI helper $packageVersion for $Arch in $out"
 
@@ -70,6 +83,7 @@ if ($Pack) {
     # makeappx comes with the Windows SDK build tools package, which restoring the project has
     # just put in the NuGet cache, so it is there on any machine that got this far, CI included.
     $packages = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+    # This process's own architecture, so the makeappx it starts runs natively or emulated alike.
     $hostArch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
     $makeappx = Get-ChildItem (Join-Path $packages 'microsoft.windows.sdk.buildtools') -Recurse -Filter makeappx.exe -ErrorAction SilentlyContinue |
         Where-Object { $_.Directory.Name -eq $hostArch } | Sort-Object FullName -Descending | Select-Object -First 1

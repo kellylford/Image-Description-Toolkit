@@ -103,11 +103,13 @@ helper is running.
 ## Releasing
 
 The Windows build workflow (`.github/workflows/build-windows.yml`) builds both architectures with
-`-Pack`, the package version set to IDT's own and the publisher set to the signing
+`-Pack`, the package version set to IDT's own plus the workflow's run number (Windows won't
+install a package over one of the same version with different contents) and the publisher set to the signing
 certificate's subject, then signs the two `.msix` files with the same Azure signing as IDT's
 exes. The installer carries the one for the PC's architecture to `{app}\windows_ai` and, if the
 "Set up Windows AI" task is ticked (offered on Windows 11 24H2 and later), runs
-`install_windows_ai.ps1` as the person installing. That adds the Windows App Runtime 1.8 if the
+`install_windows_ai.ps1` as the person installing. On a PC without an NPU it does nothing
+(`-Force` overrides that). Otherwise it adds the Windows App Runtime 1.8 if the
 PC doesn't have it (Microsoft's own installer, downloaded and checked for Microsoft's signature,
 about 100 MB), then the helper package. Its log is `idt_windows_ai_setup.log` in the person's
 Temp folder. Uninstalling IDT removes the helper package; the runtime stays, as other apps use it.

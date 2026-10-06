@@ -86,8 +86,11 @@ jobs:
         MSIX_PUBLISHER: 'CN=kelly ford, O=kelly ford, L=Madison, S=wi, C=US'
       run: |
         $version = (Get-Content VERSION -Raw).Trim()
+        # The package version's fourth number, unique to this build: Windows won't install a
+        # package over one of the same version with different contents (a rebuild).
+        $revision = [int]$env:GITHUB_RUN_NUMBER % 65536
         foreach ($arch in 'x64', 'arm64') {
-          ./windows_ai_helper/build_helper.ps1 -Arch $arch -Publisher $env:MSIX_PUBLISHER -Version $version -Pack
+          ./windows_ai_helper/build_helper.ps1 -Arch $arch -Publisher $env:MSIX_PUBLISHER -Version $version -Revision $revision -Pack
         }
     
     # ------------------------------------------------------------------ #

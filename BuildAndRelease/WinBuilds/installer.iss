@@ -114,15 +114,22 @@ end;
   24H2 or later. Offered where Windows is new enough; whether this PC is a Copilot+ PC is
   for IDT to say when it is used, since only Windows' own API can tell. }
 function CanSetUpWindowsAI: Boolean;
+#ifdef WithWindowsAI
 var
   Version: TWindowsVersion;
 begin
-#ifdef WithWindowsAI
   GetWindowsVersionEx(Version);
   Result := Version.Build >= 26100;
 #else
+begin
   Result := False;
 #endif
+end;
+
+{ By full path: a bare name is looked for in the current folder first. }
+function PowerShellExe: String;
+begin
+  Result := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
 end;
 
 function WindowsAIArch: String;
@@ -134,26 +141,38 @@ begin
 end;
 
 { Packages are installed per user, so this runs as the person who started Setup, not as
-  the administrator it elevated to. The script adds the Windows App Runtime first if the PC
-  doesn't have it. Failing here never fails Setup: IDT works without Windows AI. }
+  the administrator it elevated to. The script does nothing on a PC without an NPU, and adds
+  the Windows App Runtime first if the PC doesn't have it. Failing here never fails Setup:
+  IDT works without Windows AI. }
 procedure SetUpWindowsAI;
 var
   ResultCode: Integer;
-  Dir, Params: String;
+  Dir, Params, LogFile, Caption: String;
+  Done: Boolean;
 begin
   Dir := ExpandConstant('{app}\windows_ai');
+  LogFile := ExpandConstant('{%TEMP}\idt_windows_ai_setup.log');
   Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Dir + '\install_windows_ai.ps1"' +
-            ' -Package "' + Dir + '\IdtWindowsAI_' + WindowsAIArch + '.msix" -Arch ' + WindowsAIArch;
-  WizardForm.StatusLabel.Caption := 'Setting up Windows AI...';
-  Log('Setting up Windows AI: powershell.exe ' + Params);
-  if ExecAsOriginalUser('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0) then
+            ' -Package "' + Dir + '\IdtWindowsAI_' + WindowsAIArch + '.msix" -Arch ' + WindowsAIArch +
+            ' -Log "' + LogFile + '"';
+  Caption := WizardForm.StatusLabel.Caption;
+  WizardForm.StatusLabel.Caption := 'Setting up Windows AI. This can take a few minutes.';
+  Log('Setting up Windows AI: ' + PowerShellExe + ' ' + Params);
+  try
+    Done := ExecAsOriginalUser(PowerShellExe, Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) and (ResultCode = 0);
+  except
+    Done := False;
+    Log('Windows AI setup could not start: ' + GetExceptionMessage);
+  end;
+  WizardForm.StatusLabel.Caption := Caption;
+  if Done then
     Log('Windows AI set up')
   else
   begin
     Log('Windows AI setup failed, code ' + IntToStr(ResultCode));
     if not WizardSilent then
       MsgBox('Windows AI couldn''t be set up. The rest of IDT works without it.' + #13#10#13#10 +
-             'What happened is in idt_windows_ai_setup.log in your Temp folder.', mbInformation, MB_OK);
+             'What happened is in ' + LogFile, mbInformation, MB_OK);
   end;
 end;
 
@@ -227,11 +246,12 @@ var
   AppDir: string;
   ResultCode: Integer;
 begin
-  // Before the files go: the script that removes the helper package is one of them.
+  // Before the files go: the script that removes the helper package is one of them. It
+  // removes it for every user, as whoever installed it may not be the administrator now.
   if (CurUninstallStep = usUninstall) and
      FileExists(ExpandConstant('{app}\windows_ai\install_windows_ai.ps1')) then
   begin
-    Exec('powershell.exe', '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+    Exec(PowerShellExe, '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
          ExpandConstant('{app}\windows_ai\install_windows_ai.ps1') + '" -Remove',
          '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Log('Removing the Windows AI helper returned ' + IntToStr(ResultCode));
