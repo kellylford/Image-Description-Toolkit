@@ -18,7 +18,6 @@ for _p in (str(_ROOT), str(_ROOT / "imagedescriber")):
         sys.path.insert(0, _p)
 
 import ai_providers  # noqa: E402
-from ai_providers import ErrorKind, ProviderError, WindowsAIProvider  # noqa: E402
 from idt_core.providers import windows_ai  # noqa: E402
 from idt_core.providers.windows_ai import WindowsAIError, error_for_code  # noqa: E402
 
@@ -80,14 +79,14 @@ def pc(monkeypatch):
 
 
 def _fails(picture, model="accessible"):
-    with pytest.raises(ProviderError) as caught:
-        WindowsAIProvider().describe_image(picture, "a prompt", model)
+    with pytest.raises(ai_providers.ProviderError) as caught:
+        ai_providers.WindowsAIProvider().describe_image(picture, "a prompt", model)
     return caught.value
 
 
 def test_a_description_comes_back_with_no_usage_to_report(pc, picture):
     helper = pc("A mug on a desk.")
-    provider = WindowsAIProvider()
+    provider = ai_providers.WindowsAIProvider()
     assert provider.describe_image(picture, "ignored", "Brief") == "A mug on a desk."
     assert helper.kinds == ["brief"]
     assert provider.last_usage is None
@@ -95,14 +94,14 @@ def test_a_description_comes_back_with_no_usage_to_report(pc, picture):
 
 def test_a_model_from_another_provider_becomes_the_default_kind(pc, picture):
     helper = pc("text")
-    WindowsAIProvider().describe_image(picture, "", "llama3.2-vision")
+    ai_providers.WindowsAIProvider().describe_image(picture, "", "llama3.2-vision")
     assert helper.kinds == ["accessible"]
 
 
 def test_a_pc_without_the_model_gets_it_prepared_first(pc, picture):
     pc.state["state"] = "NotReady"
     helper = pc("text")
-    WindowsAIProvider().describe_image(picture, "", "detailed")
+    ai_providers.WindowsAIProvider().describe_image(picture, "", "detailed")
     assert pc.state["prepared"] == 1
     assert helper.kinds == ["detailed"]
 
@@ -115,7 +114,7 @@ def test_a_model_that_cant_be_got_ready_stops_the_batch_at_once(pc, picture):
         code="not_ready", status_code=503)
     helper = pc("never asked")
     err = _fails(picture)
-    assert err.kind == ErrorKind.UNAVAILABLE
+    assert err.kind == ai_providers.ErrorKind.UNAVAILABLE
     assert "still be downloading" in str(err), "the reason reaches the person"
     assert helper.kinds == []
 
@@ -133,7 +132,7 @@ def test_a_model_windows_dropped_after_being_ready_is_got_ready_again(pc, pictur
 
     monkeypatch.setattr(windows_ai, "check_ready", check_ready)
     helper = pc(error_for_code("not_ready", "The model isn't ready."), "Described after all.")
-    assert WindowsAIProvider().describe_image(picture, "", "brief") == "Described after all."
+    assert ai_providers.WindowsAIProvider().describe_image(picture, "", "brief") == "Described after all."
     assert asked_afresh and pc.state["prepared"] == 1
     assert len(helper.kinds) == 2
 
@@ -142,7 +141,7 @@ def test_a_model_windows_dropped_after_being_ready_is_got_ready_again(pc, pictur
 def test_a_pc_that_cant_run_it_stops_the_batch_without_retrying(pc, picture, code):
     helper = pc(error_for_code(code, "Windows' AI features are turned off."))
     err = _fails(picture)
-    assert err.kind == ErrorKind.UNAVAILABLE
+    assert err.kind == ai_providers.ErrorKind.UNAVAILABLE
     assert "turned off" in str(err)
     assert len(helper.kinds) == 1
 
@@ -151,14 +150,14 @@ def test_a_missing_helper_stops_the_batch(monkeypatch, picture):
     monkeypatch.setattr(windows_ai, "_on_windows", lambda: True)
     monkeypatch.setattr(windows_ai, "_windows_build", lambda: 26200)
     monkeypatch.setattr(windows_ai, "_helper_command", lambda: None)
-    assert _fails(picture).kind == ErrorKind.UNAVAILABLE
+    assert _fails(picture).kind == ai_providers.ErrorKind.UNAVAILABLE
 
 
 @pytest.mark.parametrize("code", ["content_filtered", "too_much_text", "decode_failed"])
 def test_a_refusal_of_one_picture_is_not_retried_and_says_so(pc, picture, code):
     helper = pc(error_for_code(code, "Windows' content filter declined this picture."))
     err = _fails(picture)
-    assert err.kind == ErrorKind.UNKNOWN and not err.is_retryable
+    assert err.kind == ai_providers.ErrorKind.UNKNOWN and not err.is_retryable
     assert len(helper.kinds) == 1
     # The batch reads per_image from the exception this was raised from.
     assert getattr(err.__context__, "per_image", False) is True
@@ -166,7 +165,7 @@ def test_a_refusal_of_one_picture_is_not_retried_and_says_so(pc, picture, code):
 
 def test_a_helper_that_restarted_is_tried_once_more(pc, picture):
     helper = pc(error_for_code("internal_error", "InternalError"), "Second time lucky.")
-    assert WindowsAIProvider().describe_image(picture, "", "brief") == "Second time lucky."
+    assert ai_providers.WindowsAIProvider().describe_image(picture, "", "brief") == "Second time lucky."
     assert len(helper.kinds) == 2
 
 
@@ -174,14 +173,14 @@ def test_a_helper_failing_twice_is_reported_as_a_server_error(pc, picture):
     helper = pc(WindowsAIError("The Windows AI helper stopped unexpectedly.", status_code=503),
                 WindowsAIError("The Windows AI helper stopped unexpectedly.", status_code=503))
     err = _fails(picture)
-    assert err.kind == ErrorKind.SERVER_ERROR
+    assert err.kind == ai_providers.ErrorKind.SERVER_ERROR
     assert len(helper.kinds) == 2
 
 
 def test_a_timeout_is_a_timeout(pc, picture):
     slow = WindowsAIError("Windows AI didn't describe the picture within 180 seconds.", timeout=True)
     pc(slow, slow)
-    assert _fails(picture).kind == ErrorKind.TIMEOUT
+    assert _fails(picture).kind == ai_providers.ErrorKind.TIMEOUT
 
 
 # ---------------------------------------------------------------------------
@@ -227,9 +226,9 @@ def test_only_windows_ai_takes_no_prompt():
 
 def test_no_models_listed_when_it_cant_run(monkeypatch):
     monkeypatch.setattr(windows_ai, "is_available", lambda: False)
-    assert WindowsAIProvider().get_available_models() == []
+    assert ai_providers.WindowsAIProvider().get_available_models() == []
     monkeypatch.setattr(windows_ai, "is_available", lambda: True)
-    assert WindowsAIProvider().get_available_models() == ["accessible", "detailed", "brief", "diagram"]
+    assert ai_providers.WindowsAIProvider().get_available_models() == ["accessible", "detailed", "brief", "diagram"]
 
 
 def test_registered_with_both_provider_lookups(monkeypatch):

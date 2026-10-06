@@ -716,8 +716,8 @@ def run_guide() -> None:
                 print("Provider:   ", state["provider"])
                 print("Model:      ", state["model"])
                 print("Source:     ", state["source"])
-                from cli.main import _prompt_label
-                print("Prompt:     ", _prompt_label(state["provider"], state["model"], state["prompt_name"]))
+                from cli.prompt_use import prompt_label
+                print("Prompt:     ", prompt_label(state["provider"], state["model"], state["prompt_name"]))
                 meta_str = "yes" if state["extract_metadata"] else "no"
                 if state["extract_metadata"] and state["geocode"]:
                     meta_str += " + geocoding"

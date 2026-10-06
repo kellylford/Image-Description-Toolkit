@@ -176,19 +176,7 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
     sys.exit(1)
 
 
-def _uses_prompt(provider: Optional[str]) -> bool:
-    """False for a provider that takes no prompt (Windows AI, whose models are fixed kinds of
-    description). Its runs record no prompt and must not change a workspace's saved one."""
-    from idt_core.providers.registry import uses_prompt
-
-    return provider is None or uses_prompt(provider)
-
-
-def _prompt_label(provider: Optional[str], model: Optional[str], prompt_name: str) -> str:
-    """The prompt as a run reports it before starting."""
-    if not _uses_prompt(provider):
-        return f"not used (Windows AI describes with its {model} kind)"
-    return prompt_name
+from cli.prompt_use import prompt_label as _prompt_label, uses_prompt as _uses_prompt  # noqa: E402
 
 
 def _resolve_prompt(args, project_config, provider: Optional[str] = None) -> tuple[str, str]:

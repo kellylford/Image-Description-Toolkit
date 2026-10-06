@@ -36,7 +36,7 @@ import shutil
 import subprocess
 import sys
 import threading
-from typing import List, Optional, Sequence
+from typing import List, Optional
 
 from .base import BaseProvider, DescriptionResult
 
@@ -404,7 +404,7 @@ class HelperProcess:
             for line in proc.stdout:  # type: ignore[union-attr]
                 answers.put(line)
         except (OSError, ValueError):
-            pass
+            pass  # the pipe closed under us (a stop); the None below says the helper has gone
         finally:
             answers.put(None)  # the helper has gone
 
@@ -480,7 +480,7 @@ class HelperProcess:
             if proc.stdin:
                 proc.stdin.close()  # the helper exits when its input ends
         except OSError:
-            pass
+            pass  # already closed or broken: the wait and kill below end it either way
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
