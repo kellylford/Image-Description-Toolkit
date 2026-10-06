@@ -2381,14 +2381,44 @@ def test_a_refusal_halt_offers_to_carry_on_and_leaves_them_failed(frame, monkeyp
     assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
     worker = _FakeWorker.instances[-1]
     f.workspace.items[a].processing_state = "failed"
+    from data_models import ImageItem
+    b = str(f.src / "b.jpg")
+    f.workspace.add_item(ImageItem(b))
+    f.workspace.items[b].processing_state = "pending"     # not yet tried
+    f._batch_video_failures = [("clip.mp4", "no frames could be extracted")]
     worker.finish()
     f.answer = False
-    f.on_workflow_complete(SimpleNamespace(
-        input_dir="25/40 images", output_dir="", worker=worker,
-        halted="Apple Intelligence declined to describe this image.",
-        halted_files=[], halted_streak=False, halted_refusals=True))
+    f.on_workflow_complete(_refusal_halt(worker))
     assert f.workspace.items[a].processing_state == "failed"
     assert f.workspace.batch_state is not None
     q = f.questions[-1]
-    assert "different prompt style" in q
+    assert "different prompt style" in q and "carry on with the rest" in q
     assert "every remaining image would fail" not in q
+    assert "could not be extracted from 1 video" in q, "video failures went unreported"
+    assert "declined" in f.GetStatusBar().GetStatusText(0)
+
+
+def _refusal_halt(worker):
+    return SimpleNamespace(
+        input_dir="25/25 images", output_dir="", worker=worker,
+        halted="Apple Intelligence declined to describe this image.",
+        halted_files=[], halted_streak=False, halted_refusals=True)
+
+
+def test_a_refusal_halt_with_nothing_left_does_not_offer_to_carry_on(frame, monkeypatch):
+    """Re-review: when the declined images were the last of the batch, Yes
+    led to "No images to resume processing." Say what happened instead."""
+    import imagedescriber_wx
+    f = frame
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+    a = str(f.src / "a.jpg")
+    f._launch_batch([a], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    worker = _FakeWorker.instances[-1]
+    f.workspace.items[a].processing_state = "failed"
+    worker.finish()
+    asked = len(f.questions)
+    f.on_workflow_complete(_refusal_halt(worker))
+    assert len(f.questions) == asked
+    assert any("different prompt style" in m for m in f.infos)
+    assert f.workspace.batch_state is None

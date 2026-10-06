@@ -6783,7 +6783,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         # Return keyboard focus to image list
         self.image_list.SetFocus()
 
-        self.SetStatusText("Batch stopped: provider refused the request" if halted
+        refusals_halt = bool(halted) and getattr(event, 'halted_refusals', False)
+        self.SetStatusText("Batch stopped: the provider declined many images" if refusals_halt
+                           else "Batch stopped: provider refused the request" if halted
                            else "Batch complete", 0)
         self._batch_active = False
         self.refresh_image_list()
@@ -6809,15 +6811,30 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # with this prompt). Not "every remaining image would fail": the
             # declined ones stay failed, and the rest may well work, so offer
             # to carry on, and say what would help them.
-            if ask_yes_no(
-                self,
-                "Batch paused: the provider declined many images in a row.\n\n"
+            message = (
+                "Batch stopped: the provider declined many images in a row.\n\n"
                 f"{halted}\n\n"
                 "The declined images are marked X in the image list. Describing "
                 "them again with a different prompt style (Process > Describe All "
                 "Undescribed) may work.\n\n"
-                "Choose Yes to carry on with the rest of this batch. Choose No to "
-                "carry on later: reopening this workspace offers to resume it."):
+                # A halt skips the end-of-batch warning, so say it here.
+                + (f"Frames could not be extracted from {len(video_failures)} "
+                   "video(s); the next batch tries them again.\n\n"
+                   if video_failures else ""))
+            state = self.workspace.batch_state
+            rest = (any(it.processing_state in ("pending", "paused")
+                        for it in self.workspace.items.values())
+                    or bool(self._unextracted_batch_videos(state)))
+            if not rest:
+                # The declined images were the last of the batch: nothing to
+                # carry on with, so no question whose Yes does nothing.
+                self.workspace.batch_state = None
+                show_info(self, message.rstrip())
+            elif ask_yes_no(
+                    self,
+                    message + "Choose Yes to carry on with the rest of this batch. "
+                    "Choose No to carry on later: reopening this workspace offers "
+                    "to resume it."):
                 self.resume_batch_processing()
         elif halted:
             # Offer to resume exactly this batch (same images, provider and

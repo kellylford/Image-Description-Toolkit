@@ -1387,12 +1387,16 @@ class BatchProcessingWorker(threading.Thread):
                         halted_streak = not fatal
                         halted_files = list(streak) if halted_streak else [file_path]
                     if run_log:
-                        why = (f"({worker.result_kind})" if fatal else
-                               f"({len(refusals)} images in a row declined)" if refused_out else
-                               f"({len(streak)} images in a row failed identically)")
-                        run_log.warning(
-                            f"run halted after {completed} images: every remaining "
-                            f"image would fail the same way {why}")
+                        if refused_out:
+                            run_log.warning(
+                                f"run halted after {completed} images: the provider "
+                                f"declined {len(refusals)} images in a row")
+                        else:
+                            why = (f"({worker.result_kind})" if fatal else
+                                   f"({len(streak)} images in a row failed identically)")
+                            run_log.warning(
+                                f"run halted after {completed} images: every remaining "
+                                f"image would fail the same way {why}")
                     break
 
             elapsed = time.time() - start_time
