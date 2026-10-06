@@ -2258,20 +2258,34 @@ def _halted_done(worker, path):
                            halted_files=[path], halted_streak=False)
 
 
-def _close_with_halt(f, monkeypatch, answer):
-    """The batch's last image, in flight as the app closes, halts it."""
+def _close_with_halt(f, monkeypatch, answer, inside=None, extracting=False):
+    """The batch's last image, in flight as the app closes, halts it.
+    `inside` records what happened while "save changes?" was open: a save or
+    a question there is the bug (main asked "resume?" inside the question).
+    With `extracting`, a video is still being extracted alongside."""
     import imagedescriber_wx
-    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
     a = str(f.src / "a.jpg")
-    f._launch_batch([a], OPTIONS, True)
-    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
-    worker = _FakeWorker.instances[-1]
+    if extracting:
+        worker = _pipeline_running(f, monkeypatch, _LingeringWorker)
+    else:
+        monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+        f._launch_batch([a], OPTIONS, True)
+        assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+        worker = _FakeWorker.instances[-1]
+    saves = []
+    real_save = f._save_bundle_with_progress
+    monkeypatch.setattr(f, "_save_bundle_with_progress",
+                        lambda: (saves.append(1), real_save())[1])
 
     def question():
         f.workspace.items[a].processing_state = "failed"   # as its failure set it
         f._checkpoint_item(a)                              # ...and saved it
         worker.finish()
+        asked_before = len(f.questions)
         f.on_workflow_complete(_halted_done(worker, a))
+        if inside is not None:
+            inside["saves"] = len(saves)
+            inside["questions"] = len(f.questions) - asked_before
         return answer
     monkeypatch.setattr(f, "confirm_unsaved_changes", question)
     monkeypatch.setattr(f, "Destroy", lambda: None)
@@ -2283,7 +2297,10 @@ def test_a_halt_during_a_quit_is_requeued_for_resume(frame, monkeypatch):
     """PR 353 review: the close's early return skipped the halt's requeue, so
     the image a sign-out halted on stayed "failed" and resume skipped it."""
     f = frame
-    a = _close_with_halt(f, monkeypatch, answer=True)          # quit
+    inside = {}
+    a = _close_with_halt(f, monkeypatch, answer=True, inside=inside)   # quit
+    assert inside == {"saves": 0, "questions": 0}, \
+        "saved or asked inside the save-changes question"
     gui = bundle_to_gui_workspace_dict(Workspace.open(Path(f.workspace_file)))
     assert gui["items"][a]["processing_state"] == "pending"
     assert gui["batch_state"] is not None
@@ -2294,7 +2311,10 @@ def test_a_halt_during_a_cancelled_close_is_delivered(frame, monkeypatch):
     resume wiped, so the user never heard the halt's reason."""
     f = frame
     f.answer = False                    # "resume now?" -> No, keep it for later
-    a = _close_with_halt(f, monkeypatch, answer=False)         # Cancel
+    inside = {}
+    a = _close_with_halt(f, monkeypatch, answer=False, inside=inside)  # Cancel
+    assert inside == {"saves": 0, "questions": 0}, \
+        "saved or asked inside the save-changes question"
     assert not any("Batch processing stopped" in m for m in f.infos), f.infos
     assert any("claude auth login" in q for q in f.questions + f.infos)
     assert f.workspace.items[a].processing_state == "pending"
@@ -2315,3 +2335,60 @@ def test_a_worker_that_already_finished_is_not_marked_stopped_by_close(frame, mo
     monkeypatch.setattr(f, "Destroy", lambda: None)
     f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
     assert not getattr(worker, "stopped_by_close", False)
+
+
+def test_a_halt_during_a_cancelled_close_while_extracting_is_delivered(frame, monkeypatch):
+    """PR 353 Windows review: the same, with a video still extracting when the
+    halt arrives during the question. The halt's reason is delivered once the
+    close is cancelled, extraction stops, and the batch can still be resumed."""
+    f = frame
+    f.answer = False
+    inside = {}
+    a = _close_with_halt(f, monkeypatch, answer=False, inside=inside, extracting=True)
+    assert _pump_until(lambda: f._run_cancel is None), "extraction never stopped"
+    assert inside == {"saves": 0, "questions": 0}
+    assert not any("Batch processing stopped" in m for m in f.infos), f.infos
+    assert any("claude auth login" in q for q in f.questions + f.infos)
+    assert f.workspace.items[a].processing_state == "pending"
+    assert f.workspace.batch_state is not None
+    assert f.workspace.batch_state.get("videos") == [str(f.src / "clip.mp4")]
+
+
+def test_a_video_giving_no_frames_is_reported_at_the_end(frame, monkeypatch):
+    """PR 353 Windows review: only a video whose extraction raised was
+    reported; one that quietly gave no frames was left out of the batch's
+    failure summary and silently retried next time."""
+    f = frame
+    monkeypatch.setattr(f, "_extract_video_frames_sync",
+                        lambda vp, cfg, cancel=None, frames_dir=None: ([], {}))
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert [n for n, _ in f._batch_video_failures] == ["clip.mp4"]
+    w = _FakeWorker.instances[-1]
+    f.on_workflow_complete(_batch_done(w))
+    assert any("could not be extracted from 1 video" in m for m in f.infos), f.infos
+
+
+def test_a_refusal_halt_offers_to_carry_on_and_leaves_them_failed(frame, monkeypatch):
+    """PR 353 Windows review: a refusal halt said "every remaining image would
+    fail the same way" and requeued the declined images, so Yes halted again
+    on them. They stay failed and the question says what would help."""
+    import imagedescriber_wx
+    f = frame
+    monkeypatch.setattr(imagedescriber_wx, "BatchProcessingWorker", _LingeringWorker)
+    a = str(f.src / "a.jpg")
+    f._launch_batch([a], OPTIONS, True)
+    assert _pump_until(lambda: _FakeWorker.instances and _FakeWorker.instances[-1].started)
+    worker = _FakeWorker.instances[-1]
+    f.workspace.items[a].processing_state = "failed"
+    worker.finish()
+    f.answer = False
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="25/40 images", output_dir="", worker=worker,
+        halted="Apple Intelligence declined to describe this image.",
+        halted_files=[], halted_streak=False, halted_refusals=True))
+    assert f.workspace.items[a].processing_state == "failed"
+    assert f.workspace.batch_state is not None
+    q = f.questions[-1]
+    assert "different prompt style" in q
+    assert "every remaining image would fail" not in q

@@ -278,7 +278,7 @@ def test_a_success_resets_the_streak(monkeypatch):
     assert done.halted is None
 
 
-def test_refusals_of_single_images_never_halt(monkeypatch):
+def test_refusals_below_the_cap_do_not_halt(monkeypatch):
     """#352: Apple's guardrails refuse some photos (taxidermy, #337) with an
     identical message. Ten in a row, as a trip's photos can be, halted the
     whole batch as though Apple Intelligence were down."""
@@ -295,8 +295,24 @@ def test_a_prompt_refused_on_every_image_halts(monkeypatch):
     done, _ = _run_batch(monkeypatch, names, {n: "declined" for n in names})
     assert len(_FakeImageWorker.seen) == workers_wx.REFUSAL_STREAK
     assert done.halted == "failed: declined"
-    assert done.halted_streak
-    assert len(done.halted_files) == workers_wx.REFUSAL_STREAK
+    # Declined, not untried: they stay failed rather than go back in the
+    # queue, or resuming hits the same refusals first and halts every time
+    # (PR 353 Windows review).
+    assert done.halted_refusals
+    assert not done.halted_streak
+    assert done.halted_files == []
+
+
+def test_resuming_after_a_refusal_halt_carries_on_past_them(monkeypatch):
+    """The resumed batch is the images not yet tried: it gets past the 25."""
+    names = [f"{i}.jpg" for i in range(40)]
+    script = {n: "declined" for n in names[:workers_wx.REFUSAL_STREAK]}
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert done.halted_refusals and done.halted_files == []
+    left = [n for n in names if n not in _FakeImageWorker.seen]
+    done, _ = _run_batch(monkeypatch, left, script)
+    assert done.halted is None
+    assert _FakeImageWorker.seen == left
 
 
 def test_a_described_image_resets_the_refusal_count(monkeypatch):

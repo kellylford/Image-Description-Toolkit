@@ -3991,6 +3991,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             # now, not when the whole extraction ends (#344,
                             # #345).
                             wx.CallAfter(_record_video, vp, frames, meta or {})
+                        else:
+                            # No error, but nothing to describe (a start past
+                            # the end, an unreadable stream): reported like a
+                            # failed video, not left out of the summary.
+                            reason = "no frames could be extracted"
+                            failed_videos.append((Path(vp).name, reason))
+                            wx.CallAfter(_video_failed, Path(vp).name, reason)
                     except ExtractionCancelled:
                         logger.info(f"Extraction of {Path(vp).name} stopped partway; "
                                     "it will be extracted again on the next run")
@@ -6484,14 +6491,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             # handler returns, so re-dispatching the event itself raised on its
             # first attribute access and the completion was lost (a finished
             # batch left "paused", unsaved, and offered for resume).
-            snapshot = SimpleNamespace(
-                input_dir=event.input_dir,
-                output_dir=event.output_dir,
-                worker=source,
-                halted=getattr(event, 'halted', None),
-                halted_files=list(getattr(event, 'halted_files', None) or ()),
-                halted_streak=getattr(event, 'halted_streak', False),
-            )
+            snapshot = self._completion_snapshot(event, source)
 
             # Delivered when the save finishes (_save_bundle_with_progress).
             # Not a timer: timers don't fire while a save pumps events.
@@ -6529,17 +6529,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     # Requeue what the halt says was never really tried, so a
                     # quit's resume includes it; a cancelled close delivers
                     # this completion normally, with the halt's own message.
-                    for halted_file in getattr(event, 'halted_files', None) or ():
-                        item = self.workspace.items.get(halted_file)
-                        if item is not None:
-                            item.processing_state = "pending"
-                            item.processing_error = None
-                            self._checkpoint_item(halted_file)
-                    source.close_halt = SimpleNamespace(
-                        input_dir=event.input_dir, output_dir=event.output_dir,
-                        worker=source, halted=event.halted,
-                        halted_files=list(getattr(event, 'halted_files', None) or ()),
-                        halted_streak=getattr(event, 'halted_streak', False))
+                    self._requeue_halted(getattr(event, 'halted_files', None),
+                                         checkpoint=True)
+                    source.close_halt = self._completion_snapshot(event, source)
                 self._flush_checkpoints()
                 return
             if run is not None:
@@ -6727,11 +6719,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         if halted:
             # The images whose failures halted the batch were never really
             # tried: put them back in the queue so resuming describes them.
-            for halted_file in getattr(event, 'halted_files', None) or ():
-                item = self.workspace.items.get(halted_file)
-                if item is not None:
-                    item.processing_state = "pending"
-                    item.processing_error = None
+            self._requeue_halted(getattr(event, 'halted_files', None))
 
         # Phase 3: Clear batch state on successful completion
         if self.workspace.batch_state and not halted:
@@ -6816,7 +6804,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     f"First failure: {name}: {reason}")
             show_warning(self, "\n\n".join(parts))
 
-        if halted:
+        if halted and getattr(event, 'halted_refusals', False):
+            # The provider declined image after image (Apple's guardrails
+            # with this prompt). Not "every remaining image would fail": the
+            # declined ones stay failed, and the rest may well work, so offer
+            # to carry on, and say what would help them.
+            if ask_yes_no(
+                self,
+                "Batch paused: the provider declined many images in a row.\n\n"
+                f"{halted}\n\n"
+                "The declined images are marked X in the image list. Describing "
+                "them again with a different prompt style (Process > Describe All "
+                "Undescribed) may work.\n\n"
+                "Choose Yes to carry on with the rest of this batch. Choose No to "
+                "carry on later: reopening this workspace offers to resume it."):
+                self.resume_batch_processing()
+        elif halted:
             # Offer to resume exactly this batch (same images, provider and
             # prompt), not Describe All Undescribed, which would widen a folder
             # batch to the whole workspace and skip a Redescribe batch. The
@@ -7443,6 +7446,31 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             self.on_workflow_complete(held)
         else:
             self.on_stop_batch()
+
+    @staticmethod
+    def _completion_snapshot(event, source):
+        """A copy of a batch completion event that outlives it (wx deletes a
+        posted event's C++ object once its handler returns)."""
+        return SimpleNamespace(
+            input_dir=event.input_dir,
+            output_dir=event.output_dir,
+            worker=source,
+            halted=getattr(event, 'halted', None),
+            halted_files=list(getattr(event, 'halted_files', None) or ()),
+            halted_streak=getattr(event, 'halted_streak', False),
+            halted_refusals=getattr(event, 'halted_refusals', False),
+        )
+
+    def _requeue_halted(self, files, checkpoint: bool = False) -> None:
+        """Put the images a halt says were never really tried back in the
+        resume queue (checkpointed when no full save follows)."""
+        for halted_file in files or ():
+            item = self.workspace.items.get(halted_file)
+            if item is not None:
+                item.processing_state = "pending"
+                item.processing_error = None
+                if checkpoint:
+                    self._checkpoint_item(halted_file)
 
     def _pipeline_run_of(self, worker):
         """The run still extracting frames for this describe worker, or None."""

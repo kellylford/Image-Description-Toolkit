@@ -133,8 +133,8 @@ class BatchProgressDialog(wx.Dialog):
         self.stats_list.Bind(wx.EVT_LISTBOX, self._on_stats_selection)
         main_sizer.Add(self.stats_list, 0, wx.ALL | wx.EXPAND, 10)
         
-        # Progress label
-        progress_label = wx.StaticText(
+        # Progress label (kept: it says when the bar can't show a percentage)
+        self.progress_label = progress_label = wx.StaticText(
             panel,
             label="Progress:",
             name="Progress label"
@@ -260,6 +260,11 @@ class BatchProgressDialog(wx.Dialog):
     def _rebuild(self) -> None:
         if self._last_progress is not None:
             self.update_progress(**self._last_progress)
+
+    def _set_progress_label(self, text: str, gauge_name: str) -> None:
+        if self.progress_label.GetLabel() != text:
+            self.progress_label.SetLabel(text)
+            self.progress_bar.SetName(gauge_name)
 
     def note_failure(self, image_name: str, error: str) -> None:
         """Count a failed image; shown on the next progress update."""
@@ -435,8 +440,13 @@ class BatchProgressDialog(wx.Dialog):
         # readers announce the gauge's changes (#352).
         if total > 0 and self._extraction is None:
             self.progress_bar.SetValue(int((current / total) * 100))
+            self._set_progress_label("Progress:", "Batch progress percentage")
         else:
             self.progress_bar.Pulse()
+            # A pulsing gauge keeps its last value (0), so a screen reader
+            # reviewing it read "0%" all through extraction. Say why instead.
+            self._set_progress_label("Progress: total not known yet",
+                                     "Batch progress, total not known yet")
 
         # Restore the previously selected row (skip separators if needed)
         count = self.stats_list.GetCount()

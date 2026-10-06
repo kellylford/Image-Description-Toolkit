@@ -17,7 +17,7 @@
 - If an image finishes describing while ImageDescriber is closing, the batch is still recorded as stopped, not "complete", so reopening the workspace offers to resume it (#352).
 
 **Apple Intelligence declining a few photos no longer stops a batch (#352)**
-- Apple's safety guardrails decline some ordinary photos (see #337). Each one is counted as a failure, but they no longer count toward the "ten identical failures in a row" rule, which stopped a whole batch after a run of similar photos as if Apple Intelligence had stopped working. A batch still stops after 25 refusals in a row, which means the prompt itself is being declined; Apple's message suggests trying a different prompt style.
+- Apple's safety guardrails decline some ordinary photos (see #337). Each one is counted as a failure, but they no longer count toward the "ten identical failures in a row" rule, which stopped a whole batch after a run of similar photos as if Apple Intelligence had stopped working. After 25 refusals in a row, the batch pauses and asks whether to carry on: that many usually means the prompt itself is being declined. The declined photos stay marked as failed (describing them again with a different prompt style often works), and carrying on continues with the photos not yet tried.
 
 **Smaller fixes to describing while extracting (#352)**
 - In the progress window, the line you're on stays selected when lines above it appear or disappear (for example, when extraction finishes). A screen reader could otherwise move you to a different line.
