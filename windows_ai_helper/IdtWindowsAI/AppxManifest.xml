@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The trial's package identity. Registered from the build folder in Developer Mode
-     (Add-AppxPackage -Register), so nothing needs signing while trying it out. What the Windows AI
-     APIs need, per Microsoft's docs: the systemAIModels capability, and a MaxVersionTested of
-     10.0.26226.0 or later, or loading the model fails with "Not declared by app". -->
+<!-- The helper's package. build_helper.ps1 fills in $ARCH$ (x64 or arm64) and $PUBLISHER$, which
+     must equal the signing certificate's subject exactly or the signed package won't install.
+     What Windows' AI APIs need, from Microsoft's docs and confirmed on a Copilot+ PC:
+     the systemAIModels capability, and MaxVersionTested 10.0.26226.0 or later ("Not declared by
+     app" otherwise). Without package identity at all, the API refuses with Access is denied. -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
@@ -12,11 +13,11 @@
   xmlns:systemai="http://schemas.microsoft.com/appx/manifest/systemai/windows10"
   IgnorableNamespaces="uap uap5 desktop4 rescap systemai">
 
-  <Identity Name="TheWorkBench.DescribeTrial" Publisher="CN=TheWorkBench Trial" Version="1.0.0.0" ProcessorArchitecture="arm64" />
+  <Identity Name="ImageDescriptionToolkit.WindowsAI" Publisher="$PUBLISHER$" Version="$VERSION$" ProcessorArchitecture="$ARCH$" />
 
   <Properties>
-    <DisplayName>Describe Trial</DisplayName>
-    <PublisherDisplayName>TheWorkBench</PublisherDisplayName>
+    <DisplayName>IDT Windows AI helper</DisplayName>
+    <PublisherDisplayName>Image Description Toolkit</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
 
@@ -31,16 +32,15 @@
   </Resources>
 
   <Applications>
-    <Application Id="DescribeTrial" Executable="DescribeTrial.exe" EntryPoint="Windows.FullTrustApplication"
+    <Application Id="IdtWindowsAI" Executable="IdtWindowsAI.exe" EntryPoint="Windows.FullTrustApplication"
                  desktop4:Subsystem="console" desktop4:SupportsMultipleInstances="true">
-      <uap:VisualElements DisplayName="Describe Trial" Description="Describes a picture with Windows' on-device model"
+      <uap:VisualElements DisplayName="IDT Windows AI helper" Description="Describes pictures for Image Description Toolkit with Windows' on-device model"
                           BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png"
                           Square44x44Logo="Assets\Square44x44Logo.png" AppListEntry="none" />
       <Extensions>
-        <!-- Run from any terminal as describe-trial, with the package's identity. -->
         <uap5:Extension Category="windows.appExecutionAlias">
           <uap5:AppExecutionAlias desktop4:Subsystem="console">
-            <uap5:ExecutionAlias Alias="describe-trial.exe" />
+            <uap5:ExecutionAlias Alias="idt-windows-ai.exe" />
           </uap5:AppExecutionAlias>
         </uap5:Extension>
       </Extensions>
