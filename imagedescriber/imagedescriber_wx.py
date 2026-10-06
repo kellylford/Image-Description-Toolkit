@@ -4110,6 +4110,10 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 logger.error(f"Finishing frame extraction failed: {exc}", exc_info=exc)
                 self._end_run(cancel)
                 worker.close_queue()
+                if getattr(cancel, 'resume_when_stopped', False):
+                    # Its batch had halted and was waiting to resume: resume
+                    # now rather than leave the "Resuming…" window up.
+                    wx.CallAfter(self._resume_when_extraction_stopped)
                 dlg = self.batch_progress_dialog
                 if dlg:
                     dlg.stop_extraction()
@@ -4155,8 +4159,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     # the "save changes?" question and write edits the user may
                     # be about to discard. The finished videos are kept anyway:
                     # _record_video checkpointed each one as it finished, and
-                    # on_close waits for those writes.
-                    if results and not announced and not _closing(cancel):
+                    # on_close waits for those writes. Saved even with no video
+                    # finished: the save stage wrote this batch's batch_state,
+                    # which the stop cleared, and left on disk it came back as
+                    # a batch to resume (#352).
+                    if not announced and not _closing(cancel):
                         self._save_bundle_with_progress()
                 finally:
                     self._end_run(cancel)
@@ -7444,6 +7451,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_stop_batch(self):
         """Stop batch processing permanently"""
+        run = self._run_cancel
+        if run is not None and getattr(run, 'resume_when_stopped', False):
+            # Stop while a halted batch waits to resume (#352): don't resume,
+            # and let the run's end save and say "stopped" (the halt had
+            # already spoken for it, so it would otherwise end silently).
+            run.resume_when_stopped = False
+            run.announced = False
         # Still extracting frames or saving: there is no running worker to stop
         # (this used to return here and the run carried on into describing).
         if self._run_cancel is not None and not self._batch_worker_running():
@@ -7568,7 +7582,9 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         run.resume_when_stopped = True
         dlg = self._ensure_progress_dialog({}, 0)
         if dlg:
-            dlg.begin_stage("Resuming once frame extraction stops", 0)
+            # Only Stop applies (there is no worker to pause); see on_stop_batch.
+            dlg.begin_stage("Resuming once frame extraction stops", 0,
+                            can_interrupt=False, can_stop=True)
             dlg.Show()
             dlg.Raise()
             dlg.stats_list.SetFocus()
@@ -10096,6 +10112,22 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if closing_run is not None:
                 closing_run.closing = False
                 run_worker = getattr(closing_run, 'worker', None)
+                if getattr(closing_run, 'resume_when_stopped', False):
+                    # Yes to "resume?" was waiting for extraction to let go
+                    # (#352). Staying after all: keep waiting in that window,
+                    # or, if it let go while "save changes?" was open (which
+                    # skips the resume while closing), resume now.
+                    if self._run_cancel is closing_run:
+                        if closed_dialog and self.batch_progress_dialog is None:
+                            self.batch_progress_dialog = closed_dialog
+                            closed_dialog.Show()
+                            closed_dialog.Raise()
+                    else:
+                        if closed_dialog and closed_dialog is not self.batch_progress_dialog:
+                            closed_dialog.Destroy()
+                        self._resume_when_extraction_stopped()
+                    event.Veto()
+                    return
                 if getattr(closing_run, 'describing', False):
                     # Describing alongside extraction (#344): the close
                     # stopped its worker, which may still be on its last

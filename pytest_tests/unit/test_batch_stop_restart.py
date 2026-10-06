@@ -2754,3 +2754,74 @@ def test_stats_and_summary_agree_after_a_streak_halt(frame, monkeypatch):
     assert not any(r.startswith("Failed:") for r in rows), rows
     assert not any("failed)" in r for r in rows), rows
     dlg.Destroy()
+
+
+def _halt_while_extraction_holds_a_video(f, monkeypatch):
+    """A batch halts (answer Yes to resume) while its extraction thread is
+    still letting go of a video. Returns (let_go event, resumed calls)."""
+    import imagedescriber_wx
+    let_go = threading.Event()
+
+    def extract(vp, cfg, cancel=None, frames_dir=None):
+        while not cancel.is_set():
+            time.sleep(0.01)
+        assert let_go.wait(10)
+        raise imagedescriber_wx.ExtractionCancelled(Path(vp).name)
+    monkeypatch.setattr(f, "_extract_video_frames_sync", extract)
+    f._extract_then_launch([str(f.src / "clip.mp4")], [str(f.src / "a.jpg")], OPTIONS, True)
+    assert _pump_until(lambda: _extracting(f))
+    worker = _FakeWorker.instances[-1]
+    monkeypatch.setattr(f, "_wait_for_extraction", lambda run, timeout=5.0: None)
+    resumed = []
+    monkeypatch.setattr(f, "resume_batch_processing",
+                        lambda: resumed.append(f._batch_busy_message()))
+    f.answer = True
+    f.on_workflow_complete(SimpleNamespace(
+        input_dir="0/1 images", output_dir="", worker=worker,
+        halted="Claude Code is not signed in.", halted_files=[str(f.src / "a.jpg")],
+        halted_streak=False, halted_refusals=False))
+    assert resumed == []
+    return let_go, resumed
+
+
+def test_stop_on_the_resuming_window_is_a_real_stop(frame, monkeypatch):
+    """#355 re-review A: the waiting window offered Pause and Stop with no
+    worker behind them; Stop then ended silently and resumed nothing."""
+    f = frame
+    let_go, resumed = _halt_while_extraction_holds_a_video(f, monkeypatch)
+    dlg = f.batch_progress_dialog
+    assert dlg.stop_button.IsEnabled() and not dlg.pause_button.IsEnabled()
+    f.infos.clear()
+    f.on_stop_batch()
+    let_go.set()
+    assert _pump_until(lambda: f._run_cancel is None)
+    assert resumed == [], "resumed a batch the user stopped"
+    assert any("Batch processing stopped" in m for m in f.infos), f.infos
+    assert f.workspace.batch_state is None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is None
+    assert f._batch_active is False
+
+
+@pytest.mark.parametrize("lets_go_during_question", [True, False])
+def test_a_cancelled_quit_while_waiting_to_resume_still_resumes(frame, monkeypatch,
+                                                               lets_go_during_question):
+    """#355 re-review B: the resume was dropped without a word and the app
+    was left half in a batch (_batch_active stuck True)."""
+    f = frame
+    let_go, resumed = _halt_while_extraction_holds_a_video(f, monkeypatch)
+
+    def question():
+        if lets_go_during_question:
+            let_go.set()
+            assert _pump_until(lambda: f._run_cancel is None)
+        return False                                   # Cancel: stay
+    monkeypatch.setattr(f, "confirm_unsaved_changes", question)
+    f.on_close(SimpleNamespace(CanVeto=lambda: True, Veto=lambda: None))
+    if not lets_go_during_question:
+        dlg = f.batch_progress_dialog
+        assert dlg is not None and dlg.IsShown(), "the waiting window went away"
+        let_go.set()
+    assert _pump_until(lambda: resumed)
+    assert resumed == [None]
+    assert f._batch_active is False
