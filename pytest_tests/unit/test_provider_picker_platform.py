@@ -258,7 +258,8 @@ def test_prompt_editor_matches_the_shared_provider_list(frame):
     dlg = prompt_editor_dialog.PromptEditorDialog(frame)
     try:
         labels = _labels(dlg.provider_combo)
-        assert labels == [key for key, _ in ai_providers.provider_picker_choices()]
+        # Testing a prompt needs a provider that takes one.
+        assert labels == [key for key, _ in ai_providers.provider_picker_choices(needs_prompt=True)]
         assert ("mlx" in labels) == _mlx_can_run()
     finally:
         dlg.Destroy()
@@ -293,7 +294,7 @@ def test_prompt_editor_lists_mlx_models_where_mlx_runs(frame, monkeypatch):
 
     monkeypatch.setattr(
         ai_providers, "provider_picker_choices",
-        lambda title_case=True: [("ollama", "Ollama"), ("openai", "OpenAI"),
+        lambda title_case=True, needs_prompt=False: [("ollama", "Ollama"), ("openai", "OpenAI"),
                                  ("claude", "Claude"), ("mlx", "MLX")],
     )
     monkeypatch.setattr(ai_providers.MLXProvider, "is_available", lambda self: True)

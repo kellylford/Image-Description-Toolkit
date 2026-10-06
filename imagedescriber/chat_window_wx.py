@@ -169,7 +169,7 @@ class ChatDialog(wx.Dialog):
         # Labels map back to keys through _provider_key(), not .lower():
         # "Claude Code" is the label for the "claude-code" key.
         self.provider_choice = wx.Choice(
-            self, choices=[label for _, label in provider_picker_choices()],
+            self, choices=[label for _, label in provider_picker_choices(needs_prompt=True)],
             name="AI provider"
         )
         self.provider_choice.SetSelection(0)  # Default to Ollama

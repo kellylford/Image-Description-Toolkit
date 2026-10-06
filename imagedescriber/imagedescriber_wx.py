@@ -4473,6 +4473,14 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         self._batch_provider = options.get('provider', '')
         self._batch_model = options.get('model', '')
         self._batch_prompt = options.get('prompt_style', '')
+        try:
+            from ai_providers import provider_uses_prompt
+        except ImportError:
+            from imagedescriber.ai_providers import provider_uses_prompt
+        if self._batch_provider and not provider_uses_prompt(self._batch_provider):
+            # No prompt to show: the progress window leaves the line out
+            # rather than name a style the provider never sees.
+            self._batch_prompt = ''
 
         self.batch_progress_dialog = BatchProgressDialog(
             self, 0,
@@ -6275,10 +6283,15 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 )
         else:
             self.batch_progress = None
-            # current == 0 is a "status" event (e.g. MLX model loading/download).
-            # Update the progress dialog so it doesn't look completely frozen.
+            # current == 0 is a "status" event: a model loading or starting
+            # before the first image (MLX, Apple Intelligence, Windows AI).
+            # Show the worker's own message, so the progress dialog says what
+            # it is waiting for rather than looking frozen. It was MLX only,
+            # with MLX's wording, until there were three such providers. Only
+            # theirs: a download posts count-zero events too.
             if (hasattr(event, 'total') and event.total > 0 and
-                    getattr(self, '_batch_provider', '').lower() == 'mlx' and
+                    getattr(event, 'message', '') and
+                    getattr(self, '_batch_provider', '').lower() in ('mlx', 'apple', 'windows-ai') and
                     self.batch_progress_dialog and
                     not self.batch_progress_dialog.IsBeingDeleted()):
                 self.batch_progress_dialog.update_progress(
@@ -6287,7 +6300,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     batch_provider=self._batch_provider,
                     batch_model=self._batch_model,
                     batch_prompt=self._batch_prompt,
-                    status_message="Loading MLX model into Metal memory — please wait…"
+                    status_message=event.message.lstrip("⏳ ")
                 )
 
     def on_worker_complete(self, event):
@@ -6879,14 +6892,23 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
         if halted and getattr(event, 'halted_refusals', False):
             # The provider declined image after image (Apple's guardrails
-            # with this prompt). Not "every remaining image would fail": the
-            # declined ones stay failed, and the rest may well work, so offer
-            # to carry on, and say what would help them.
+            # with this prompt, Windows' content filter or too much text).
+            # Not "every remaining image would fail": the declined ones stay
+            # failed, and the rest may well work, so offer to carry on, and
+            # say what would help them. A different prompt can't help a
+            # provider that takes none; a different provider can.
+            try:
+                from ai_providers import provider_uses_prompt
+            except ImportError:
+                from imagedescriber.ai_providers import provider_uses_prompt
+            remedy = ("a different prompt style"
+                      if provider_uses_prompt(getattr(self, '_batch_provider', '') or '')
+                      else "a different provider")
             message = (
                 "Batch stopped: the provider declined many images in a row.\n\n"
                 f"{halted}\n\n"
                 "The declined images are marked X in the image list. Describing "
-                "them again with a different prompt style (Process > Describe All "
+                f"them again with {remedy} (Process > Describe All "
                 "Undescribed) may work.\n\n"
                 # A halt skips the end-of-batch warning, so say it here.
                 + (f"Frames could not be extracted from {len(video_failures)} "
@@ -8501,8 +8523,11 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
         from dialogs_wx import FollowupQuestionDialog
 
         try:
-            from ai_providers import get_available_providers
-            available_providers = list(get_available_providers().keys())
+            from ai_providers import get_available_providers, provider_uses_prompt
+            # A follow-up question is a prompt; a provider that takes none
+            # (Windows AI) would answer it with another description.
+            available_providers = [p for p in get_available_providers()
+                                   if provider_uses_prompt(p)]
         except Exception:
             available_providers = None
 
@@ -8571,6 +8596,17 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             'provider': self.config.get('default_provider', 'ollama'),
             'model': self.config.get('default_model', 'llama3.2-vision'),
         }
+        try:
+            from ai_providers import provider_uses_prompt, provider_key
+        except ImportError:
+            from imagedescriber.ai_providers import provider_uses_prompt, provider_key
+        if not provider_uses_prompt(options['provider']):
+            # The name comes from a prompt; Windows AI takes none and would
+            # return a full description to use as a file name.
+            show_warning(self, f"{_display_provider(provider_key(options['provider']))} can't suggest "
+                               "a name, because it takes no prompt. Choose another default provider "
+                               "in Tools, Configure Settings to use auto-rename.")
+            return
 
         self.SetStatusText("Generating name with AI...", 0)
 

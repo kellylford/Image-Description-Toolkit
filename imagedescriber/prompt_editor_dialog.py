@@ -225,7 +225,8 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             name="AI provider",
             # Lowercase keys, not display labels: this dialog compares the
             # selection against provider names directly.
-            choices=[key for key, _ in provider_picker_choices()],
+            # Testing a prompt needs a provider that takes one.
+            choices=[key for key, _ in provider_picker_choices(needs_prompt=True)],
         )
         self.provider_combo.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_combo, 0, wx.EXPAND)

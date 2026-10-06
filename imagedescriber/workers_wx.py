@@ -66,9 +66,19 @@ except ImportError:
 # import would restore the old behaviour of storing API errors as descriptions,
 # which is precisely the bug this guards (issue #230). Fail loudly instead.
 try:
-    from ai_providers import is_provider_error, ErrorKind            # frozen mode
+    from ai_providers import is_provider_error, ErrorKind, provider_uses_prompt   # frozen mode
 except ImportError:
-    from imagedescriber.ai_providers import is_provider_error, ErrorKind   # dev mode
+    from imagedescriber.ai_providers import (                          # dev mode
+        is_provider_error, ErrorKind, provider_uses_prompt,
+    )
+
+
+def _prompt_for(provider: str, prompt_style: str, custom_prompt: str):
+    """The prompt a run records: "none" and no text for a provider that takes no prompt
+    (Windows AI), so a description never claims a prompt style its model never saw."""
+    if provider and not provider_uses_prompt(provider):
+        return "none", ""
+    return prompt_style, custom_prompt
 
 #: Failure kinds that every remaining image in a batch would hit too: the
 #: provider is signed out, refused the credentials, or is not set up. A batch
@@ -369,8 +379,7 @@ class ProcessingWorker(threading.Thread):
         self.file_path = file_path
         self.provider = provider
         self.model = model
-        self.prompt_style = prompt_style
-        self.custom_prompt = custom_prompt
+        self.prompt_style, self.custom_prompt = _prompt_for(provider, prompt_style, custom_prompt)
         self.api_key = api_key
         self.geocode = geocode
         
@@ -1145,8 +1154,7 @@ class BatchProcessingWorker(threading.Thread):
         self.file_paths = list(file_paths)
         self.provider = provider
         self.model = model
-        self.prompt_style = prompt_style
-        self.custom_prompt = custom_prompt
+        self.prompt_style, self.custom_prompt = _prompt_for(provider, prompt_style, custom_prompt)
         self.prompt_config_path = prompt_config_path
         self.skip_existing = skip_existing
         self.progress_offset = progress_offset
@@ -1252,6 +1260,18 @@ class BatchProcessingWorker(threading.Thread):
                 evt = ProgressUpdateEventData(
                     file_path="",
                     message="⏳ Starting Apple Intelligence on this Mac — please wait…",
+                    current=0,
+                    total=total
+                )
+                wx.PostEvent(self.parent_window, evt)
+
+            # Windows AI: the first image starts the helper and, on a PC that
+            # hasn't the model yet, waits while Windows downloads it.
+            if self.provider.lower() == 'windows-ai':
+                evt = ProgressUpdateEventData(
+                    file_path="",
+                    message="Starting Windows AI. The first time, Windows may download "
+                            "its model, which can take a few minutes.",
                     current=0,
                     total=total
                 )

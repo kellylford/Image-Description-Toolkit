@@ -113,6 +113,10 @@ class ProviderCapabilities:
     #: answer a question). Chat surfaces offer only providers with this set: see
     #: :func:`chat_providers`.
     chat: bool = True
+    #: Whether a prompt shapes its descriptions. False for Windows AI, whose model takes none:
+    #: its runs record the prompt as "none", and anything that is only a prompt (a follow-up
+    #: question, a rename, testing a prompt) can't use it.
+    uses_prompt: bool = True
 
     def size_limit_for(self, media_type: str) -> Optional[int]:
         """Upload limit for a MIME type, or None if none is documented."""
@@ -257,6 +261,7 @@ _REGISTRY: Dict[str, ProviderCapabilities] = {
         is_local=True,
         # Describes pictures only: no prompt, no conversation, so no chat and no attachments.
         chat=False,
+        uses_prompt=False,
     ),
 }
 
@@ -314,6 +319,12 @@ def can_chat(provider_name: str) -> bool:
     """True if the provider can hold a conversation. Unknown names are given the benefit of the
     doubt, as :func:`capabilities_for` gives them an all-default record."""
     return capabilities_for(provider_name).chat
+
+
+def uses_prompt(provider_name: str) -> bool:
+    """True if a prompt shapes the provider's descriptions. Unknown names are given the benefit
+    of the doubt, as :func:`capabilities_for` gives them an all-default record."""
+    return capabilities_for(provider_name).uses_prompt
 
 
 def chat_providers() -> List[str]:

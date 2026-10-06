@@ -38,6 +38,7 @@ from ai_providers import (  # noqa: E402
     MLXProvider,
     OllamaCloudProvider,
     OllamaProvider,
+    WindowsAIProvider,
     OpenAIProvider,
     ProviderError,
     RETRYABLE_KINDS,
@@ -378,6 +379,43 @@ class _AppleDriver(ProviderDriver):
         return AppleProvider(), script
 
 
+class _WindowsAIDriver(ProviderDriver):
+    provider_class = WindowsAIProvider
+    speaks_http = False
+    no_http_reason = (
+        "Windows AI talks to its own helper process on this PC over stdin and "
+        "stdout. There is no remote, no account and no rate limiter, so 401 and "
+        "429 cannot arise; the helper's failures arrive as codes, of which the "
+        "transient ones (the helper restarting the model, or dying) are marked "
+        "503 and retried -- covered here by the garbage case, which restarts "
+        "the helper, and the timeout case."
+    )
+
+    def build(self, monkeypatch, tmp_path, outcomes):
+        from idt_core.providers import windows_ai
+        from idt_core.providers.windows_ai import WindowsAIError
+
+        script = _Script(outcomes)
+
+        class FakeHelper:
+            def request(self, kind, mime_type, image_bytes, timeout=None):
+                outcome, value = script.next()
+                if outcome == "ok":
+                    return value
+                if outcome == "timeout":
+                    raise WindowsAIError(
+                        "Windows AI didn't describe the picture within 180 seconds.", timeout=True)
+                if outcome == "garbage":
+                    raise WindowsAIError(
+                        "The Windows AI helper gave an answer IDT can't read: <html>", status_code=503)
+                raise _ScriptExhausted(outcome)
+
+        # No Windows check, no helper process: the transport is the helper's request.
+        monkeypatch.setattr(windows_ai, "check_ready", lambda *a, **k: {"state": "Ready"})
+        monkeypatch.setattr(windows_ai, "_helper", FakeHelper())
+        return WindowsAIProvider(), script
+
+
 DRIVERS = [
     _OllamaDriver(),
     _OllamaCloudDriver(),
@@ -385,6 +423,7 @@ DRIVERS = [
     _ClaudeDriver(),
     _ClaudeCodeDriver(),
     _AppleDriver(),
+    _WindowsAIDriver(),
     _MLXDriver(),
 ]
 

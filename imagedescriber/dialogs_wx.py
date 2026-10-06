@@ -72,8 +72,10 @@ from idt_core.providers.registry import display_name as _display_provider  # noq
 # .lower(): that only works while every label is its key in title case.
 try:
     from ai_providers import provider_key as _provider_key  # frozen mode
+    from ai_providers import provider_uses_prompt as _uses_prompt
 except ImportError:
     from imagedescriber.ai_providers import provider_key as _provider_key  # dev mode
+    from imagedescriber.ai_providers import provider_uses_prompt as _uses_prompt
 
 
 def set_accessible_name(widget, name):
@@ -401,6 +403,17 @@ def _get_model_description_text(provider: str, model_id: str) -> str:
                      "once via 'sudo fm license'")
         return " | ".join(parts)
 
+    if provider == "windows-ai":
+        from idt_core.providers import catalog
+
+        entry = catalog.model_entry(provider, model_id)
+        # What a picker can't see: where it runs, and that the prompt below
+        # isn't used, which matters more here than anywhere else.
+        parts = [entry.description] if entry.description else []
+        parts.append("Runs on this Copilot+ PC; no key or cost. Takes no prompt, "
+                     "so the prompt style and custom prompt aren't used")
+        return " | ".join(parts)
+
     if provider == "claude-code":
         from idt_core.providers import catalog
 
@@ -458,6 +471,11 @@ class FollowupQuestionDialog(wx.Dialog):
             style=wx.DEFAULT_DIALOG_STYLE | wx.RESIZE_BORDER
         )
         
+        # A follow-up question is a prompt. A description made by a provider
+        # that takes none (Windows AI) is followed up with another provider,
+        # chosen afresh: carrying its kind over as a model would mean nothing.
+        if original_provider and not _uses_prompt(original_provider):
+            original_provider, original_model = "", ""
         self.original_provider = original_provider
         self.original_model = original_model
         self.config = config
@@ -472,8 +490,8 @@ class FollowupQuestionDialog(wx.Dialog):
                 from ai_providers import provider_picker_choices
             except ImportError:
                 from imagedescriber.ai_providers import provider_picker_choices
-            available_providers = [key for key, _ in provider_picker_choices()]
-        self.available_providers = available_providers
+            available_providers = [key for key, _ in provider_picker_choices(needs_prompt=True)]
+        self.available_providers = [p for p in available_providers if _uses_prompt(p)]
         self.question = ""
         self.selected_provider = original_provider
         self.selected_model = original_model
@@ -533,7 +551,9 @@ class FollowupQuestionDialog(wx.Dialog):
         if self.original_provider and self.original_provider not in provider_choices:
             provider_choices.insert(0, self.original_provider)
         self.provider_choice = wx.Choice(self, choices=provider_choices)
-        self.provider_choice.SetStringSelection(self.original_provider)
+        if not self.provider_choice.SetStringSelection(self.original_provider or "") \
+                and self.provider_choice.GetCount():
+            self.provider_choice.SetSelection(0)
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         set_accessible_name(self.provider_choice, "AI provider")
         provider_sizer.Add(self.provider_choice, 1, wx.EXPAND)
@@ -1003,6 +1023,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         # Prompt style
         prompt_box = wx.StaticBox(panel, label="Prompt Style")
+        self.prompt_box = prompt_box
         prompt_sizer = wx.StaticBoxSizer(prompt_box, wx.VERTICAL)
         
         prompt_label = wx.StaticText(panel, label="P&rompt style:")
@@ -1019,6 +1040,7 @@ class ProcessingOptionsDialog(wx.Dialog):
         
         # Custom prompt override
         custom_prompt_box = wx.StaticBox(panel, label="Custom Prompt (Optional)")
+        self.custom_prompt_box = custom_prompt_box
         custom_prompt_sizer = wx.StaticBoxSizer(custom_prompt_box, wx.VERTICAL)
         
         custom_prompt_label = wx.StaticText(
@@ -1084,7 +1106,23 @@ class ProcessingOptionsDialog(wx.Dialog):
                 model_id = self.model_combo.GetStringSelection()
         text = _get_model_description_text(provider, model_id)
         self.model_desc_text.ChangeValue(text)
+        self._show_prompt_use(provider)
     
+    def _show_prompt_use(self, provider: str) -> None:
+        """Say on the prompt controls when the chosen provider won't use them.
+
+        They stay enabled -- disabled controls drop out of the tab order, and a
+        screen reader user would lose them without knowing why -- but their
+        names and group labels say so, and the run records the prompt as none.
+        """
+        if not hasattr(self, 'prompt_box'):
+            return
+        note = "" if _uses_prompt(provider) else f", not used by {_display_provider(provider)}"
+        self.prompt_box.SetLabel("Prompt Style" + note)
+        self.custom_prompt_box.SetLabel("Custom Prompt (Optional)" + note)
+        set_accessible_name(self.prompt_choice, "Prompt style" + note)
+        set_accessible_name(self.custom_prompt_input, "Custom prompt override" + note)
+
     def _select_model_id(self, model_id) -> bool:
         """Select the entry whose API id is ``model_id``. True if one matched.
 
@@ -1142,7 +1180,7 @@ class ProcessingOptionsDialog(wx.Dialog):
                 else:
                     self.model_combo.Append(DEFAULT_OLLAMA_MODEL)
                     self.model_combo.SetSelection(0)
-            elif provider in ("openai", "claude", "claude-code", "apple"):
+            elif provider in ("openai", "claude", "claude-code", "apple", "windows-ai"):
                 # Live-backed list from the model catalog (issue #267), read
                 # from its cache so this stays instant on the UI thread.
                 try:
