@@ -135,6 +135,8 @@ _NO_IDENTITY_HINT = (
 _PER_IMAGE_CODES = {"content_filtered", "too_much_text", "unsupported_format", "decode_failed", "too_large"}
 _SETUP_CODES = {"not_supported", "disabled_by_user", "blocked_by_policy"}
 #: Worth one retry: the model may still be loading, or Windows hit something transient.
+#: (internal_error is first retried at smaller sizes by WindowsAIProvider.describe, which
+#: decides what a picture that fails at every size means; this covers the rest.)
 _RETRYABLE_CODES = {"not_ready", "internal_error"}
 
 #: No console window flashing up for the helper. Windows only: elsewhere a non-zero
@@ -586,8 +588,11 @@ class WindowsAIProvider(BaseProvider):
 
     def _describe_at_other_sizes(self, image_bytes: bytes, first: WindowsAIError) -> str:
         """Try a picture Windows failed on again at each of :data:`RETRY_LONG_EDGES` smaller
-        than it. If none works, it's this picture: a refusal of it (``per_image``), not a sign
-        that Windows AI has stopped working, so a batch carries on and doesn't retry it."""
+        than it. If none works, it is reported as a failure that isn't retried and isn't a
+        refusal: rare for one picture (none of 8 measured), but every picture failing so is a
+        broken helper, which a batch should stop for after ten in a row, not take for Windows
+        declining pictures. A picture with no smaller size to try keeps its first error, which
+        a caller may retry as it is."""
         from PIL import Image
 
         try:
@@ -602,17 +607,17 @@ class WindowsAIProvider(BaseProvider):
         img = ImageOps.exif_transpose(img)
         if img.mode != "RGB":
             img = img.convert("RGB")
-        for edge in RETRY_LONG_EDGES:
-            if edge >= max(img.size):
-                continue
-            smaller = img.copy()
-            smaller.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+        edges = [edge for edge in RETRY_LONG_EDGES if edge < max(img.size)]
+        if not edges:
+            raise first
+        for edge in edges:   # largest first, so each resize shrinks the last one in place
+            img.thumbnail((edge, edge), Image.Resampling.LANCZOS)
             out = io.BytesIO()
-            smaller.save(out, format="JPEG", quality=90)
+            img.save(out, format="JPEG", quality=90)
             try:
                 return _helper.request(self._model, "image/jpeg", out.getvalue())
             except WindowsAIError as exc:
                 if exc.code != "internal_error":
                     raise
-        raise WindowsAIError(f"{first} It failed at smaller sizes too.", code="internal_error",
-                             per_image=True)
+        raise WindowsAIError(f"{str(first).rstrip('.')}. Windows couldn't describe it at a smaller "
+                             "size either.", code="internal_error")

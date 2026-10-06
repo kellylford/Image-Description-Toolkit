@@ -239,3 +239,17 @@ def test_registered_with_both_provider_lookups(monkeypatch):
     monkeypatch.setattr(ai_providers._windows_ai_provider, "is_available", lambda: True)
     assert "windows-ai" in ai_providers.get_available_providers()
     assert ai_providers.provider_key("Windows AI") == "windows-ai"
+
+
+def test_a_picture_that_fails_at_every_size_counts_toward_the_streak_not_as_a_refusal(pc, tmp_path):
+    """Every picture failing so is a broken helper: the batch must stop after ten in a row,
+    with "every remaining image would fail", not take it for Windows declining pictures."""
+    from PIL import Image
+
+    path = tmp_path / "large.jpg"
+    Image.new("RGB", (3000, 2000), (10, 120, 200)).save(path, format="JPEG")
+    helper = pc(*[error_for_code("internal_error", "COMException 0x80004005: Unspecified error")] * 4)
+    err = _fails(str(path))
+    assert err.kind == ai_providers.ErrorKind.UNKNOWN and not err.is_retryable
+    assert not getattr(err.__context__, "per_image", False)
+    assert len(helper.kinds) == 4

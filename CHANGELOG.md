@@ -14,6 +14,7 @@
 
 - ImageDescriber's Processing Options dialog now opens on the model in your default settings. It read a setting the real settings don't have, so it always started on the first model in the list.
 - Very large images sent to Claude Code that were still too big after resizing are now made smaller again instead of failing.
+- Large phone photos that IDT makes smaller before sending are turned upright first. They could reach the model on their side.
 
 ## [4.7.0] - 2026-10-06
 

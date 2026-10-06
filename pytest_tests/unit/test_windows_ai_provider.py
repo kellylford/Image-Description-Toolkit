@@ -558,11 +558,28 @@ def test_a_picture_windows_fails_on_is_tried_again_smaller(helper):
 
 def test_each_smaller_size_is_tried_before_giving_up_on_one_picture(helper):
     helper.configure(serve=["code:internal_error"] * 4)
-    with pytest.raises(WindowsAIError, match="smaller sizes too") as caught:
+    with pytest.raises(WindowsAIError, match="at a smaller size either") as caught:
         WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
     assert len(helper.requests()) == 4, "full size, then 2048, 1024 and 512"
-    # One picture Windows can't do: the batch carries on, and nothing retries it again.
-    assert caught.value.per_image and caught.value.status_code is None
+    # Not retried again, and not a refusal: every picture failing so is a broken helper,
+    # which a batch must stop for after ten in a row.
+    assert not caught.value.per_image and caught.value.status_code is None
+    assert "said the helper. Windows couldn't" in str(caught.value), "one clean sentence each"
+
+
+def test_a_small_picture_keeps_its_first_error_and_its_retry(helper):
+    helper.configure(serve=["code:internal_error"])
+    with pytest.raises(WindowsAIError, match="said the helper$") as caught:
+        WindowsAIProvider().describe(_photo(400, 300), "image/jpeg", "")
+    assert len(helper.requests()) == 1, "no smaller size to try"
+    assert caught.value.status_code == 503, "retryable as it is, as before"
+
+
+def test_a_refusal_at_full_size_is_not_tried_smaller(helper):
+    helper.configure(serve=["code:content_filtered"])
+    with pytest.raises(WindowsAIError):
+        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
+    assert len(helper.requests()) == 1
 
 
 def test_only_sizes_smaller_than_the_picture_are_tried(helper):
