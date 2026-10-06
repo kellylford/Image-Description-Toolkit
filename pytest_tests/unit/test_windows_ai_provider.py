@@ -530,3 +530,107 @@ def test_only_windows_ai_takes_no_prompt():
     assert not registry.uses_prompt("windows-ai") and not registry.uses_prompt("Windows AI")
     assert [p for p in registry.list_providers() if not registry.uses_prompt(p)] == ["windows-ai"]
     assert registry.uses_prompt("something-new"), "an unknown provider is assumed to take a prompt"
+
+
+# ---------------------------------------------------------------------------
+# InternalError: the picture at another size
+# ---------------------------------------------------------------------------
+
+
+def _photo(width, height):
+    import os as _os
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.frombytes("RGB", (width, height), _os.urandom(width * height * 3)).save(out, format="JPEG", quality=60)
+    return out.getvalue()
+
+
+def test_a_picture_windows_fails_on_is_tried_again_smaller(helper):
+    helper.configure(serve=["code:internal_error", "ok"])
+    result = WindowsAIProvider("brief").describe(_photo(3000, 2000), "image/jpeg", "")
+    assert result.text == "brief description 2"
+    first, second = helper.requests()
+    assert second["image_bytes"] < first["image_bytes"]
+    assert second["kind"] == "brief" and second["mime"] == "image/jpeg"
+
+
+def test_each_smaller_size_is_tried_before_giving_up_on_one_picture(helper):
+    helper.configure(serve=["code:internal_error"] * 4)
+    with pytest.raises(WindowsAIError, match="at a smaller size either") as caught:
+        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
+    assert len(helper.requests()) == 4, "full size, then 2048, 1024 and 512"
+    # Not retried again, and not a refusal: every picture failing so is a broken helper,
+    # which a batch must stop for after ten in a row.
+    assert not caught.value.per_image and caught.value.status_code is None
+    assert "said the helper. Windows couldn't" in str(caught.value), "one clean sentence each"
+
+
+def test_a_small_picture_keeps_its_first_error_and_its_retry(helper):
+    helper.configure(serve=["code:internal_error"])
+    with pytest.raises(WindowsAIError, match="said the helper$") as caught:
+        WindowsAIProvider().describe(_photo(400, 300), "image/jpeg", "")
+    assert len(helper.requests()) == 1, "no smaller size to try"
+    assert caught.value.status_code == 503, "retryable as it is, as before"
+
+
+def test_a_refusal_at_full_size_is_not_tried_smaller(helper):
+    helper.configure(serve=["code:content_filtered"])
+    with pytest.raises(WindowsAIError):
+        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
+    assert len(helper.requests()) == 1
+
+
+def test_only_sizes_smaller_than_the_picture_are_tried(helper):
+    helper.configure(serve=["code:internal_error"] * 4)
+    with pytest.raises(WindowsAIError):
+        WindowsAIProvider().describe(_photo(800, 600), "image/jpeg", "")
+    assert len(helper.requests()) == 2, "full size, then 512"
+
+
+def test_a_different_failure_at_a_smaller_size_is_reported_as_itself(helper):
+    helper.configure(serve=["code:internal_error", "code:content_filtered"])
+    with pytest.raises(WindowsAIError) as caught:
+        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
+    assert caught.value.code == "content_filtered"
+
+
+def test_a_sideways_phone_photo_is_sent_upright_at_a_smaller_size(helper, tmp_path, monkeypatch):
+    """Re-encoding drops EXIF, so the smaller copy must be turned upright before it is sent."""
+    from PIL import Image
+
+    img = Image.new("RGB", (3000, 2000), (200, 30, 30))   # stored landscape...
+    exif = img.getexif()
+    exif[0x0112] = 6                                       # ...shown portrait (rotate 90)
+    out = io.BytesIO()
+    img.save(out, format="JPEG", exif=exif)
+    sent = []
+    real_request = windows_ai._helper.request
+
+    def capture(kind, mime, data, timeout=windows_ai.DESCRIBE_TIMEOUT_SECONDS):
+        sent.append(data)
+        return real_request(kind, mime, data, timeout)
+
+    monkeypatch.setattr(windows_ai._helper, "request", capture)
+    helper.configure(serve=["code:internal_error", "ok"])
+    WindowsAIProvider().describe(out.getvalue(), "image/jpeg", "")
+    width, height = Image.open(io.BytesIO(sent[1])).size
+    assert height > width, "the retried copy is portrait, as the photo is shown"
+
+
+def test_fit_image_turns_a_sideways_photo_upright():
+    import os as _os
+
+    from PIL import Image
+
+    from idt_core.converter import fit_image
+
+    img = Image.frombytes("RGB", (3000, 2000), _os.urandom(3000 * 2000 * 3))
+    exif = img.getexif()
+    exif[0x0112] = 6
+    out = io.BytesIO()
+    img.save(out, format="JPEG", quality=95, exif=exif)
+    data, mime = fit_image(out.getvalue(), "image/jpeg", 500_000, 1000)
+    width, height = Image.open(io.BytesIO(data)).size
+    assert height > width

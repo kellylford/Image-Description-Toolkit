@@ -86,7 +86,11 @@ def fit_image(image_bytes: bytes, mime_type: str, max_bytes: int,
         return image_bytes, mime_type
     from PIL import Image
 
-    img = Image.open(io.BytesIO(image_bytes))
+    from PIL import ImageOps
+
+    # The copy is saved without EXIF, so a phone photo is turned upright first, or it would
+    # reach the model on its side.
+    img = ImageOps.exif_transpose(Image.open(io.BytesIO(image_bytes)))
     if img.mode != "RGB":
         img = img.convert("RGB")
     # Almost every photo fits at long_edge. One that doesn't (fine detail or noise compresses

@@ -135,6 +135,8 @@ _NO_IDENTITY_HINT = (
 _PER_IMAGE_CODES = {"content_filtered", "too_much_text", "unsupported_format", "decode_failed", "too_large"}
 _SETUP_CODES = {"not_supported", "disabled_by_user", "blocked_by_policy"}
 #: Worth one retry: the model may still be loading, or Windows hit something transient.
+#: (internal_error is first retried at smaller sizes by WindowsAIProvider.describe, which
+#: decides what a picture that fails at every size means; this covers the rest.)
 _RETRYABLE_CODES = {"not_ready", "internal_error"}
 
 #: No console window flashing up for the helper. Windows only: elsewhere a non-zero
@@ -532,6 +534,13 @@ def normalise_kind(model: Optional[str]) -> str:
 MAX_IMAGE_BYTES = 4_000_000
 FIT_LONG_EDGE = 4096
 
+#: Sizes, as the longer side in pixels, to try a picture again at when Windows' model fails on
+#: it with InternalError. The failure belongs to a picture at one size, not to the picture: on a
+#: Copilot+ PC (10/6/2026), photos that failed at full size every time were described at 2048,
+#: 1024 or 512, a different one for each photo, and one that failed at 1024 was described at
+#: 2048. Retrying at the same size only failed again.
+RETRY_LONG_EDGES = (2048, 1024, 512)
+
 
 def _as_supported_image(image_bytes: bytes, mime_type: str):
     """The picture in a type and size the helper accepts: as it is, or converted to JPEG,
@@ -569,5 +578,46 @@ class WindowsAIProvider(BaseProvider):
 
     def describe(self, image_bytes: bytes, mime_type: str, prompt: str) -> DescriptionResult:
         image_bytes, mime_type = _as_supported_image(image_bytes, mime_type)
-        text = _helper.request(self._model, mime_type, image_bytes)
+        try:
+            text = _helper.request(self._model, mime_type, image_bytes)
+        except WindowsAIError as exc:
+            if exc.code != "internal_error":
+                raise
+            text = self._describe_at_other_sizes(image_bytes, exc)
         return DescriptionResult(text=text, model=self._model, provider="windows-ai")
+
+    def _describe_at_other_sizes(self, image_bytes: bytes, first: WindowsAIError) -> str:
+        """Try a picture Windows failed on again at each of :data:`RETRY_LONG_EDGES` smaller
+        than it. If none works, it is reported as a failure that isn't retried and isn't a
+        refusal: rare for one picture (none of 8 measured), but every picture failing so is a
+        broken helper, which a batch should stop for after ten in a row, not take for Windows
+        declining pictures. A picture with no smaller size to try keeps its first error, which
+        a caller may retry as it is."""
+        from PIL import Image
+
+        try:
+            img = Image.open(io.BytesIO(image_bytes))
+            img.load()
+        except Exception:                                   # noqa: BLE001
+            raise first   # not a picture PIL reads: nothing to resize
+        # The copy is saved without EXIF, so turn a phone photo upright first, or the copy
+        # would reach Windows on its side.
+        from PIL import ImageOps
+
+        img = ImageOps.exif_transpose(img)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        edges = [edge for edge in RETRY_LONG_EDGES if edge < max(img.size)]
+        if not edges:
+            raise first
+        for edge in edges:   # largest first, so each resize shrinks the last one in place
+            img.thumbnail((edge, edge), Image.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img.save(out, format="JPEG", quality=90)
+            try:
+                return _helper.request(self._model, "image/jpeg", out.getvalue())
+            except WindowsAIError as exc:
+                if exc.code != "internal_error":
+                    raise
+        raise WindowsAIError(f"{str(first).rstrip('.')}. Windows couldn't describe it at a smaller "
+                             "size either.", code="internal_error")
