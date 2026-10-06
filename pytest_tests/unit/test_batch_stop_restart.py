@@ -2097,7 +2097,8 @@ def test_late_completion_during_a_quit_keeps_the_batch_to_resume(frame, monkeypa
     assert seen["saves"] == 0
     assert "Batch complete" not in seen["status"]
     assert seen["batch_state"] is not None
-    assert Workspace.open(Path(f.workspace_file)).batch_state is not None
+    on_disk = Workspace.open(Path(f.workspace_file)).batch_state
+    assert on_disk is not None
     assert f.infos == []
 
 
