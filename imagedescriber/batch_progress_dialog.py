@@ -238,6 +238,16 @@ class BatchProgressDialog(wx.Dialog):
         self._extraction = {"done": done, "total": total, "name": name}
         self._rebuild()
 
+    def show_waiting_for_frames(self) -> None:
+        """Describing has caught up with extraction: say so in place of the
+        last image, which was no longer being described."""
+        if self._last_progress is None:
+            return
+        args = dict(self._last_progress)
+        args.update(file_path=None,
+                    image_name="(waiting for the next video's frames)")
+        self.update_progress(**args)
+
     def stop_extraction(self) -> None:
         """Extraction was stopped (Stop, a halt): drop its row so the final
         stats don't still say videos are being extracted. No title change:
@@ -560,6 +570,10 @@ class BatchProgressDialog(wx.Dialog):
         Changes Pause→disabled, Stop→Close, updates title to show completion.
         """
         self._is_complete = True
+        # Redraw first: a failure noted after the last progress update (the
+        # batch's last image failing) was counted in the summary below but
+        # not in the stats, which read "Failed: 3" over "4 failed".
+        self._rebuild()
         # Late extraction ticks must not rebuild the list over the summary.
         self._extraction = None
         self._last_progress = None

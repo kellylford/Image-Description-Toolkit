@@ -1194,7 +1194,8 @@ class BatchProcessingWorker(threading.Thread):
         with self._queue_cond:
             return self._queue_open
 
-    def queued_count(self) -> int:
+    def queued_total(self) -> int:
+        """Images ever queued for this batch, done or not."""
         with self._queue_cond:
             return len(self.file_paths)
 
@@ -1280,6 +1281,16 @@ class BatchProcessingWorker(threading.Thread):
                     break
 
                 # The next image; with an open queue this waits for more.
+                # Say so first, or the window kept showing the last image as
+                # the one being described for as long as a video took (#352).
+                with self._queue_cond:
+                    will_wait = i >= len(self.file_paths) and self._queue_open
+                if will_wait and not self._stop_event.is_set():
+                    evt = ProgressUpdateEventData(
+                        file_path="", message="Waiting for the next video's frames…",
+                        current=0, total=len(self.file_paths) + self.progress_offset)
+                    evt.waiting_for_frames = True
+                    wx.PostEvent(self.parent_window, evt)
                 wait_started = time.time()
                 file_path, total = self._next_file(i)
                 if file_path is None:
