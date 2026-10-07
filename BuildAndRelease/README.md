@@ -77,10 +77,10 @@ Located in `MacBuilds/`:
 
 ### Windows Build Process
 
-1. **Setup** (one-tWinBuilds/builditall_wx.bat` to build all executables
+1. **Setup** (one-time): Run `winsetup.bat` from project root to create .winenv for each app
+2. **Build**: Run `WinBuilds/builditall_wx.bat` to build all executables
 3. **Package**: Run `WinBuilds/package_all_windows.bat` to collect to dist_all/bin/
-4. **Installer**: Run `WinBuilds/ckage_all_windows.bat` to collect to dist_all/bin/
-4. **Installer**: Run `build_installer.bat` to create Windows installer
+4. **Installer**: Run `WinBuilds/build_installer.bat` to create Windows installer. It stops if Windows AI's helper packages (`windows_ai_helper/dist/*.msix`) are missing, which they always are locally: only the GitHub "Build Windows Executables" workflow builds and signs them. Release with that workflow's installer, or `set IDT_ALLOW_NO_WINDOWS_AI=1` to build one without Windows AI.
 
 ### macOS Build Process
 

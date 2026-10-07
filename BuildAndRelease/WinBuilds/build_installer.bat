@@ -99,6 +99,39 @@ if %MISSING_FILES%==1 (
     exit /b 1
 )
 
+REM Windows AI's helper packages. installer.iss quietly leaves Windows AI out
+REM without them, and only the Windows build workflow makes them: it builds and
+REM signs them, and Windows won't install an unsigned one. So a local build has
+REM none, and on a PC that already has the helper the result still seems to work.
+REM Stop here unless leaving Windows AI out is meant.
+set MISSING_WINDOWS_AI=0
+if not exist "..\..\windows_ai_helper\dist\IdtWindowsAI_x64.msix" set MISSING_WINDOWS_AI=1
+if not exist "..\..\windows_ai_helper\dist\IdtWindowsAI_arm64.msix" set MISSING_WINDOWS_AI=1
+
+if %MISSING_WINDOWS_AI%==1 if not "%IDT_ALLOW_NO_WINDOWS_AI%"=="1" (
+    echo ERROR: Windows AI's helper packages are not here, so this installer would
+    echo not include Windows AI.
+    echo.
+    echo Expected: windows_ai_helper\dist\IdtWindowsAI_x64.msix
+    echo           windows_ai_helper\dist\IdtWindowsAI_arm64.msix
+    echo.
+    echo Only the GitHub "Build Windows Executables" workflow can make them, because
+    echo it signs them. For a release, use the installer that workflow builds: the
+    echo idt-installer-windows artifact of its latest run on main.
+    echo.
+    echo To build this installer without Windows AI anyway, run:
+    echo   set IDT_ALLOW_NO_WINDOWS_AI=1
+    echo and then build_installer.bat again.
+    echo.
+    pause
+    exit /b 1
+)
+
+if %MISSING_WINDOWS_AI%==1 (
+    echo WARNING: Building without Windows AI, as IDT_ALLOW_NO_WINDOWS_AI=1 asks.
+    echo.
+)
+
 echo All required files found.
 echo.
 echo Compiling installer...
