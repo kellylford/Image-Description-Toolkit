@@ -30,7 +30,7 @@ IDT includes three standalone applications that share the same AI provider infra
 | OpenAI GPT | `openai` | `openai` | Cloud | Yes | Windows, macOS |
 | Claude Code (your Claude subscription) | `claude-code` | `claude-code` | Cloud | No — sign in to Claude Code | Windows, macOS |
 | Apple Intelligence (on-device) | `apple` | `apple` | Local | No | macOS 27+, Apple Silicon |
-| Windows AI (on-device) | `windows-ai` | `windows-ai` | Local | No | Windows 11 24H2+, Copilot+ PC |
+| Windows AI (on-device) | `Windows-AI` | `Windows-AI` | Local | No | Windows 11 24H2+, Copilot+ PC |
 | MLX (Apple Silicon) | — | `mlx` | Local | No | ImageDescriber only, macOS Apple Silicon |
 
 ---
@@ -1159,7 +1159,7 @@ All menu items, buttons, and interactive controls are reachable by keyboard. Arr
 > | `openai` | `openai` | Same name in both |
 > | `claude-code` | `claude-code` | Same name in both; shown as "Claude Code" in pickers |
 > | `apple` | `apple` | Same name in both; shown as "Apple Intelligence" in pickers |
-> | `windows-ai` | `windows-ai` | Same name in both; shown as "Windows AI" in pickers |
+> | `Windows-AI` | `Windows-AI` | Same name in both, in any case (`windows-ai` works too); shown as "Windows AI" in pickers |
 > | — | `ollama_cloud` | GUI only; remote Ollama server |
 > | — | `mlx` | GUI only; Apple Silicon local models |
 
@@ -1386,7 +1386,7 @@ idt chat --provider apple
 
 Windows 11 can describe images with Windows' own on-device model on a Copilot+ PC, and IDT uses it as a provider. The model runs on the PC's NPU: nothing is uploaded, and it needs no API key, no account and no internet connection, and costs nothing however many images you describe. It is for describing images, in `idt describe` and ImageDescriber; it can't chat.
 
-**CLI and GUI provider name:** `windows-ai` (shown as **Windows AI** in pickers)
+**CLI and GUI provider name:** `Windows-AI`, in any case (shown as **Windows AI** in pickers)
 
 **What you need**
 
@@ -1399,7 +1399,7 @@ Windows 11 can describe images with Windows' own on-device model on a Copilot+ P
 The installer does it, on a PC with an NPU. It adds a small helper that lets IDT reach Windows' model, and the Windows App Runtime that the helper needs if your PC doesn't already have it (a download of about 100 MB from Microsoft). Then check it:
 
 ```bash
-idt models --provider windows-ai
+idt models --provider Windows-AI
 ```
 
 That lists the models when the PC is ready, and says what is wrong when it is not: not a Copilot+ PC, Windows too old, or the AI features turned off. The first time, Windows may need to download its model; IDT says so and waits. That can take a few minutes, once.
@@ -1424,8 +1424,8 @@ Photos, quickly and privately. A description takes about two to four seconds on 
 **CLI examples**
 
 ```bash
-idt describe C:\Photos --provider windows-ai
-idt describe C:\Photos --provider windows-ai --model brief
+idt describe C:\Photos --provider Windows-AI
+idt describe C:\Photos --provider Windows-AI --model brief
 ```
 
 **Not available in:** chat (IDT Chat, `idt chat`, ImageDescriber's chat), follow-up questions and auto-rename. All of these send a prompt, and Windows AI takes none.

@@ -310,6 +310,22 @@ def display_name(provider_name: str) -> str:
     return caps.display_name or (provider_name or "").strip().title()
 
 
+#: How a provider is written where a person types it (``--provider``). Keys are
+#: lowercase, which reads fine for "claude-code" but not "windows-ai": a screen
+#: reader says the lowercase "ai" as a word. Every spelling is accepted on the way
+#: in -- lookups ignore case -- so this only changes what is shown.
+_TYPED_NAMES: Dict[str, str] = {"windows-ai": "Windows-AI"}
+
+
+def typed_name(provider_name: str) -> str:
+    """The provider as someone would type it: "windows-ai" -> "Windows-AI".
+
+    Unregistered names, and providers without a typed form of their own, come
+    back unchanged.
+    """
+    return _TYPED_NAMES.get(_canonical(provider_name), provider_name)
+
+
 def list_providers() -> List[str]:
     """Canonical names of every registered provider."""
     return sorted(_REGISTRY)

@@ -42,7 +42,7 @@ description takes about two to four seconds.
 **Setting it up.** The installer does it: leave **Set up Windows AI** ticked. On a
 PC with an NPU it adds a small helper that lets IDT reach Windows' model, and the
 Windows App Runtime from Microsoft if the PC doesn't already have it (about 100 MB,
-downloaded once). Then `idt models --provider windows-ai` lists its models, or
+downloaded once). Then `idt models --provider Windows-AI` lists its models, or
 says what's missing.
 
 **Its models are kinds of description.** Windows' model takes no prompt. It offers
@@ -53,8 +53,8 @@ style isn't used: ImageDescriber's prompt controls say "not used by Windows AI",
 and descriptions record the prompt as "none".
 
 ```bash
-idt describe C:\Photos --provider windows-ai
-idt describe C:\Photos --provider windows-ai --model brief
+idt describe C:\Photos --provider Windows-AI
+idt describe C:\Photos --provider Windows-AI --model brief
 ```
 
 **Where it works.** `idt describe` and the other describing commands, `idt guideme`
@@ -519,4 +519,4 @@ models each provider recommends for describing images:
 | Ollama | whatever you've pulled — `idt models --provider ollama` |
 | Claude Code | `haiku`, `sonnet`, `opus` — aliases that always point at the current model of each tier |
 | Apple Intelligence | `system` — the one on-device model; run `idt models --provider apple` to check this Mac is ready |
-| Windows AI | `accessible`, `detailed`, `brief`, `diagram` — the kinds of description; run `idt models --provider windows-ai` to check this PC is ready |
+| Windows AI | `accessible`, `detailed`, `brief`, `diagram` — the kinds of description; run `idt models --provider Windows-AI` to check this PC is ready |

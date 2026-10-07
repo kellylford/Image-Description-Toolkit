@@ -176,7 +176,8 @@ def test_the_prompt_editor_keeps_a_windows_ai_default_provider(frame):
 
     dlg = prompt_editor_dialog.PromptEditorDialog(frame)
     try:
-        assert dlg.provider_combo.SetStringSelection("windows-ai")
+        assert dlg.provider_combo.SetStringSelection("Windows-AI")
+        assert dlg._selected_provider() == "windows-ai"
     finally:
         dlg.Destroy()
 
@@ -191,6 +192,16 @@ def test_settings_offer_it_as_the_default_provider():
     setting = meta["AI Model Settings"]["default_provider"]
     assert "windows-ai" in setting["choices"]
     assert "takes no prompt" in setting["description"]
+
+
+def test_settings_show_it_as_windows_dash_ai_and_save_the_key():
+    """A screen reader says the lowercase "ai" of "windows-ai" as a word."""
+    import configure_dialog
+
+    setting = {"choices": ["ollama", "windows-ai"], "choice_labels": {"windows-ai": "Windows-AI"}}
+    assert configure_dialog._choice_label(setting, "windows-ai") == "Windows-AI"
+    assert configure_dialog._choice_value(setting, "Windows-AI") == "windows-ai"
+    assert configure_dialog._choice_value(setting, "ollama") == "ollama"
 
 
 # ---------------------------------------------------------------------------

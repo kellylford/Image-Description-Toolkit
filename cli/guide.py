@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from idt_core.providers.registry import typed_name
+
 _here = Path(__file__).parent.parent
 if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
@@ -149,12 +151,15 @@ def _step_provider() -> str:
     from idt_core.providers.windows_ai import is_available as _windows_ai_available
 
     if _windows_ai_available():
-        print("  windows-ai - Windows AI on this Copilot+ PC (no API key, works offline;")
+        print("  Windows-AI - Windows AI on this Copilot+ PC (no API key, works offline;")
         print("               describes with a fixed kind of description, no prompt)")
         providers.append("windows-ai")
     print()
-    choice = get_choice("Which provider?", providers, default=1)
-    return choice
+    # Listed as typed (Windows-AI, not windows-ai: a screen reader says a lowercase "ai"
+    # as a word), returned as the key.
+    shown = [typed_name(p) for p in providers]
+    choice = get_choice("Which provider?", shown, default=1)
+    return providers[shown.index(choice)] if choice in shown else choice
 
 
 def _step_api_key(provider: str) -> bool:
@@ -573,14 +578,14 @@ def _build_command(
         parts.append("--preserve-alt-text" if extra.get("preserve_alt_text", True) else "--no-preserve-alt-text")
         if not extra.get("redescribe", True):
             parts.append("--no-redescribe")
-        parts += ["--provider", provider, "--model", model]
+        parts += ["--provider", typed_name(provider), "--model", model]
         if provider != "windows-ai":
             parts += ["--prompt", prompt_name]
         if extra.get("limit"):
             parts += ["--max", str(extra["limit"])]
     else:
         parts += ["describe", source]
-        parts += ["--provider", provider, "--model", model]
+        parts += ["--provider", typed_name(provider), "--model", model]
         if provider != "windows-ai":
             parts += ["--prompt", prompt_name]
         if not extract_metadata:
@@ -713,7 +718,7 @@ def run_guide() -> None:
                 cmd_str = _format_command(cmd_parts)
 
                 _header("Command Summary")
-                print("Provider:   ", state["provider"])
+                print("Provider:   ", typed_name(state["provider"]))
                 print("Model:      ", state["model"])
                 print("Source:     ", state["source"])
                 from cli.prompt_use import prompt_label
