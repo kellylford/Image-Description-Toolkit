@@ -497,6 +497,13 @@ class HelperProcess:
                 self._stopped = True
             self._close_locked()
 
+    def restart(self) -> None:
+        """Stop the helper so the next request starts a fresh one, with a fresh copy of the
+        model. Unlike :meth:`stop` this isn't a cancel: it's for a helper whose model has got
+        stuck, and is called between requests, never while one waits."""
+        with self._request_lock, self._state_lock:
+            self._close_locked()
+
 
 #: The process-wide helper. One is right: requests are handled one at a time anyway, so a
 #: second would add memory without adding throughput.
@@ -579,20 +586,44 @@ class WindowsAIProvider(BaseProvider):
     def describe(self, image_bytes: bytes, mime_type: str, prompt: str) -> DescriptionResult:
         image_bytes, mime_type = _as_supported_image(image_bytes, mime_type)
         try:
-            text = _helper.request(self._model, mime_type, image_bytes)
+            text = self._describe_at_any_size(image_bytes, mime_type)
         except WindowsAIError as exc:
             if exc.code != "internal_error":
                 raise
-            text = self._describe_at_other_sizes(image_bytes, exc)
+            # Windows' model can get stuck: on a Copilot+ PC (10/7/2026), four hours into a
+            # batch, every picture began failing with InternalError at every size, until the
+            # batch halted; resumed later, the same pictures were described at once. Before
+            # giving up on a picture, start the helper again (a new process, so a new copy of
+            # the model) and try once more. The helper's own Describer.Reset recreates the model
+            # too, but only after an unexpected exception, not for an InternalError result.
+            _helper.restart()
+            try:
+                text = self._describe_at_any_size(image_bytes, mime_type)
+            except WindowsAIError as again:
+                if again.code != "internal_error":
+                    raise
+                # Not retryable (no 503): the restart was the retry, and a caller retrying
+                # would only restart the helper again.
+                raise WindowsAIError(f"{str(again).rstrip('.')}, even after restarting Windows AI.",
+                                     code=again.code)
         return DescriptionResult(text=text, model=self._model, provider="windows-ai")
+
+    def _describe_at_any_size(self, image_bytes: bytes, mime_type: str) -> str:
+        """The picture at full size, then, if Windows fails on it, at the smaller sizes."""
+        try:
+            return _helper.request(self._model, mime_type, image_bytes)
+        except WindowsAIError as exc:
+            if exc.code != "internal_error":
+                raise
+            return self._describe_at_other_sizes(image_bytes, exc)
 
     def _describe_at_other_sizes(self, image_bytes: bytes, first: WindowsAIError) -> str:
         """Try a picture Windows failed on again at each of :data:`RETRY_LONG_EDGES` smaller
         than it. If none works, it is reported as a failure that isn't retried and isn't a
-        refusal: rare for one picture (none of 8 measured), but every picture failing so is a
-        broken helper, which a batch should stop for after ten in a row, not take for Windows
-        declining pictures. A picture with no smaller size to try keeps its first error, which
-        a caller may retry as it is."""
+        refusal: rare for one picture (none of 8 measured). Every picture failing so is a stuck
+        model, which :meth:`describe` restarts the helper for; if that doesn't cure it, a batch
+        should stop after ten in a row, not take it for Windows declining pictures. A picture
+        with no smaller size to try keeps its first error."""
         from PIL import Image
 
         try:
@@ -619,5 +650,4 @@ class WindowsAIProvider(BaseProvider):
             except WindowsAIError as exc:
                 if exc.code != "internal_error":
                     raise
-        raise WindowsAIError(f"{str(first).rstrip('.')}. Windows couldn't describe it at a smaller "
-                             "size either.", code="internal_error")
+        raise WindowsAIError(f"{str(first).rstrip('.')} at any size.", code="internal_error")

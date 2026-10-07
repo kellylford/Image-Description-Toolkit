@@ -1,3 +1,11 @@
+## [4.8.1] - 2026-10-07
+
+### 🐛 Bug Fixes
+
+**Windows AI tries harder before a stuck model stops a batch**
+- About four hours into a long batch, Windows' model began failing on every picture with "Windows couldn't describe this picture (InternalError)", at every size, and after ten in a row the batch stopped. The pictures were fine: resumed later, the same ones were described straight away.
+- Now, when a picture fails at every size, IDT restarts Windows AI, which loads a fresh copy of the model, and tries the picture once more before giving up on it. If it still fails, the message reads "Windows couldn't describe this picture (InternalError) at any size, even after restarting Windows AI." If every picture fails like that, the batch still stops after ten in a row, and resuming it later carries on where it stopped.
+
 ## [4.8.0] - 2026-10-06
 
 ### ✨ New
