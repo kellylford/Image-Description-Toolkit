@@ -64,3 +64,52 @@ been released since 4.6.1.
 - A real halt during a long extraction, against a real provider.
 - The Mac: the Apple Intelligence refusal path, and VoiceOver on the iPhone library.
 - #355 in a built executable. CI built it; nobody ran it.
+
+---
+
+## Windows AI: a name a screen reader says properly
+
+The provider key `windows-ai` was shown to people as-is: in CLI help, `idt models`,
+the guide, the Configure and Prompt Editor dialogs, description metadata and the docs.
+A screen reader says the lowercase "ai" in it as a word. Microsoft's own name is
+"Windows AI" (the Windows AI APIs), never `windows-ai`.
+
+### Decisions
+
+- **The key stays `windows-ai`.** It is in config files, workspaces and tests, and every
+  other key is lowercase. Only what people see and type changed.
+- **Spoken name: "Windows AI"** (the registry's `display_name`, unchanged), used wherever a
+  stored provider is shown: the ImageDescriber description pane, its text and HTML
+  exports, the resume-batch prompt, `idt show`, and `idt_core/exporter.py`'s text and
+  HTML exports. These now use the display name for every provider ("Claude",
+  "Ollama"), which matches what the batch progress and chat windows already did. CSV and
+  JSON columns still hold keys.
+- **Typed name: `Windows-AI`**: the new `registry.typed_name()`. Used in `--provider`
+  help, usage and errors, `idt models` headings, the guide's menu, summary and built
+  command, the Configure dialog's default_provider choice (through a new
+  `choice_labels` setting option), the Prompt Editor's picker and the docs.
+- **`--provider` takes any case and any alias**: `Windows-AI`, `windows-ai`, `WindowsAI`,
+  `"Windows AI"`. It no longer uses argparse `choices`, whose error would list the keys.
+  `idt config --set default_provider=Windows-AI` saves the key.
+
+### Files changed
+
+`idt_core/providers/registry.py`, `cli/main.py`, `cli/guide.py`,
+`imagedescriber/configure_dialog.py`, `imagedescriber/prompt_editor_dialog.py`,
+`imagedescriber/imagedescriber_wx.py`, `idt_core/exporter.py`, `CHANGELOG.md`,
+`docs/USER_GUIDE.md`, `docs/DEVELOPER_GUIDE.md`, `docs/release-notes-v4.8.0.md`, and tests
+in `test_cli_models_command.py`, `test_windows_ai_provider.py`,
+`test_windows_ai_dialogs.py` and `test_provider_picker_platform.py`.
+
+### Tests
+
+- Full suite before the test updates: 2162 passed, 52 skipped, 1 failed. The failure was
+  the expected one: the Prompt Editor picker test pinned its labels to the raw keys.
+- After the updates: the five affected files pass (166 tests).
+- On this Copilot+ PC, `idt models --provider "Windows AI"` listed the four kinds under
+  "Windows-AI"; `--provider bogus` lists `Windows-AI` among the choices.
+
+### Not tested
+
+- The GUI dialogs were not opened by hand with a screen reader. Only unit tests covered them.
+- No frozen build was made.

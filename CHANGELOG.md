@@ -3,7 +3,7 @@
 ### ✨ New
 
 **Windows AI: describe images on a Copilot+ PC, on the PC itself (#360)**
-- A new provider, `windows-ai`, uses Windows' own on-device model. It runs on the PC's NPU: no API key, no account, no internet connection and no cost, and pictures never leave the PC. It needs a Copilot+ PC with Windows 11 24H2 or later.
+- A new provider, Windows AI (`--provider Windows-AI`), uses Windows' own on-device model. It runs on the PC's NPU: no API key, no account, no internet connection and no cost, and pictures never leave the PC. It needs a Copilot+ PC with Windows 11 24H2 or later.
 - Its models are the four kinds of description Windows offers: accessible (the default, written for people who are blind or have low vision), detailed, brief and diagram. It takes no prompt, so the prompt style isn't used and descriptions record the prompt as "none".
 - It works in `idt describe` and the other describing commands, `idt guideme`, and ImageDescriber. It isn't offered for chat, follow-up questions or auto-rename, which all need a prompt.
 - Windows declines some pictures: ones that are mostly text (OCR suits those better), and ones its content filter stops. Each is marked as failed and the batch carries on, as for Apple Intelligence's refusals.

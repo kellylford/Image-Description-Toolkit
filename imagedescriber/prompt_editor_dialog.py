@@ -93,6 +93,7 @@ except ImportError:
 # "claude-code" -> "Claude Code". idt_core imports the same way in dev and
 # frozen builds, so no try/except fallback is needed.
 from idt_core.providers.registry import display_name as _display_provider  # noqa: E402
+from idt_core.providers.registry import typed_name as _typed_provider  # noqa: E402
 
 
 class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
@@ -223,9 +224,10 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
         self.provider_combo = wx.Choice(
             provider_panel,
             name="AI provider",
-            # Lowercase keys, not display labels: this dialog compares the
-            # selection against provider names directly.
-            choices=[key for key, _ in provider_picker_choices()],
+            # Keys as typed, not display labels: this is the default_provider
+            # setting, which is a key. Windows-AI rather than windows-ai, which a
+            # screen reader says with "ai" as a word; _selected_provider maps back.
+            choices=[_typed_provider(key) for key, _ in provider_picker_choices()],
         )
         self.provider_combo.Bind(wx.EVT_CHOICE, self.on_provider_changed)
         provider_sizer.Add(self.provider_combo, 0, wx.EXPAND)
@@ -352,7 +354,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             # would then write an empty default_provider back to the config.
             # Reachable whenever a config names a provider this machine cannot
             # offer — e.g. one written on a Mac with MLX, opened on Windows.
-            if not self.provider_combo.SetStringSelection(provider):
+            if not self.provider_combo.SetStringSelection(_typed_provider(provider)):
                 self.provider_combo.SetSelection(0)
             
             api_key = self.config_data.get('api_key', '')
@@ -415,11 +417,15 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
                 actual_key = lower_variations[default_style.lower()]
                 self.default_prompt_combo.SetStringSelection(actual_key)
     
+    def _selected_provider(self) -> str:
+        """The provider key the picker shows: "Windows-AI" -> "windows-ai"."""
+        return self.provider_combo.GetStringSelection().lower()
+
     def populate_model_combo(self):
         """Populate the default model combo box with models from the selected provider"""
         self.default_model_combo.Clear()
         
-        provider = self.provider_combo.GetStringSelection()
+        provider = self._selected_provider()
         
         try:
             # Get models based on selected provider
@@ -571,7 +577,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
     
     def on_provider_changed(self, event):
         """Handle AI provider change"""
-        provider = self.provider_combo.GetStringSelection()
+        provider = self._selected_provider()
         # Show/hide API key field based on provider
         needs_api_key = provider in ["openai"]
         self.api_key_panel.Show(needs_api_key)
@@ -729,7 +735,7 @@ class PromptEditorDialog(wx.Dialog, ModifiedStateMixin):
             self.config_data['default_prompt_style'] = self.default_prompt_combo.GetStringSelection()
             
             # Update default provider
-            self.config_data['default_provider'] = self.provider_combo.GetStringSelection()
+            self.config_data['default_provider'] = self._selected_provider()
             
             # Update API key (only if not empty)
             api_key = self.api_key_text.GetValue().strip()

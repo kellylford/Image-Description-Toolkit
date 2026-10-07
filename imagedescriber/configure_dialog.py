@@ -36,6 +36,19 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def _choice_label(setting_info: Dict[str, Any], value: Any) -> Any:
+    """What a choice setting shows for ``value``: its entry in "choice_labels", else itself."""
+    return setting_info.get("choice_labels", {}).get(value, value)
+
+
+def _choice_value(setting_info: Dict[str, Any], label: str) -> str:
+    """The value a shown choice stands for: the reverse of :func:`_choice_label`."""
+    for value, shown in setting_info.get("choice_labels", {}).items():
+        if shown == label:
+            return value
+    return label
+
+
 class ApiKeyEditDialog(wx.Dialog):
     """Dialog for adding or editing an API key"""
 
@@ -177,6 +190,8 @@ except ImportError as e:
     print("This indicates a PyInstaller build issue or missing dependency.")
     sys.exit(1)
 
+from idt_core.providers.registry import typed_name as typed_provider_name  # noqa: E402
+
 
 class SettingEditDialog(wx.Dialog):
     """Dialog for editing a single setting value"""
@@ -259,12 +274,12 @@ class SettingEditDialog(wx.Dialog):
             elif setting_type == "choice":
                 self.editor = wx.Choice(panel)
                 choices = self.setting_info.get("choices", [])
-                self.editor.Append(choices)
+                self.editor.Append([_choice_label(self.setting_info, c) for c in choices])
                 
                 # Handle current value - if it's not in the list, add it as first option
                 if self.current_value:
                     if self.current_value in choices:
-                        self.editor.SetStringSelection(str(self.current_value))
+                        self.editor.SetStringSelection(str(_choice_label(self.setting_info, self.current_value)))
                     else:
                         # Add current value as first choice (user may have custom model)
                         self.editor.Insert(f"{self.current_value} (current)", 0)
@@ -363,7 +378,7 @@ class SettingEditDialog(wx.Dialog):
             # Strip " (current)" suffix if present (added for custom values)
             if value.endswith(" (current)"):
                 value = value[:-10]  # Remove " (current)"
-            return value
+            return _choice_value(self.setting_info, value)
         else:
             return self.editor.GetValue()
 
@@ -507,7 +522,9 @@ class ConfigureDialog(wx.Dialog):
                     "path": ["default_provider"],
                     "type": "choice",
                     "choices": ["ollama", "openai", "claude", "claude-code", "apple", "windows-ai"],
-                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys, claude-code uses your Claude subscription through the Claude Code app (sign in with 'claude auth login'), apple runs Apple Intelligence on this Mac (macOS 27; accept the terms once with 'sudo fm license'), and windows-ai runs Windows' own model on a Copilot+ PC (it takes no prompt; its models are kinds of description)."
+                    # Shown as typed: a screen reader says a lowercase "ai" as a word.
+                    "choice_labels": {"windows-ai": typed_provider_name("windows-ai")},
+                    "description": "Default AI provider to use when processing images. Ollama runs locally, OpenAI and Claude require API keys, claude-code uses your Claude subscription through the Claude Code app (sign in with 'claude auth login'), apple runs Apple Intelligence on this Mac (macOS 27; accept the terms once with 'sudo fm license'), and Windows-AI runs Windows' own model on a Copilot+ PC (it takes no prompt; its models are kinds of description)."
                 },
                 "default_model": {
                     "file": "image_describer",
@@ -1017,7 +1034,7 @@ class ConfigureDialog(wx.Dialog):
             current_value = self.get_setting_value(setting_info)
             
             # Format display text: "Setting Name: current_value"
-            display_text = f"{setting_name}: {current_value}"
+            display_text = f"{setting_name}: {_choice_label(setting_info, current_value)}"
             
             settings_list.Append(display_text, setting_name)
         
@@ -1055,7 +1072,7 @@ class ConfigureDialog(wx.Dialog):
         
         # Add choices if available
         if "choices" in setting_info:
-            description += f"\n\nOptions: {', '.join(setting_info['choices'])}"
+            description += f"\n\nOptions: {', '.join(str(_choice_label(setting_info, c)) for c in setting_info['choices'])}"
         
         explanation_text.SetValue(description)
         
@@ -1139,7 +1156,7 @@ class ConfigureDialog(wx.Dialog):
             self.set_setting_value(setting_info, new_value)
             
             # Update the list item text to show new value
-            display_text = f"{setting_name}: {new_value}"
+            display_text = f"{setting_name}: {_choice_label(setting_info, new_value)}"
             settings_list.SetString(selection, display_text)
             
             # Refresh the display

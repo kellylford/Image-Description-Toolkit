@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .project import Project
+from .providers.registry import display_name
 
 # ------------------------------------------------------------------ #
 # HTML export                                                          #
@@ -299,7 +300,7 @@ def export_txt(project: Project, filename: str = "descriptions.txt") -> Path:
         ]
         if desc:
             block_lines += [
-                f"Model: {desc.model}  ({desc.provider})",
+                f"Model: {desc.model}  ({display_name(desc.provider)})",
                 f"Date: {desc.timestamp[:10]}",
                 "",
                 desc.text,
@@ -391,7 +392,7 @@ def export_workspace_html(ws, filename: str = "descriptions.html") -> Path:
         # Show every description in its own labeled block
         a(f"      <h3>{'Descriptions' if multi else 'Description'}</h3>")
         for desc in item.descriptions:
-            label = f"{desc.model}  ·  {desc.provider}  ·  {_ws_when(desc)[:10]}"
+            label = f"{desc.model}  ·  {display_name(desc.provider)}  ·  {_ws_when(desc)[:10]}"
             if desc.output_tokens:
                 label += f"  ·  {desc.output_tokens} tokens"
             a('      <div class="desc-block">')
@@ -468,7 +469,7 @@ def export_workspace_txt(ws, filename: str = "descriptions.txt") -> Path:
                 block_lines.append(f"(Description {idx} of {len(item.descriptions)})")
             block_lines.append(f"File: {item.display_name}")
             block_lines += [
-                f"Model: {desc.model}  ({desc.provider})",
+                f"Model: {desc.model}  ({display_name(desc.provider)})",
                 f"Date: {_ws_when(desc)[:10]}",
                 "",
                 desc.text,

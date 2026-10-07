@@ -172,7 +172,7 @@ def _make_provider(provider: str, model: Optional[str], ollama_host: str):
         return OpenAIProvider(model=model or DEFAULT_MODEL)
 
     print(f"Unknown provider: {provider!r}", file=sys.stderr)
-    print("Valid providers: anthropic, apple, claude-code, ollama, openai, windows-ai", file=sys.stderr)
+    print(f"Valid providers: {', '.join(_PROVIDER_CHOICES_SHOWN)}", file=sys.stderr)
     sys.exit(1)
 
 
@@ -227,14 +227,46 @@ def _resolve_prompt(args, project_config, provider: Optional[str] = None) -> tup
     return (name, text)
 
 
+_PROVIDER_CHOICES = ("anthropic", "apple", "claude-code", "ollama", "openai", "windows-ai")
+
+
+def _provider_choices_shown() -> list:
+    from idt_core.providers.registry import typed_name
+
+    return [typed_name(p) for p in _PROVIDER_CHOICES]
+
+
+_PROVIDER_CHOICES_SHOWN = _provider_choices_shown()
+_PROVIDER_METAVAR = "{" + ",".join(_PROVIDER_CHOICES_SHOWN) + "}"
+
+
+def _provider_arg(value: str) -> str:
+    """``--provider``'s type: the provider key for any spelling of it.
+
+    Case is ignored, and Windows AI answers to Windows-AI, WindowsAI and "Windows
+    AI" as well as its key -- the help shows Windows-AI, since a screen reader
+    says a lowercase "ai" as a word. This replaces argparse's ``choices``, whose
+    error message would list the keys rather than the names shown.
+    """
+    from idt_core.providers.registry import capabilities_for
+
+    key = value.strip().lower()
+    if capabilities_for(key).provider == "windows-ai":
+        key = "windows-ai"
+    if key not in _PROVIDER_CHOICES:
+        raise argparse.ArgumentTypeError(
+            f"invalid choice: {value!r} (choose from {', '.join(_PROVIDER_CHOICES_SHOWN)})")
+    return key
+
+
 def _provider_args(p: argparse.ArgumentParser) -> None:
     """Add the standard provider/model/ollama-host arguments."""
     p.add_argument(
-        "--provider", choices=["anthropic", "apple", "claude-code", "ollama", "openai", "windows-ai"],
+        "--provider", type=_provider_arg, metavar=_PROVIDER_METAVAR,
         help="AI provider (default: from config, else ollama). "
              "claude-code uses your Claude subscription via the claude CLI; "
              "apple runs Apple Intelligence on this Mac (macOS 27); "
-             "windows-ai runs Windows' own model on a Copilot+ PC (its models are "
+             "Windows-AI runs Windows' own model on a Copilot+ PC (its models are "
              "the description kinds accessible, detailed, brief and diagram, and it "
              "takes no prompt)",
     )
@@ -1388,7 +1420,9 @@ def _print_item(item, args):
         return
 
     print(f"File:      {item.display_name}")
-    print(f"Model:     {desc.model}  ({desc.provider})")
+    from idt_core.providers.registry import display_name
+
+    print(f"Model:     {desc.model}  ({display_name(desc.provider)})")
     if desc.metadata_context:
         print(f"Context:   {desc.metadata_context}")
     if item.alt_text:
@@ -1681,7 +1715,7 @@ def cmd_models(args):
     idt models --provider anthropic — list Claude models for this account
     idt models --provider claude-code — Claude on your subscription
     idt models --provider apple     — Apple Intelligence on this Mac
-    idt models --provider windows-ai — Windows AI on this Copilot+ PC
+    idt models --provider Windows-AI — Windows AI on this Copilot+ PC
     idt models --refresh            — ignore the cache and ask the APIs now
     idt models --all                — skip the OpenAI chat-model filter
     """
@@ -1729,7 +1763,10 @@ def cmd_models(args):
         print(json.dumps(results, indent=2))
         return
 
-    for provider, info in results.items():
+    from idt_core.providers.registry import typed_name
+
+    for key, info in results.items():
+        provider = typed_name(key)
         status = info["status"]
         models = info.get("models", [])
         if status == "ok":
@@ -2387,6 +2424,11 @@ def cmd_config(args):
         key = key.strip()
         value = value.strip()
         if key == "default_provider":
+            from idt_core.providers.registry import capabilities_for
+
+            # Windows-AI, WindowsAI and "Windows AI" all name the one provider; store its key.
+            if capabilities_for(value).provider == "windows-ai":
+                value = "windows-ai"
             cfg.default_provider = value
         elif key == "default_model":
             cfg.default_model = value
@@ -2518,7 +2560,7 @@ Supported providers:
   ollama     Local models via Ollama (no API key)
   apple      Apple Intelligence on this Mac (macOS 27, no API key)
   claude-code  Claude on your Claude subscription, via the claude CLI
-  windows-ai Windows AI on a Copilot+ PC (no API key; describes only, no prompt)
+  Windows-AI Windows AI on a Copilot+ PC (no API key; describes only, no prompt)
         """,
     )
 
@@ -2750,9 +2792,7 @@ Supported providers:
         "models",
         help="Show available AI models for each provider",
     )
-    p_models.add_argument("--provider",
-                          choices=["anthropic", "apple", "claude-code", "ollama", "openai",
-                                   "windows-ai"],
+    p_models.add_argument("--provider", type=_provider_arg, metavar=_PROVIDER_METAVAR,
                           help="Show only this provider")
     p_models.add_argument("--ollama-host", metavar="URL",
                           default="http://localhost:11434")

@@ -397,6 +397,28 @@ def test_models_lists_the_kinds_on_a_ready_pc(monkeypatch, capsys):
     assert "first use" not in out
 
 
+def test_models_heads_windows_ai_as_typed(monkeypatch, capsys):
+    """Windows-AI, not windows-ai: a screen reader says a lowercase "ai" as a word."""
+    _windows_ai_pc(monkeypatch)
+    out = _run(_Args(provider="windows-ai"), capsys)
+    assert "Windows-AI (4 models available)" in out
+    assert "windows-ai" not in out
+
+
+@pytest.mark.parametrize("typed", ["Windows-AI", "windows-ai", "WINDOWS-AI", "WindowsAI", "Windows AI"])
+def test_provider_flag_takes_any_spelling_of_windows_ai(typed):
+    assert cli_main._provider_arg(typed) == "windows-ai"
+
+
+def test_provider_flag_still_rejects_unknown_names_listing_what_is_typed():
+    import argparse
+
+    with pytest.raises(argparse.ArgumentTypeError, match="Windows-AI") as err:
+        cli_main._provider_arg("windows-ia")
+    assert "windows-ai" not in str(err.value).replace("'windows-ia'", "")
+    assert cli_main._provider_arg("Ollama") == "ollama"
+
+
 def test_models_notes_a_model_not_yet_downloaded(monkeypatch, capsys):
     _windows_ai_pc(monkeypatch, report={"state": "NotReady"})
     out = _run(_Args(provider="windows-ai"), capsys)

@@ -10,8 +10,8 @@ Download from the [releases](https://github.com/kellylford/Image-Description-Too
 
 | File | Platform |
 |---|---|
-| **`ImageDescriptionToolkitSetup-4.6.1-windows.exe`** | Windows 10/11, 64-bit |
-| **`IDT-4.6.1-macos-arm64.dmg`** | macOS, Apple Silicon |
+| **`ImageDescriptionToolkitSetup-4.8.0-windows.exe`** | Windows 10/11, 64-bit |
+| **`IDT-4.8.0-macos-arm64.dmg`** | macOS, Apple Silicon |
 
 Either one gives you all the applications:
 - **idt** - Command-line interface for batch processing and automation
@@ -21,14 +21,14 @@ Either one gives you all the applications:
 One install covers them all; you never update them separately.
 
 Standalone builds are also published if you want a single tool without an installer:
-`idt-4.6.1-windows-x64.exe`, `ImageDescriber-4.6.1-windows-x64.exe`,
-`IDTChat-4.6.1-windows-x64.exe`, and `idt-4.6.1-macos-arm64.tar.gz`.
+`idt-4.8.0-windows-x64.exe`, `ImageDescriber-4.8.0-windows-x64.exe`,
+`IDTChat-4.8.0-windows-x64.exe`, and `idt-4.8.0-macos-arm64.tar.gz`.
 `SHA256SUMS.txt` lets you verify any download.
 
 No Python required. The Windows installer is signed; the macOS build is signed and
 notarized.
 
-**Latest Release (v4.6.1):** Two new providers that need no API key — Apple Intelligence, which describes images entirely on your Mac (macOS 27), and Claude Code, which uses a Claude Pro/Max subscription.
+**Latest Release (v4.8.0):** Windows AI, a new provider that describes images on a Copilot+ PC with Windows' own model: on the PC itself, with no API key, account or cost.
 
 ### Quick Start
 
@@ -64,7 +64,7 @@ idt update
 ## Features
 
 - **Two Powerful Applications**: GUI for visual workflow, CLI for automation
-- **Multiple AI Providers**: Ollama (local), OpenAI, Claude (API key), Claude Code (your Claude Pro/Max subscription, no API key), Apple Intelligence (on-device on macOS 27, no API key)
+- **Multiple AI Providers**: Ollama (local), OpenAI, Claude (API key), Claude Code (your Claude Pro/Max subscription, no API key), Apple Intelligence (on-device on macOS 27, no API key), Windows AI (on-device on Copilot+ PCs, no API key)
 - **Batch Processing**: Process directories of images automatically
 - **Video Frame Extraction**: Extract and describe frames from videos
 - **Integrated Viewer**: Browse and monitor workflows in real-time (built into GUI)
@@ -76,7 +76,7 @@ idt update
 ## Documentation
 
 ### User Guides
-- **[Release Notes (v4.6.1)](docs/release-notes-v4.6.1.md)** - What IDT is and what's in the current release
+- **[Release Notes (v4.8.0)](docs/release-notes-v4.8.0.md)** - What IDT is and what's in the current release
 - **[User Guide](docs/USER_GUIDE.md)** - Complete usage instructions, including the full CLI reference
 - **[macOS Setup](MACOS_SETUP.md)** - macOS installation and usage
 

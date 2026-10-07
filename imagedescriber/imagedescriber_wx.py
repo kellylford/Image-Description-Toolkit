@@ -2110,7 +2110,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 exchanges = turn_count // 2
                 info += f" ({exchanges} exchange{'s' if exchanges != 1 else ''})"
             if providers:
-                info += f"\nProvider: {', '.join(sorted(providers))}"
+                info += f"\nProvider: {', '.join(sorted(_display_provider(p) for p in providers))}"
             if models:
                 info += f"\nModel: {', '.join(sorted(models))}"
             self.image_info_label.SetLabel(info)
@@ -2173,7 +2173,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 metadata_lines = []
                 metadata_lines.append("\n\n---")
                 if desc.provider:
-                    metadata_lines.append(f"Provider: {desc.provider}")
+                    metadata_lines.append(f"Provider: {_display_provider(desc.provider)}")
                 if desc.model:
                     metadata_lines.append(f"Model: {desc.model}")
                 if desc.prompt_style:
@@ -2225,7 +2225,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             metadata_lines = []
             metadata_lines.append("\n\n---")
             if first_desc.provider:
-                metadata_lines.append(f"Provider: {first_desc.provider}")
+                metadata_lines.append(f"Provider: {_display_provider(first_desc.provider)}")
             if first_desc.model:
                 metadata_lines.append(f"Model: {first_desc.model}")
             if first_desc.prompt_style:
@@ -2322,7 +2322,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 metadata_lines = []
                 metadata_lines.append("\n\n---")
                 if selected_desc.provider:
-                    metadata_lines.append(f"Provider: {selected_desc.provider}")
+                    metadata_lines.append(f"Provider: {_display_provider(selected_desc.provider)}")
                 if selected_desc.model:
                     metadata_lines.append(f"Model: {selected_desc.model}")
                 if selected_desc.prompt_style:
@@ -5961,7 +5961,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                             f.write(metadata_str + "\n")
 
                     # Processing info
-                    f.write(f"Provider: {desc.provider}\n")
+                    f.write(f"Provider: {_display_provider(desc.provider)}\n")
                     f.write(f"Model: {desc.model}\n")
                     f.write(f"Prompt Style: {desc.prompt_style}\n")
 
@@ -6110,7 +6110,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                     source_label = f'Website Alt Text'
                 else:
                     css_class = 'description-block ai'
-                    source_label = f'{desc.model} ({desc.provider})'
+                    source_label = f'{desc.model} ({_display_provider(desc.provider)})'
 
                 parts.append(f'<div class="{css_class}">')
                 if len(item.descriptions) > 1:
@@ -7707,7 +7707,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             f"Resume batch processing?\n\n"
             f"{progress}"
             f"Remaining: {remaining}\n\n"
-            f"Provider: {batch_state.get('provider', 'Unknown')}\n"
+            f"Provider: {_display_provider(batch_state.get('provider')) or 'Unknown'}\n"
             f"Model: {batch_state.get('model', 'Unknown')}\n"
             f"Prompt: {batch_state.get('prompt_style', 'Unknown')}"
         )

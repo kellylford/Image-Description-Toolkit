@@ -500,6 +500,7 @@ def test_guideme_command_has_no_prompt_for_windows_ai():
 
     parts = _build_command("dir", "C:/pics", "windows-ai", "brief", "none", True, False, {})
     assert "--prompt" not in parts
+    assert parts[parts.index("--provider") + 1] == "Windows-AI"
     assert parts[parts.index("--model") + 1] == "brief"
 
 
@@ -522,6 +523,33 @@ def test_guideme_reads_each_kind_once(monkeypatch, capsys):
     monkeypatch.setattr(guide, "get_choice", lambda _q, labels, **k: seen.setdefault("labels", labels) and "BACK")
     guide._step_model("windows-ai")
     assert seen["labels"][0] == "Accessible  (recommended)"
+
+
+def test_typed_name_is_windows_dash_ai():
+    from idt_core.providers import registry
+
+    assert registry.typed_name("windows-ai") == "Windows-AI"
+    assert registry.typed_name("WindowsAI") == "Windows-AI"
+    assert registry.typed_name("claude-code") == "claude-code"
+    assert registry.display_name("Windows-AI") == "Windows AI"
+
+
+def test_guideme_lists_windows_ai_as_typed_and_returns_its_key(monkeypatch, capsys):
+    from cli import guide
+    from idt_core.providers import apple, windows_ai
+
+    monkeypatch.setattr(apple, "is_available", lambda: False)
+    monkeypatch.setattr(windows_ai, "is_available", lambda: True)
+    seen = {}
+
+    def choose(_q, options, **k):
+        seen["options"] = options
+        return "Windows-AI"
+
+    monkeypatch.setattr(guide, "get_choice", choose)
+    assert guide._step_provider() == "windows-ai"
+    assert "Windows-AI" in seen["options"] and "windows-ai" not in seen["options"]
+    assert "windows-ai" not in capsys.readouterr().out
 
 
 def test_only_windows_ai_takes_no_prompt():
