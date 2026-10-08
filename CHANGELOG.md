@@ -11,6 +11,7 @@
 **Describing a folder again no longer extracts its videos' frames again**
 - `idt describe` and `idt video` read every video again on each run, even when its frames were already in the workspace. For a large library on a network share, that was half an hour of extraction before any picture was described. Now a video is skipped when all its frames are still there and were made with the same options. Its line then says "(already extracted)".
 - A video is extracted again if it was stopped partway, if any of its frames were deleted, if reading it ended early (a network share dropping out, for example), or if you ask for different options, such as `idt video --interval 1` after `--interval 5`.
+- When reading ends early, the video's line says it will be read again next time. Some files always end early, such as a clip trimmed without re-encoding. If a second read stops at the same place, that is taken as the real end, and the video is skipped after that.
 - Videos in workspaces made before this version, or by ImageDescriber, are extracted once more. After that they're skipped.
 
 ## [4.8.0] - 2026-10-06

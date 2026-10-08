@@ -35,6 +35,8 @@ class VideoExtractionResult:
     fps: float = 0.0
     #: False when reading stopped well short of the video's end (see extract_frames_to_dir).
     complete: bool = True
+    #: How many frames were read before reading stopped.
+    frames_read: int = 0
 
 
 def extract_frames_to_dir(
@@ -128,6 +130,7 @@ def extract_frames_to_dir(
         duration_seconds=duration,
         fps=fps,
         complete=complete,
+        frames_read=frame_number,
     )
 
 

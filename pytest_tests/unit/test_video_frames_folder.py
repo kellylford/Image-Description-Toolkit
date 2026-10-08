@@ -188,6 +188,39 @@ def test_a_read_that_stops_short_is_extracted_again_next_time(tmp_path, monkeypa
     assert _extract_one_video_into_workspace(ws, clip, opts, src).reused
 
 
+def test_a_video_that_always_stops_at_the_same_frame_is_read_twice_then_reused(tmp_path, monkeypatch):
+    """A clip trimmed without re-encoding always ends before the count its container
+    gives. Stopping at the same frame twice is the real end: read it twice, not forever."""
+    cv2 = pytest.importorskip("cv2")
+    from cli.main import _extract_one_video_into_workspace, _frames_note
+    from idt_core.video import VideoExtractionOptions
+    src = tmp_path / "phone"
+    clip = src / "jan" / "IMG_0001.mp4"
+    _video(clip, 20, 90)
+    ws = Workspace.create(tmp_path / "w.idtw")
+    opts = VideoExtractionOptions(mode="interval", interval_seconds=5.0)
+    real_capture = cv2.VideoCapture
+
+    class Trimmed:
+        def __init__(self, path):
+            self._cap, self._reads = real_capture(path), 0
+
+        def read(self):
+            self._reads += 1
+            return (False, None) if self._reads > 60 else self._cap.read()
+
+        def __getattr__(self, name):
+            return getattr(self._cap, name)
+
+    monkeypatch.setattr(cv2, "VideoCapture", Trimmed)
+    first = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert first.short and "read again next time" in _frames_note(first)
+    second = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert not second.short and not second.reused and _frames_note(second) == ""
+    third = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert third.reused and len(third) == len(first)
+
+
 def test_extract_frames_to_dir_says_when_it_reached_the_end(tmp_path):
     pytest.importorskip("cv2")
     from idt_core.video import VideoExtractionOptions, extract_frames_to_dir
