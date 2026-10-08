@@ -335,20 +335,32 @@ def test_a_refusal_does_not_hide_a_real_streak(monkeypatch):
 
 def test_one_videos_frames_failing_do_not_stop_the_batch(monkeypatch):
     """Windows AI failed on every frame of one screen recording while describing the
-    frames around it (10/8/2026); counted as ten failures, it stopped every run there."""
-    bad = [f"ws/derived/frames/iPhone/RPReplay/RPReplay_{t}.00s.jpg" for t in range(0, 75, 5)]
-    names = ["ws/images/a.jpg"] + bad + ["ws/images/b.jpg"]
+    frames around it (10/8/2026); counted as ten failures, it stopped every run there.
+    Now the video counts once, and after three of its frames the rest are skipped."""
+    bad = [f"ws.idtw/derived/frames/iPhone/RPReplay/RPReplay_{t}.00s.jpg" for t in range(0, 75, 5)]
+    names = ["ws.idtw/images/a.jpg"] + bad + ["ws.idtw/images/b.jpg"]
     script = {Path(n).name: "plain" for n in bad}
     done, _ = _run_batch(monkeypatch, names, script)
-    assert _FakeImageWorker.seen == [Path(n).name for n in names]
+    assert _FakeImageWorker.seen == [Path(n).name for n in [names[0]] + bad[:3] + [names[-1]]]
     assert done.halted is None
 
 
 def test_ten_videos_failing_in_a_row_still_stop_the_batch(monkeypatch):
-    names = [f"ws/derived/frames/v{n}/v{n}_0.00s.jpg" for n in range(12)]
+    """Two frames each: the stop counts videos, and requeues every frame it counted."""
+    names = [f"ws.idtw/derived/frames/v{n}/v{n}_{t}.00s.jpg" for n in range(12) for t in (0, 5)]
     script = {Path(n).name: "plain" for n in names}
     done, _ = _run_batch(monkeypatch, names, script)
-    assert len(_FakeImageWorker.seen) == workers_wx.SAME_FAILURE_STREAK
+    assert len(_FakeImageWorker.seen) == 2 * workers_wx.SAME_FAILURE_STREAK - 1
+    assert done.halted == "failed: plain"
+    assert len(done.halted_files) == 2 * workers_wx.SAME_FAILURE_STREAK - 1
+
+
+def test_a_stuck_provider_stops_inside_long_videos(monkeypatch):
+    """360 frames a video: each video costs three frames, not all of them."""
+    names = [f"ws.idtw/derived/frames/v{n}/v{n}_{t}.00s.jpg" for n in range(12) for t in range(0, 1800, 5)]
+    script = {Path(n).name: "plain" for n in names}
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert len(_FakeImageWorker.seen) == 3 * (workers_wx.SAME_FAILURE_STREAK - 1) + 1
     assert done.halted == "failed: plain"
 
 

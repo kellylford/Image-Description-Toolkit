@@ -636,7 +636,8 @@ def cmd_describe(args):
         _pct = int(_done / _total * 100) if _total else 0
         _set_console_title(f"IDT - Describing Images ({_pct}%, {_done} of {_total})")
 
-    progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+    progress.summary(described=described, errors=errors, skipped=pipeline.skipped,
+                     not_tried=pipeline.not_tried)
     _report_halt(pipeline, ws, redescribe=args.redescribe)
     if missing and not args.quiet:
         print(f"Skipped {len(missing)} missing original(s) not found on disk.")
@@ -666,7 +667,12 @@ _HALT_REASON_CHARS = 300
 
 def _report_halt(pipeline, ws, redescribe: bool, watching: bool = False) -> None:
     """Say why a describing run stopped early, if it did, and how to carry on. On stderr, so
-    --quiet still shows it and the tab-separated output on stdout stays clean."""
+    --quiet still shows it and the tab-separated output on stdout stays clean. Also says
+    why any video frames were skipped."""
+    if getattr(pipeline, "skipped", 0):
+        print(f"{pipeline.skipped} video frame(s) were skipped: the frames before them from "
+              "the same video failed the same way. They stay undescribed, and describing the "
+              "workspace again tries them again.", file=sys.stderr, flush=True)
     if not pipeline.halted:
         return
     reason = pipeline.halted
@@ -1006,7 +1012,8 @@ def _cmd_describe_stdin(args):
             errors += 1
             progress.update(event.item.display_name, success=False, error=event.error)
 
-    progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+    progress.summary(described=described, errors=errors, skipped=pipeline.skipped,
+                     not_tried=pipeline.not_tried)
     _report_halt(pipeline, ws, redescribe=args.redescribe)
 
     if described > 0:
@@ -1150,7 +1157,8 @@ def cmd_download(args):
                 errors += 1
                 progress.update(event.item.display_name, success=False, error=event.error)
 
-        progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+        progress.summary(described=described, errors=errors, skipped=pipeline.skipped,
+                     not_tried=pipeline.not_tried)
         _report_halt(pipeline, ws, redescribe=args.redescribe)
 
         if described > 0:
@@ -1283,7 +1291,8 @@ def cmd_video(args):
             else:
                 errors += 1
                 progress.update(event.item.display_name, success=False, error=event.error)
-        progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+        progress.summary(described=described, errors=errors, skipped=pipeline.skipped,
+                     not_tried=pipeline.not_tried)
         _report_halt(pipeline, ws, redescribe=args.redescribe)
 
         if described > 0:

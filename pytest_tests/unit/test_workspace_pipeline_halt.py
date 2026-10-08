@@ -269,11 +269,15 @@ def _with_frames(tmp_path, frames_per_video):
 
 def test_one_videos_frames_failing_do_not_stop_the_run(tmp_path):
     """Windows AI failed at every size on all 15 frames of one screen recording while
-    describing the frames around it (10/8/2026). That stopped every run at that video."""
+    describing the frames around it (10/8/2026). That stopped every run at that video.
+    Now the video counts once, and after three of its frames the rest are skipped."""
     ws = _with_frames(tmp_path, [15, 3])
     internal = lambda: RuntimeError("Windows couldn't describe this picture (InternalError).")
-    pipeline, events = _run(ws, ScriptedProvider([internal() for _ in range(15)] + ["ok"] * 3))
-    assert len(events) == 18 and pipeline.halted is None
+    provider = ScriptedProvider([internal() for _ in range(3)] + ["ok"] * 3)
+    pipeline, events = _run(ws, provider)
+    assert pipeline.halted is None
+    assert len(events) == 6 and provider.calls == 6
+    assert pipeline.skipped == 12
 
 
 def test_ten_videos_failing_in_a_row_still_stop_the_run(tmp_path):
@@ -282,12 +286,46 @@ def test_ten_videos_failing_in_a_row_still_stop_the_run(tmp_path):
     assert pipeline.halted and len(events) == 19, "the 10th video's first frame"
 
 
+def test_a_stuck_provider_stops_inside_long_videos(tmp_path):
+    """A 30-minute video is 360 frames; three tried per video caps a stuck provider at
+    about 30 timeouts, not 360 a video."""
+    ws = _with_frames(tmp_path, [40] * 11)
+    provider = ScriptedProvider([_timeout() for _ in range(440)])
+    pipeline, events = _run(ws, provider)
+    assert pipeline.halted and provider.calls == 3 * 9 + 1
+
+
+def test_a_different_error_on_the_next_frame_starts_the_video_count_again(tmp_path):
+    ws = _with_frames(tmp_path, [6])
+    outcomes = [RuntimeError("a"), RuntimeError("a"), RuntimeError("b"), RuntimeError("b"),
+                RuntimeError("b"), "ok"]
+    pipeline, events = _run(ws, ScriptedProvider(outcomes))
+    assert len(events) == 5 and pipeline.skipped == 1
+
+
+def test_the_cli_says_why_frames_were_skipped(tmp_path, capsys):
+    from cli.main import _report_halt
+
+    ws = _with_frames(tmp_path, [6])
+    pipeline, _ = _run(ws, ScriptedProvider([_timeout() for _ in range(6)]))
+    _report_halt(pipeline, ws, redescribe=False)
+    err = capsys.readouterr().err
+    assert "3 video frame(s) were skipped" in err and "tries them again" in err
+
+
 def test_failure_source():
-    from idt_core.pipeline import failure_source
+    from idt_core.pipeline import failure_source, frame_video
 
     assert failure_source("x.jpg", "/v/clip.mov") == "/v/clip.mov"
-    frame = "C:/ws.idtw/derived/frames/iPhone/IMG_1/IMG_1_5.00s.jpg"
+    frame = "C:/w.idtw/derived/frames/iPhone/IMG_1/IMG_1_5.00s.jpg"
     assert failure_source(frame) == str(Path(frame).parent)
-    assert failure_source(frame.replace("derived", "Derived")) == str(Path(frame.replace("derived", "Derived")).parent)
-    assert failure_source("C:/pics/a.jpg") == str(Path("C:/pics/a.jpg"))
-    assert failure_source("C:/pics/frames/a.jpg") == str(Path("C:/pics/frames/a.jpg")), "only derived/frames"
+    upper = "C:/W.IDTW/Derived/Frames/IMG_1/IMG_1_5.00s.jpg"
+    assert failure_source(upper) == str(Path(upper).parent)
+    scratch = "C:/Users/k/Documents/idt/_scratch/derived/frames/IMG_1/IMG_1_5.00s.jpg"
+    assert frame_video(scratch) == str(Path(scratch).parent)
+    assert frame_video("C:/pics/a.jpg") is None
+    # A folder of the user's own called derived/frames isn't a workspace's.
+    assert frame_video("C:/Photos/derived/frames/a.jpg") is None
+    # A workspace kept under such a folder: its own derived/frames is the one that counts.
+    nested = "C:/proj/derived/frames/w.idtw/images/a.jpg"
+    assert frame_video(nested) is None
