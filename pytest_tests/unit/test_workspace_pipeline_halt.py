@@ -67,7 +67,7 @@ def test_ten_identical_failures_in_a_row_stop_the_run(tmp_path):
     pipeline, events = _run(ws, provider)
     assert len(events) == SAME_FAILURE_STREAK == 10
     assert provider.calls == 10, "the other 20 images aren't tried"
-    assert "10 images in a row failed with the same error" in pipeline.halted
+    assert "10 pictures or videos in a row failed with the same error" in pipeline.halted
     assert "timed out" in pipeline.halted
     assert pipeline.not_tried == 20 and not pipeline.halted_by_refusals
     log = next((ws.path / "logs").glob("run_*.log")).read_text(encoding="utf-8")
@@ -201,7 +201,7 @@ def test_the_stop_message_names_the_command_that_carries_on(tmp_path, capsys):
     ws, pipeline = _halted(tmp_path, [_timeout() for _ in range(12)], 12)
     _report_halt(pipeline, ws, redescribe=False)
     err = capsys.readouterr().err
-    assert "Why it stopped: 10 images in a row failed" in err
+    assert "Why it stopped: 10 pictures or videos in a row failed" in err
     assert f'run: idt describe "{ws.path}"' in err and "--redescribe" not in err
 
 
@@ -246,3 +246,110 @@ def test_no_message_when_the_run_finished(tmp_path, capsys):
     ws, pipeline = _halted(tmp_path, [], 3)
     _report_halt(pipeline, ws, redescribe=False)
     assert capsys.readouterr().err == ""
+
+
+# ---------------------------------------------------------------------------
+# Frames of one video count once
+# ---------------------------------------------------------------------------
+
+
+def _with_frames(tmp_path, frames_per_video):
+    """A workspace whose items are frames of the given videos, in that order."""
+    ws = _workspace(tmp_path, sum(frames_per_video))
+    items = sorted(ws.media_items(), key=lambda i: i.image)
+    n = 0
+    for v, count in enumerate(frames_per_video):
+        for _ in range(count):
+            items[n].item_type = "extracted_frame"
+            items[n].parent_video = f"/videos/clip{v}.mov"
+            ws.save_item(items[n])
+            n += 1
+    return ws
+
+
+def test_one_videos_frames_failing_do_not_stop_the_run(tmp_path):
+    """Windows AI failed at every size on all 15 frames of one screen recording while
+    describing the frames around it (10/8/2026). That stopped every run at that video.
+    Now the video counts once, and after three of its frames the rest are skipped."""
+    ws = _with_frames(tmp_path, [15, 3])
+    internal = lambda: RuntimeError("Windows couldn't describe this picture (InternalError).")
+    provider = ScriptedProvider([internal() for _ in range(3)] + ["ok"] * 3)
+    pipeline, events = _run(ws, provider)
+    assert pipeline.halted is None
+    assert len(events) == 18 and provider.calls == 6, "skipped frames are events too"
+    assert pipeline.skipped == 12 == sum(e.skipped for e in events)
+    assert not any(e.success for e in events if e.skipped)
+
+
+def test_ten_videos_failing_in_a_row_still_stop_the_run(tmp_path):
+    ws = _with_frames(tmp_path, [2] * 12)
+    pipeline, events = _run(ws, ScriptedProvider([_timeout() for _ in range(24)]))
+    assert pipeline.halted and len(events) == 19, "the 10th video's first frame"
+
+
+def test_a_stuck_provider_stops_inside_long_videos(tmp_path):
+    """A 30-minute video is 360 frames; three tried per video caps a stuck provider at
+    about 30 timeouts, not 360 a video."""
+    ws = _with_frames(tmp_path, [40] * 11)
+    provider = ScriptedProvider([_timeout() for _ in range(440)])
+    pipeline, events = _run(ws, provider)
+    assert pipeline.halted and provider.calls == 3 * 9 + 1
+
+
+def test_a_different_error_on_the_next_frame_starts_the_video_count_again(tmp_path):
+    ws = _with_frames(tmp_path, [6])
+    outcomes = [RuntimeError("a"), RuntimeError("a"), RuntimeError("b"), RuntimeError("b"),
+                RuntimeError("b"), "ok"]
+    pipeline, events = _run(ws, ScriptedProvider(outcomes))
+    assert len(events) == 6 and pipeline.skipped == 1 and events[-1].skipped
+
+
+def test_the_cli_says_why_frames_were_skipped(tmp_path, capsys):
+    from cli.main import _report_halt
+
+    ws = _with_frames(tmp_path, [6])
+    pipeline, _ = _run(ws, ScriptedProvider([_timeout() for _ in range(6)]))
+    _report_halt(pipeline, ws, redescribe=False)
+    err = capsys.readouterr().err
+    assert "3 video frame(s) were skipped" in err and "tries them again" in err
+    _report_halt(pipeline, ws, redescribe=True)
+    assert f'idt describe "{ws.path}" --redescribe' in capsys.readouterr().err
+
+
+def test_the_progress_count_keeps_pace_with_skipped_frames(tmp_path):
+    import io
+
+    from idt_core.progress import Progress
+
+    ws = _with_frames(tmp_path, [6])
+    out = io.StringIO()
+    progress = Progress(total=6, out=out)
+    pipeline = WorkspacePipeline(ws, ScriptedProvider([_timeout() for _ in range(6)]))
+    for event in pipeline.run(RunOptions(prompt_name="none", prompt_text="", extract_metadata=False)):
+        if event.skipped:
+            progress.skip(event.item.display_name, event.error)
+        else:
+            progress.update(event.item.display_name, success=event.success, error=event.error)
+    lines = [line for line in out.getvalue().splitlines() if " of 6" in line]
+    assert lines[-1].startswith("6 of 6") and "skipped" in lines[-1]
+
+
+def test_failure_source():
+    from idt_core.pipeline import failure_source, frame_video
+
+    assert failure_source("x.jpg", "/v/clip.mov") == "/v/clip.mov"
+    frame = "C:/w.idtw/derived/frames/iPhone/IMG_1/IMG_1_5.00s.jpg"
+    assert failure_source(frame) == str(Path(frame).parent)
+    upper = "C:/W.IDTW/Derived/Frames/IMG_1/IMG_1_5.00s.jpg"
+    assert failure_source(upper) == str(Path(upper).parent)
+    scratch = "C:/Users/k/Documents/idt/_scratch/derived/frames/IMG_1/IMG_1_5.00s.jpg"
+    assert frame_video(scratch) == str(Path(scratch).parent)
+    assert frame_video("C:/pics/a.jpg") is None
+    # A folder of the user's own called derived/frames isn't a workspace's.
+    assert frame_video("C:/Photos/derived/frames/a.jpg") is None
+    # A workspace kept under such a folder: its own derived/frames is the one that counts.
+    nested = "C:/proj/derived/frames/w.idtw/images/a.jpg"
+    assert frame_video(nested) is None
+    # A source subfolder called derived/frames inside a bundle: the bundle's own pair counts.
+    inner = "C:/w.idtw/derived/frames/derived/frames/IMG/x.jpg"
+    assert frame_video(inner) == str(Path(inner).parent)

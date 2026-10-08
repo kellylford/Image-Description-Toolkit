@@ -33,11 +33,12 @@ people want the installer, which puts all three on the Start menu.
 
 ## What changed in 4.8.1
 
-A maintenance release for the `idt` command-line tool, from a run over an 11,000-picture
-iPhone library on a network share with Windows AI.
+A maintenance release, mostly for the `idt` command-line tool, from a run over an
+11,000-picture iPhone library on a network share with Windows AI. One change, to how
+a batch treats a video whose frames all fail, applies to ImageDescriber too.
 
-- **A run stops when every picture is failing the same way.** If 10 pictures in a row
-  fail with exactly the same error, `idt describe`, `idt guideme` and the other
+- **A run stops when every picture is failing the same way.** If 10 different pictures
+  or videos in a row fail with exactly the same error, `idt describe`, `idt guideme` and the other
   describing commands now stop, as ImageDescriber already did. Before, they carried on
   through every picture that was left: when Windows AI stopped responding partway
   through a large batch, each picture waited three minutes to time out, with over
@@ -45,6 +46,16 @@ iPhone library on a network share with Windows AI.
   past, such as the Windows AI helper not being installed, and when the provider
   declines 25 pictures in a row, which usually means it is declining the prompt itself.
   A few declined pictures don't count toward the 10.
+- **One video that fails doesn't stop a run.** Windows AI can fail on every frame of a
+  video, such as an iPhone screen recording, while describing everything around it.
+  Those frames used to stop a batch, at the same place every time it was run. Now,
+  in the command-line tool and in ImageDescriber, a video's frames count as one toward
+  the 10. Once 3 frames of a video in a row fail the same way, the rest of that video
+  is skipped, and the batch carries on with the next picture. The skipped frames stay
+  undescribed. The command-line tool counts them at the end of the run and says how to
+  try them again. ImageDescriber marks them as failed, and **Describe All Undescribed**
+  tries them again. If the batch stopped because the provider stopped working,
+  resuming it tries those frames as well.
 - **It tells you why it stopped, and how to carry on.** The last line says
   **Stopped.** instead of **Done.** and counts the pictures not tried. Next comes the
   reason, then the exact command to carry on from where it stopped. The window title
@@ -529,8 +540,9 @@ idt version     Version information
 - **Windows AI can stop responding partway through a very long batch.** It happened
   twice, after hours of describing: every picture then failed, or waited three minutes
   and timed out. The model runs inside Windows, not in IDT, so IDT can't restart it.
-  The run now stops after 10 failures in a row. Restarting the PC cleared it, after
-  which the run carried on from where it stopped.
+  The run now stops after 10 different pictures or videos in a row fail, which is at
+  most about 30 pictures, since only 3 frames of each video are tried. Restarting the
+  PC cleared it, after which the run carried on from where it stopped.
 - Local models are slower than cloud ones, sometimes much slower, depending on your
   hardware.
 

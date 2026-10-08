@@ -111,7 +111,7 @@ RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 #: Code plan, Ollama not running). REFUSAL_STREAK: consecutive images the provider
 #: declined (#352). Shared with the command line's runs, so the two can't drift.
 from idt_core.pipeline import (  # noqa: E402
-    REFUSAL_STREAK, SAME_FAILURE_STREAK,
+    REFUSAL_STREAK, SAME_FAILURE_STREAK, FailureStreak, frame_video,
     is_per_image_failure as _is_per_image_failure,
     normalise_failure_text as _normalise_failure_text,
 )
@@ -1288,7 +1288,8 @@ class BatchProcessingWorker(threading.Thread):
             halted_streak = False
             halted_refusals = False
             streak, streak_key = [], None
-            refusals = []
+            rules = FailureStreak()   # see idt_core.pipeline
+            skipped_by_video = {}     # video -> its frames skipped, for a requeue
             i = 0
             while True:
                 # Phase 2: Check if stopped
@@ -1349,7 +1350,26 @@ class BatchProcessingWorker(threading.Thread):
                 )
                 evt.waited = waited
                 evt.more_coming = self.queue_open
+                skipping = rules.skips(file_path)
+                evt.skipped = skipping
                 wx.PostEvent(self.parent_window, evt)
+
+                # The frames before this one from the same video failed the
+                # same way: skip it rather than spend a provider call (or a
+                # timeout) on it. Reported as a failure, so it stays
+                # undescribed and the counts add up; it neither counts toward
+                # nor breaks the identical-failure stop.
+                if skipping:
+                    note = ("Not tried: the frames before it from the same video "
+                            "failed the same way.")
+                    skipped_by_video.setdefault(frame_video(file_path), []).append(file_path)
+                    wx.PostEvent(self.parent_window, ProcessingFailedEventData(
+                        file_path=file_path, error=note, batch=self))
+                    failed += 1
+                    completed += 1
+                    if run_log:
+                        run_log.warning(f"{i}/{total}  {Path(file_path).name}: skipped  {note}")
+                    continue
 
                 # Create worker for this image
                 worker = ProcessingWorker(
@@ -1389,16 +1409,19 @@ class BatchProcessingWorker(threading.Thread):
                 # the provider were down (#352).
                 if worker.result_ok:
                     streak = []
-                    refusals = []
+                    rules.success()
                 elif getattr(worker, 'result_per_image', False):
-                    refusals.append(file_path)
+                    rules.refusal()
                 else:
-                    refusals = []
                     key = worker.result_signature
                     if streak and streak_key != key:
                         streak = []
                     streak_key = key
                     streak.append(file_path)
+                    # Frames of one video count once, and after a few the rest
+                    # of it is skipped: one video Windows AI fails on stopped
+                    # the batch, every time (FailureStreak).
+                    rules.failure(file_path, key)
 
                 # Signed out / credentials refused / provider not set up: every
                 # remaining image would fail identically, so stop here. The
@@ -1407,8 +1430,8 @@ class BatchProcessingWorker(threading.Thread):
                 # images in a row with an identical error halt it too; that
                 # costs a resume, not the images.
                 fatal = not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS
-                refused_out = not fatal and len(refusals) >= REFUSAL_STREAK
-                if fatal or refused_out or len(streak) >= SAME_FAILURE_STREAK:
+                refused_out = not fatal and rules.declined_out
+                if fatal or refused_out or rules.stuck:
                     halted = worker.result_error or "The provider refused the request."
                     if refused_out:
                         # Declined, not untried: the same prompt declines
@@ -1423,14 +1446,22 @@ class BatchProcessingWorker(threading.Thread):
                         # requeues the whole streak (each one was counted).
                         halted_streak = not fatal
                         halted_files = list(streak) if halted_streak else [file_path]
+                        if halted_streak:
+                            # Frames skipped from the videos in the streak were
+                            # skipped because the provider had stopped, not
+                            # because those videos are bad: they go back in the
+                            # queue with the streak (each was counted as failed).
+                            for video in {frame_video(f) for f in streak} - {None}:
+                                halted_files.extend(skipped_by_video.get(video, []))
                     if run_log:
                         if refused_out:
                             run_log.warning(
                                 f"run halted after {completed} images: the provider "
-                                f"declined {len(refusals)} images in a row")
+                                f"declined {rules.refusals} images in a row")
                         else:
                             why = (f"({worker.result_kind})" if fatal else
-                                   f"({len(streak)} images in a row failed identically)")
+                                   f"({rules.same_failures} pictures or videos in a row "
+                                   f"failed identically)")
                             run_log.warning(
                                 f"run halted after {completed} images: every remaining "
                                 f"image would fail the same way {why}")

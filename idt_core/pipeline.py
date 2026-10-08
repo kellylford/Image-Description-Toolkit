@@ -184,10 +184,13 @@ class WorkspaceEvent:
     signature: Optional[str] = None
     per_image: bool = False
     setup: bool = False
+    #: Not tried: a video frame whose video's earlier frames failed the same way. Neither
+    #: a success nor a failure; ``error`` holds the reason.
+    skipped: bool = False
 
     @property
     def success(self) -> bool:
-        return self.error is None
+        return self.error is None and not self.skipped
 
 
 #: Consecutive images failing with the identical error that stop a run: a provider that has
@@ -218,6 +221,111 @@ def normalise_failure_text(text: str) -> str:
     identical failures look different."""
     text = _HEX_ADDRESS.sub("0x", text)
     return _REQUEST_ID.sub(lambda m: (m.group(1) or "") + "<id>", text)
+
+
+#: Frames of one video tried before the rest of that video is skipped, when they all fail
+#: the same way. Caps how long a stuck provider runs inside one long video: a 30-minute
+#: video is 360 frames, and at a three-minute timeout each, counting the video once
+#: toward SAME_FAILURE_STREAK would have taken 18 hours to reach the next video.
+FRAMES_TRIED_PER_VIDEO = 3
+
+#: Why a frame was skipped, as the run log and the command line say it.
+SKIPPED_FRAME_REASON = "the frames before it from the same video failed the same way"
+
+
+def frame_video(path, parent_video: Optional[str] = None) -> Optional[str]:
+    """The video a frame was extracted from, or None for a picture that isn't a frame.
+
+    From ``parent_video`` when the caller knows it (the CLI's items), else from where
+    frames are kept: each video's own folder under a workspace's derived/frames, the
+    workspace being a ``.idtw`` folder or ImageDescriber's ``_scratch``. Only a pair
+    directly inside a workspace counts (the last one, if there are several), so a
+    folder of the user's own that happens to be called derived/frames isn't taken for
+    one. A bundle renamed without ``.idtw`` falls back to counting each frame.
+    """
+    if parent_video:
+        return str(parent_video)
+    p = Path(path)
+    lowered = [part.lower() for part in p.parts]
+    for i in range(len(lowered) - 2, 0, -1):
+        if lowered[i] == "derived" and lowered[i + 1] == "frames":
+            workspace = lowered[i - 1]
+            if workspace.endswith(".idtw") or workspace == "_scratch":
+                return str(p.parent)
+    return None
+
+
+def failure_source(path, parent_video: Optional[str] = None) -> str:
+    """What a failure counts against for the identical-failure stop: the video, for a
+    frame extracted from one; otherwise the picture itself.
+
+    Frames of one video look alike, and a provider can fail on all of them: Windows AI
+    failed with InternalError at every size on every frame of one iPhone screen
+    recording while describing the frames on either side (10/8/2026). Counted as ten
+    failures, that one video stopped the run, and stopped it again at the same place
+    on every run after.
+    """
+    return frame_video(path, parent_video) or str(Path(path))
+
+
+class FailureStreak:
+    """The run-stopping rules, shared by the command line's runs and ImageDescriber's
+    batches so the two can't drift.
+
+    * Ten different pictures or videos in a row failing with the identical error stop
+      the run (:attr:`stuck`): the provider has stopped working.
+    * After FRAMES_TRIED_PER_VIDEO frames of one video fail the same way in a row, the
+      rest of that video is skipped (:meth:`skips`), so one bad video costs a few
+      frames and a stuck provider can't spend hours inside one long video.
+    * REFUSAL_STREAK pictures in a row declined (:attr:`declined_out`) stop it too;
+      refusals neither count toward nor break the identical-failure streak.
+    """
+
+    def __init__(self) -> None:
+        self._signature = None
+        self._sources: set = set()
+        self._video_run = (None, 0)   # ((video, signature), identical failures in a row)
+        self._skipped: set = set()
+        self.refusals = 0
+
+    def skips(self, path, parent_video: Optional[str] = None) -> bool:
+        """True if this is a frame of a video whose remaining frames are being skipped."""
+        video = frame_video(path, parent_video)
+        return video is not None and video in self._skipped
+
+    def success(self) -> None:
+        self._signature, self._sources, self._video_run, self.refusals = None, set(), (None, 0), 0
+
+    def refusal(self) -> None:
+        self.refusals += 1
+
+    def failure(self, path, signature, parent_video: Optional[str] = None) -> None:
+        if signature != self._signature:
+            self._sources = set()
+        self._signature, self.refusals = signature, 0
+        self._sources.add(failure_source(path, parent_video))
+        video = frame_video(path, parent_video)
+        if video is not None:
+            key = (video, signature)
+            run = self._video_run[1] + 1 if self._video_run[0] == key else 1
+            self._video_run = (key, run)
+            if run >= FRAMES_TRIED_PER_VIDEO:
+                self._skipped.add(video)
+        else:
+            self._video_run = (None, 0)
+
+    @property
+    def same_failures(self) -> int:
+        """Different pictures or videos in a row that failed with the identical error."""
+        return len(self._sources)
+
+    @property
+    def stuck(self) -> bool:
+        return self.same_failures >= SAME_FAILURE_STREAK
+
+    @property
+    def declined_out(self) -> bool:
+        return self.refusals >= REFUSAL_STREAK
 
 
 def _chain_says(exc: Optional[BaseException], attribute: str) -> bool:
@@ -263,6 +371,8 @@ class WorkspacePipeline:
         self.halted: Optional[str] = None
         self.halted_by_refusals = False
         self.not_tried = 0
+        #: Frames the last run skipped because earlier frames of their video failed.
+        self.skipped = 0
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
         all_items = self.workspace.media_items()
@@ -319,10 +429,20 @@ class WorkspacePipeline:
         self.halted = None
         self.halted_by_refusals = False
         self.not_tried = 0
-        last_signature, same_failures, refusals = None, 0, 0
+        self.skipped = 0
+        streak = FailureStreak()
 
         try:
             for index, item in enumerate(queue, start=1):
+                path = item.source_path or item.image
+                if streak.skips(path, item.parent_video):
+                    # Not tried: yielded so a caller's count keeps pace, but neither a
+                    # success nor a failure, and no part of the stop rules.
+                    self.skipped += 1
+                    log.info(f"{index}/{total}  {item.image}: skipped ({SKIPPED_FRAME_REASON})")
+                    yield WorkspaceEvent(item=item, index=index, total=total,
+                                         error=SKIPPED_FRAME_REASON, skipped=True)
+                    continue
                 event = self._process(item, index, total, options)
                 if event.success:
                     described += 1
@@ -338,29 +458,30 @@ class WorkspacePipeline:
                 yield event
 
                 if event.success:
-                    last_signature, same_failures, refusals = None, 0, 0
+                    streak.success()
                 elif event.per_image:
-                    refusals += 1
+                    streak.refusal()
                 else:
-                    same_failures = same_failures + 1 if event.signature == last_signature else 1
-                    last_signature, refusals = event.signature, 0
+                    streak.failure(path, event.signature, item.parent_video)
                 if index < total:
                     if event.setup:
                         self.halted = event.error
-                    elif same_failures >= SAME_FAILURE_STREAK:
-                        self.halted = (f"{same_failures} images in a row failed with the same "
-                                       f"error: {event.error}")
-                    elif refusals >= REFUSAL_STREAK:
+                    elif streak.stuck:
+                        self.halted = (f"{streak.same_failures} pictures or videos in a row failed "
+                                       f"with the same error: {event.error}")
+                    elif streak.declined_out:
                         self.halted_by_refusals = True
-                        self.halted = (f"{self.provider.provider_name} declined {refusals} images in "
-                                       "a row, which usually means it is declining the prompt itself.")
+                        self.halted = (f"{self.provider.provider_name} declined {streak.refusals} "
+                                       "images in a row, which usually means it is declining the "
+                                       "prompt itself.")
                 if self.halted:
                     self.not_tried = total - index
                     log.warning(f"run halted after {index} of {total} images: {self.halted}")
                     break
 
             elapsed = time.monotonic() - t0
-            log.info(f"done  described={described}  errors={errors}  elapsed={elapsed:.1f}s")
+            log.info(f"done  described={described}  errors={errors}  skipped={self.skipped}  "
+                     f"elapsed={elapsed:.1f}s")
             self.workspace.save_manifest()
         except BaseException:
             log.exception("run aborted")
