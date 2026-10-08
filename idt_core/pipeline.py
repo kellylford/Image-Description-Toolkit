@@ -184,10 +184,13 @@ class WorkspaceEvent:
     signature: Optional[str] = None
     per_image: bool = False
     setup: bool = False
+    #: Not tried: a video frame whose video's earlier frames failed the same way. Neither
+    #: a success nor a failure; ``error`` holds the reason.
+    skipped: bool = False
 
     @property
     def success(self) -> bool:
-        return self.error is None
+        return self.error is None and not self.skipped
 
 
 #: Consecutive images failing with the identical error that stop a run: a provider that has
@@ -226,15 +229,19 @@ def normalise_failure_text(text: str) -> str:
 #: toward SAME_FAILURE_STREAK would have taken 18 hours to reach the next video.
 FRAMES_TRIED_PER_VIDEO = 3
 
+#: Why a frame was skipped, as the run log and the command line say it.
+SKIPPED_FRAME_REASON = "the frames before it from the same video failed the same way"
+
 
 def frame_video(path, parent_video: Optional[str] = None) -> Optional[str]:
     """The video a frame was extracted from, or None for a picture that isn't a frame.
 
     From ``parent_video`` when the caller knows it (the CLI's items), else from where
     frames are kept: each video's own folder under a workspace's derived/frames, the
-    workspace being a ``.idtw`` folder or ImageDescriber's ``_scratch``. Only the last
-    such pair counts, and only directly inside a workspace, so a folder of the user's
-    own that happens to be called derived/frames isn't taken for one.
+    workspace being a ``.idtw`` folder or ImageDescriber's ``_scratch``. Only a pair
+    directly inside a workspace counts (the last one, if there are several), so a
+    folder of the user's own that happens to be called derived/frames isn't taken for
+    one. A bundle renamed without ``.idtw`` falls back to counting each frame.
     """
     if parent_video:
         return str(parent_video)
@@ -245,7 +252,6 @@ def frame_video(path, parent_video: Optional[str] = None) -> Optional[str]:
             workspace = lowered[i - 1]
             if workspace.endswith(".idtw") or workspace == "_scratch":
                 return str(p.parent)
-            return None
     return None
 
 
@@ -430,10 +436,12 @@ class WorkspacePipeline:
             for index, item in enumerate(queue, start=1):
                 path = item.source_path or item.image
                 if streak.skips(path, item.parent_video):
-                    # Not tried: it stays undescribed, so the next run tries it again.
+                    # Not tried: yielded so a caller's count keeps pace, but neither a
+                    # success nor a failure, and no part of the stop rules.
                     self.skipped += 1
-                    log.info(f"{index}/{total}  {item.image}: skipped (the frames before it "
-                             f"from the same video failed the same way)")
+                    log.info(f"{index}/{total}  {item.image}: skipped ({SKIPPED_FRAME_REASON})")
+                    yield WorkspaceEvent(item=item, index=index, total=total,
+                                         error=SKIPPED_FRAME_REASON, skipped=True)
                     continue
                 event = self._process(item, index, total, options)
                 if event.success:

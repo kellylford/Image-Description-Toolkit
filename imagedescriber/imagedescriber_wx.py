@@ -6264,8 +6264,13 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
             if self.batch_start_time:
                 elapsed = max(0.0, time.time() - self.batch_start_time
                               - getattr(event, 'waited', 0.0))
-                self.batch_processing_times.append(elapsed)
+                # The time since a skipped video frame is no describing time
+                # (a skip takes no time), and hundreds of them would drag the
+                # average and the time remaining down to nothing.
+                if not getattr(self, '_last_progress_was_skip', False):
+                    self.batch_processing_times.append(elapsed)
                 self.batch_start_time = time.time()  # Reset for next image
+            self._last_progress_was_skip = getattr(event, 'skipped', False)
 
             # Phase 3: Calculate average time
             avg_time = (sum(self.batch_processing_times) / len(self.batch_processing_times)

@@ -617,7 +617,9 @@ def cmd_describe(args):
 
     _show = getattr(args, "show_descriptions", False)
     for event in pipeline.run(options):
-        if event.success:
+        if event.skipped:
+            progress.skip(event.item.display_name, event.error)
+        elif event.success:
             described += 1
             extra = ""
             if not args.quiet and event.metadata:
@@ -632,7 +634,7 @@ def cmd_describe(args):
         else:
             errors += 1
             progress.update(event.item.display_name, success=False, error=event.error)
-        _done = described + errors
+        _done = described + errors + pipeline.skipped
         _pct = int(_done / _total * 100) if _total else 0
         _set_console_title(f"IDT - Describing Images ({_pct}%, {_done} of {_total})")
 
@@ -670,9 +672,14 @@ def _report_halt(pipeline, ws, redescribe: bool, watching: bool = False) -> None
     --quiet still shows it and the tab-separated output on stdout stays clean. Also says
     why any video frames were skipped."""
     if getattr(pipeline, "skipped", 0):
+        if redescribe:
+            again = ("They keep any earlier descriptions; to try them again, run: "
+                     f'idt describe "{ws.path}" --redescribe')
+        else:
+            again = ("They stay undescribed, and describing the workspace again tries them "
+                     "again.")
         print(f"{pipeline.skipped} video frame(s) were skipped: the frames before them from "
-              "the same video failed the same way. They stay undescribed, and describing the "
-              "workspace again tries them again.", file=sys.stderr, flush=True)
+              f"the same video failed the same way. {again}", file=sys.stderr, flush=True)
     if not pipeline.halted:
         return
     reason = pipeline.halted
@@ -1002,7 +1009,9 @@ def _cmd_describe_stdin(args):
     pipeline = WorkspacePipeline(ws, provider)
 
     for event in pipeline.run_items(items, options):
-        if event.success:
+        if event.skipped:
+            progress.skip(event.item.display_name, event.error)
+        elif event.success:
             described += 1
             progress.update(event.item.display_name, success=True)
             if args.quiet and event.item.descriptions:
@@ -1150,7 +1159,9 @@ def cmd_download(args):
         pipeline = WorkspacePipeline(ws, provider)
 
         for event in pipeline.run_items(result.items, options):
-            if event.success:
+            if event.skipped:
+                progress.skip(event.item.display_name, event.error)
+            elif event.success:
                 described += 1
                 progress.update(event.item.display_name, success=True)
             else:
@@ -1285,7 +1296,9 @@ def cmd_video(args):
         described = errors = 0
         pipeline = WorkspacePipeline(ws, provider)
         for event in pipeline.run_items(all_frame_items, options):
-            if event.success:
+            if event.skipped:
+                progress.skip(event.item.display_name, event.error)
+            elif event.success:
                 described += 1
                 progress.update(event.item.display_name, success=True)
             else:
@@ -2287,7 +2300,10 @@ def cmd_watch(args):
     def _describe(new_items) -> None:
         pipeline = WorkspacePipeline(ws, provider)
         for event in pipeline.run_items(new_items, options):
-            if event.success:
+            if event.skipped:
+                if not args.quiet:
+                    print(f"Skipped: {event.item.display_name} ({event.error})")
+            elif event.success:
                 desc = event.item.active_description
                 if not args.quiet:
                     print(f"Described: {event.item.display_name}")

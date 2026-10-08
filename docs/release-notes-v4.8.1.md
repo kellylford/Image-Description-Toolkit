@@ -52,8 +52,10 @@ a batch treats a video whose frames all fail, applies to ImageDescriber too.
   in the command-line tool and in ImageDescriber, a video's frames count as one toward
   the 10. Once 3 frames of a video in a row fail the same way, the rest of that video
   is skipped, and the batch carries on with the next picture. The skipped frames stay
-  undescribed, so describing again tries them again. The end of the run says how many
-  were skipped.
+  undescribed. The command-line tool counts them at the end of the run and says how to
+  try them again. ImageDescriber marks them as failed, and **Describe All Undescribed**
+  tries them again. If the batch stopped because the provider stopped working,
+  resuming it tries those frames as well.
 - **It tells you why it stopped, and how to carry on.** The last line says
   **Stopped.** instead of **Done.** and counts the pictures not tried. Next comes the
   reason, then the exact command to carry on from where it stopped. The window title
@@ -540,8 +542,7 @@ idt version     Version information
   and timed out. The model runs inside Windows, not in IDT, so IDT can't restart it.
   The run now stops after 10 different pictures or videos in a row fail, which is at
   most about 30 pictures, since only 3 frames of each video are tried. Restarting the
-  PC cleared it, after
-  which the run carried on from where it stopped.
+  PC cleared it, after which the run carried on from where it stopped.
 - Local models are slower than cloud ones, sometimes much slower, depending on your
   hardware.
 

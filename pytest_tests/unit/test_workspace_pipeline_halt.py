@@ -276,8 +276,9 @@ def test_one_videos_frames_failing_do_not_stop_the_run(tmp_path):
     provider = ScriptedProvider([internal() for _ in range(3)] + ["ok"] * 3)
     pipeline, events = _run(ws, provider)
     assert pipeline.halted is None
-    assert len(events) == 6 and provider.calls == 6
-    assert pipeline.skipped == 12
+    assert len(events) == 18 and provider.calls == 6, "skipped frames are events too"
+    assert pipeline.skipped == 12 == sum(e.skipped for e in events)
+    assert not any(e.success for e in events if e.skipped)
 
 
 def test_ten_videos_failing_in_a_row_still_stop_the_run(tmp_path):
@@ -300,7 +301,7 @@ def test_a_different_error_on_the_next_frame_starts_the_video_count_again(tmp_pa
     outcomes = [RuntimeError("a"), RuntimeError("a"), RuntimeError("b"), RuntimeError("b"),
                 RuntimeError("b"), "ok"]
     pipeline, events = _run(ws, ScriptedProvider(outcomes))
-    assert len(events) == 5 and pipeline.skipped == 1
+    assert len(events) == 6 and pipeline.skipped == 1 and events[-1].skipped
 
 
 def test_the_cli_says_why_frames_were_skipped(tmp_path, capsys):
@@ -311,6 +312,26 @@ def test_the_cli_says_why_frames_were_skipped(tmp_path, capsys):
     _report_halt(pipeline, ws, redescribe=False)
     err = capsys.readouterr().err
     assert "3 video frame(s) were skipped" in err and "tries them again" in err
+    _report_halt(pipeline, ws, redescribe=True)
+    assert f'idt describe "{ws.path}" --redescribe' in capsys.readouterr().err
+
+
+def test_the_progress_count_keeps_pace_with_skipped_frames(tmp_path):
+    import io
+
+    from idt_core.progress import Progress
+
+    ws = _with_frames(tmp_path, [6])
+    out = io.StringIO()
+    progress = Progress(total=6, out=out)
+    pipeline = WorkspacePipeline(ws, ScriptedProvider([_timeout() for _ in range(6)]))
+    for event in pipeline.run(RunOptions(prompt_name="none", prompt_text="", extract_metadata=False)):
+        if event.skipped:
+            progress.skip(event.item.display_name, event.error)
+        else:
+            progress.update(event.item.display_name, success=event.success, error=event.error)
+    lines = [line for line in out.getvalue().splitlines() if " of 6" in line]
+    assert lines[-1].startswith("6 of 6") and "skipped" in lines[-1]
 
 
 def test_failure_source():
@@ -329,3 +350,6 @@ def test_failure_source():
     # A workspace kept under such a folder: its own derived/frames is the one that counts.
     nested = "C:/proj/derived/frames/w.idtw/images/a.jpg"
     assert frame_video(nested) is None
+    # A source subfolder called derived/frames inside a bundle: the bundle's own pair counts.
+    inner = "C:/w.idtw/derived/frames/derived/frames/IMG/x.jpg"
+    assert frame_video(inner) == str(Path(inner).parent)

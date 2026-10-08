@@ -362,6 +362,13 @@ def test_a_stuck_provider_stops_inside_long_videos(monkeypatch):
     done, _ = _run_batch(monkeypatch, names, script)
     assert len(_FakeImageWorker.seen) == 3 * (workers_wx.SAME_FAILURE_STREAK - 1) + 1
     assert done.halted == "failed: plain"
+    # Skipped because the provider had stopped, not because the videos are bad: every
+    # frame of the videos in the streak goes back in the queue, not just the ones tried.
+    tried_videos = {Path(n).parent.name for n in names[:9 * 360]}
+    assert len(tried_videos) == 9
+    requeued = {Path(f).parent.name for f in done.halted_files}
+    assert tried_videos <= requeued
+    assert len(done.halted_files) == 9 * 360 + 1
 
 
 def test_guardrail_refusal_is_per_image_through_the_adapter():
