@@ -30,10 +30,6 @@ class FakeHelper:
     def __init__(self, *outcomes):
         self.outcomes = list(outcomes)
         self.kinds = []
-        self.restarts = 0
-
-    def restart(self):
-        self.restarts += 1
 
     def request(self, kind, mime_type, image_bytes, timeout=None):
         self.kinds.append(kind)
@@ -252,23 +248,8 @@ def test_a_picture_that_fails_at_every_size_counts_toward_the_streak_not_as_a_re
 
     path = tmp_path / "large.jpg"
     Image.new("RGB", (3000, 2000), (10, 120, 200)).save(path, format="JPEG")
-    helper = pc(*[error_for_code("internal_error", "COMException 0x80004005: Unspecified error")] * 8)
+    helper = pc(*[error_for_code("internal_error", "COMException 0x80004005: Unspecified error")] * 4)
     err = _fails(str(path))
     assert err.kind == ai_providers.ErrorKind.UNKNOWN and not err.is_retryable
     assert not getattr(err.__context__, "per_image", False)
-    assert len(helper.kinds) == 8 and helper.restarts == 1, "every size, on each of two helpers"
-
-
-def test_a_small_picture_windows_keeps_failing_on_restarts_the_helper_once(pc, picture):
-    """No smaller size to try: one fresh helper, then a failure the batch doesn't retry, so a
-    stuck model costs each picture one restart, not one per retry."""
-    helper = pc(*[error_for_code("internal_error", "COMException 0x80004005: Unspecified error")] * 4)
-    err = _fails(picture)
-    assert not err.is_retryable
-    assert len(helper.kinds) == 2 and helper.restarts == 1
-
-
-def test_a_small_picture_is_described_by_the_fresh_helper(pc, picture):
-    helper = pc(error_for_code("internal_error", "COMException 0x80004005: Unspecified error"), "A mug.")
-    assert ai_providers.WindowsAIProvider().describe_image(picture, "ignored", "accessible") == "A mug."
-    assert helper.restarts == 1
+    assert len(helper.kinds) == 4

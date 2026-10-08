@@ -2,9 +2,11 @@
 
 ### 🐛 Bug Fixes
 
-**Windows AI tries harder before a stuck model stops a batch**
-- About four hours into a long batch, Windows' model began failing on every picture with "Windows couldn't describe this picture (InternalError)", at every size, and after ten in a row the batch stopped. The pictures were fine: resumed later, the same ones were described straight away.
-- Now, when a picture fails at every size, IDT restarts Windows AI, which loads a fresh copy of the model, and tries the picture once more before giving up on it. If it still fails, the message reads "Windows couldn't describe this picture (InternalError) at any size, even after restarting Windows AI." If every picture fails like that, the batch still stops after ten in a row, and resuming it later carries on where it stopped.
+**The command line stops a run when every image is failing the same way**
+- `idt describe`, `idt guideme` and the other describing commands now stop when ten images in a row fail with the same error, as ImageDescriber already does. Before, they carried on through every remaining image. When Windows AI stopped responding partway through a large batch, each picture waited three minutes to time out, with over 10,000 still to go.
+- They stop at once for a problem nothing else will get past, such as the Windows AI helper not being installed. They also stop when the provider declines 25 images in a row, which usually means it is declining the prompt itself. A few declined pictures don't count toward the ten.
+- The last line says "Stopped." instead of "Done." and counts the images not tried. Below it, IDT says why it stopped and gives the exact command to carry on. The window title says the run stopped early, and the reason is written to the run log.
+- `idt watch` stops only the batch that was failing and keeps watching. It says how to describe the images that batch didn't reach.
 
 ## [4.8.0] - 2026-10-06
 

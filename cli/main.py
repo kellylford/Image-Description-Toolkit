@@ -604,10 +604,14 @@ def cmd_describe(args):
         _pct = int(_done / _total * 100) if _total else 0
         _set_console_title(f"IDT - Describing Images ({_pct}%, {_done} of {_total})")
 
-    progress.summary(described=described, errors=errors)
+    progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+    _report_halt(pipeline, ws, redescribe=args.redescribe)
     if missing and not args.quiet:
         print(f"Skipped {len(missing)} missing original(s) not found on disk.")
-    _set_console_title(f"IDT - Image Description Complete ({described} of {_total})")
+    if pipeline.halted:
+        _set_console_title(f"IDT - Stopped early ({described} of {_total} described)")
+    else:
+        _set_console_title(f"IDT - Image Description Complete ({described} of {_total})")
 
     if described > 0:
         ws.defaults.provider = provider_name
@@ -622,6 +626,36 @@ def cmd_describe(args):
     # Auto-export HTML report (default on; opt out with --no-export)
     if not getattr(args, "no_export", False) and described > 0:
         _auto_export_workspace(ws, args.quiet)
+
+
+#: The most of the failure that the stop message repeats; each image's line already showed it all.
+_HALT_REASON_CHARS = 300
+
+
+def _report_halt(pipeline, ws, redescribe: bool, watching: bool = False) -> None:
+    """Say why a describing run stopped early, if it did, and how to carry on. On stderr, so
+    --quiet still shows it and the tab-separated output on stdout stays clean."""
+    if not pipeline.halted:
+        return
+    reason = pipeline.halted
+    if len(reason) > _HALT_REASON_CHARS:
+        reason = reason[:_HALT_REASON_CHARS].rstrip() + "…"
+    lines = [f"Why it stopped: {reason}"]
+    if pipeline.halted_by_refusals:
+        lines.append("Describing again with the same prompt will be declined the same way; "
+                     "try another prompt style or provider.")
+    if watching:
+        lines.append("Still watching for new images. To describe the ones this batch didn't "
+                     f'reach, run later: idt describe "{ws.path}"')
+    elif redescribe:
+        # They still have their earlier descriptions (a download's alt text, or the
+        # description being replaced), so a plain describe would skip them.
+        lines.append("The images not tried keep their earlier descriptions. To describe them, fix "
+                     f'the problem, then run: idt describe "{ws.path}" --redescribe '
+                     "(this describes every image in the workspace again).")
+    else:
+        lines.append(f'To carry on, fix the problem, then run: idt describe "{ws.path}"')
+    print("\n".join(lines), file=sys.stderr, flush=True)
 
 
 def _extract_one_video_into_workspace(ws, video: Path, opts,
@@ -874,7 +908,8 @@ def _cmd_describe_stdin(args):
             errors += 1
             progress.update(event.item.display_name, success=False, error=event.error)
 
-    progress.summary(described=described, errors=errors)
+    progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+    _report_halt(pipeline, ws, redescribe=args.redescribe)
 
     if described > 0:
         ws.defaults.provider = provider_name
@@ -1017,7 +1052,8 @@ def cmd_download(args):
                 errors += 1
                 progress.update(event.item.display_name, success=False, error=event.error)
 
-        progress.summary(described=described, errors=errors)
+        progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+        _report_halt(pipeline, ws, redescribe=args.redescribe)
 
         if described > 0:
             ws.defaults.provider = provider_name
@@ -1148,7 +1184,8 @@ def cmd_video(args):
             else:
                 errors += 1
                 progress.update(event.item.display_name, success=False, error=event.error)
-        progress.summary(described=described, errors=errors)
+        progress.summary(described=described, errors=errors, not_tried=pipeline.not_tried)
+        _report_halt(pipeline, ws, redescribe=args.redescribe)
 
         if described > 0:
             ws.defaults.provider = provider_name
@@ -2148,6 +2185,7 @@ def cmd_watch(args):
                     print(f"{event.item.source_path}\t{desc.text}")
             else:
                 print(f"Error: {event.item.display_name}: {event.error}", file=sys.stderr)
+        _report_halt(pipeline, ws, redescribe=False, watching=True)
         if any(i.described for i in new_items):
             ws.defaults.provider = provider_name
             ws.defaults.model = model

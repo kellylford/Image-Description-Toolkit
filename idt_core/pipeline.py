@@ -12,6 +12,7 @@ Design:
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -178,10 +179,75 @@ class WorkspaceEvent:
     total: int
     error: Optional[str] = None
     metadata: Optional[ImageMetadata] = None
+    #: For a failure, what the run's stop rules need to know about it (see _failure_event).
+    #: Not the exception itself: its traceback would keep the image's bytes alive.
+    signature: Optional[str] = None
+    per_image: bool = False
+    setup: bool = False
 
     @property
     def success(self) -> bool:
         return self.error is None
+
+
+#: Consecutive images failing with the identical error that stop a run: a provider that has
+#: stopped working fails every remaining image the same way (Ollama not running, a used-up
+#: plan, a stuck Windows AI that timed out on picture after picture, three minutes each, with
+#: 10,700 still to go, 10/7/2026). Large enough that a few bad files in a row don't trip it.
+#: ImageDescriber's batches use the same rules (imagedescriber/workers_wx.py).
+SAME_FAILURE_STREAK = 10
+
+#: Consecutive images the provider declined (per-image refusals, which neither count toward
+#: nor break the identical-failure streak). A few dozen similar photos can each be refused;
+#: this many in a row is the prompt itself being refused on every image (#352).
+REFUSAL_STREAK = 25
+
+_HEX_ADDRESS = re.compile(r"\b0x[0-9a-fA-F]+\b")
+#: Per-request identifiers that API error bodies embed (Anthropic puts
+#: 'request_id': 'req_…' in str(exc)); with them, no two failures matched.
+#: A bare req_ only when id-length, so a file called req_0001.jpg in a
+#: "file not found" message stays distinct; "request ID" in any spelling.
+_REQUEST_ID = re.compile(
+    r"\breq_[A-Za-z0-9]{16,}|"
+    r"""(request[\s_-]?id['"]?\s*[:=]?\s*['"]?)[A-Za-z0-9_-]{6,}""",
+    re.IGNORECASE)
+
+
+def normalise_failure_text(text: str) -> str:
+    """An error message without the object addresses and request IDs that would make two
+    identical failures look different."""
+    text = _HEX_ADDRESS.sub("0x", text)
+    return _REQUEST_ID.sub(lambda m: (m.group(1) or "") + "<id>", text)
+
+
+def _chain_says(exc: Optional[BaseException], attribute: str) -> bool:
+    """True if `exc`, or anything it was raised from, has `attribute` set to True."""
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if getattr(exc, attribute, False) is True:
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
+def is_per_image_failure(exc: BaseException) -> bool:
+    """True if the provider declined this one image (``per_image``) rather than failed."""
+    return _chain_says(exc, "per_image")
+
+
+def is_setup_failure(exc: BaseException) -> bool:
+    """True if nothing will work until the user changes something (``setup``: the Windows AI
+    helper isn't installed, Apple Intelligence isn't licensed), so a run stops at once."""
+    return _chain_says(exc, "setup")
+
+
+def _failure_event(item: WorkspaceItem, index: int, total: int, exc: BaseException) -> WorkspaceEvent:
+    return WorkspaceEvent(
+        item=item, index=index, total=total, error=str(exc),
+        signature=f"{type(exc).__name__}: {normalise_failure_text(str(exc))}",
+        per_image=is_per_image_failure(exc), setup=is_setup_failure(exc),
+    )
 
 
 class WorkspacePipeline:
@@ -192,6 +258,11 @@ class WorkspacePipeline:
         self.provider = provider
         self._extractor: Optional[MetadataExtractor] = None
         self._geocoder: Optional[NominatimGeocoder] = None
+        #: Why the last run stopped before its last image (None if it didn't), whether that was
+        #: for refusals, and how many images it didn't try.
+        self.halted: Optional[str] = None
+        self.halted_by_refusals = False
+        self.not_tried = 0
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
         all_items = self.workspace.media_items()
@@ -245,6 +316,10 @@ class WorkspacePipeline:
         )
         t0 = time.monotonic()
         described = errors = 0
+        self.halted = None
+        self.halted_by_refusals = False
+        self.not_tried = 0
+        last_signature, same_failures, refusals = None, 0, 0
 
         try:
             for index, item in enumerate(queue, start=1):
@@ -261,6 +336,28 @@ class WorkspacePipeline:
                     errors += 1
                     log.error(f"{index}/{total}  {item.image}: ERROR — {event.error}")
                 yield event
+
+                if event.success:
+                    last_signature, same_failures, refusals = None, 0, 0
+                elif event.per_image:
+                    refusals += 1
+                else:
+                    same_failures = same_failures + 1 if event.signature == last_signature else 1
+                    last_signature, refusals = event.signature, 0
+                if index < total:
+                    if event.setup:
+                        self.halted = event.error
+                    elif same_failures >= SAME_FAILURE_STREAK:
+                        self.halted = (f"{same_failures} images in a row failed with the same "
+                                       f"error: {event.error}")
+                    elif refusals >= REFUSAL_STREAK:
+                        self.halted_by_refusals = True
+                        self.halted = (f"{self.provider.provider_name} declined {refusals} images in "
+                                       "a row, which usually means it is declining the prompt itself.")
+                if self.halted:
+                    self.not_tried = total - index
+                    log.warning(f"run halted after {index} of {total} images: {self.halted}")
+                    break
 
             elapsed = time.monotonic() - t0
             log.info(f"done  described={described}  errors={errors}  elapsed={elapsed:.1f}s")
@@ -311,4 +408,4 @@ class WorkspacePipeline:
             return WorkspaceEvent(item=item, index=index, total=total, metadata=meta)
 
         except Exception as exc:
-            return WorkspaceEvent(item=item, index=index, total=total, error=str(exc))
+            return _failure_event(item, index, total, exc)

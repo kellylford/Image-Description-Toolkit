@@ -557,23 +557,22 @@ def test_a_picture_windows_fails_on_is_tried_again_smaller(helper):
 
 
 def test_each_smaller_size_is_tried_before_giving_up_on_one_picture(helper):
-    helper.configure(serve=["code:internal_error"] * 8)
-    with pytest.raises(WindowsAIError, match="at any size, even after restarting Windows AI.$") as caught:
+    helper.configure(serve=["code:internal_error"] * 4)
+    with pytest.raises(WindowsAIError, match="at a smaller size either") as caught:
         WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
-    assert len(helper.requests()) == 8, "full size, 2048, 1024 and 512, on each of two helpers"
-    assert helper.starts("--serve") == 2
+    assert len(helper.requests()) == 4, "full size, then 2048, 1024 and 512"
     # Not retried again, and not a refusal: every picture failing so is a broken helper,
     # which a batch must stop for after ten in a row.
     assert not caught.value.per_image and caught.value.status_code is None
-    assert str(caught.value) == "said the helper at any size, even after restarting Windows AI.", "one sentence"
+    assert "said the helper. Windows couldn't" in str(caught.value), "one clean sentence each"
 
 
-def test_a_small_picture_is_tried_once_more_on_a_fresh_helper_then_not_retried(helper):
-    helper.configure(serve=["code:internal_error"] * 2)
-    with pytest.raises(WindowsAIError, match="said the helper, even after restarting Windows AI.$") as caught:
+def test_a_small_picture_keeps_its_first_error_and_its_retry(helper):
+    helper.configure(serve=["code:internal_error"])
+    with pytest.raises(WindowsAIError, match="said the helper$") as caught:
         WindowsAIProvider().describe(_photo(400, 300), "image/jpeg", "")
-    assert len(helper.requests()) == 2, "no smaller size to try, on either helper"
-    assert caught.value.status_code is None, "the restart was the retry"
+    assert len(helper.requests()) == 1, "no smaller size to try"
+    assert caught.value.status_code == 503, "retryable as it is, as before"
 
 
 def test_a_refusal_at_full_size_is_not_tried_smaller(helper):
@@ -581,47 +580,13 @@ def test_a_refusal_at_full_size_is_not_tried_smaller(helper):
     with pytest.raises(WindowsAIError):
         WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
     assert len(helper.requests()) == 1
-    assert helper.starts("--serve") == 1, "a refusal doesn't restart the helper"
-
-
-def test_a_stuck_model_is_cured_by_a_fresh_helper(helper):
-    """10/7/2026: four hours into a batch every picture failed at every size, and a fresh
-    helper described the same pictures at once. One restart, then the picture at full size."""
-    helper.configure(serve=["code:internal_error"] * 4 + ["ok", "ok"])
-    provider = WindowsAIProvider()
-    first = provider.describe(_photo(3000, 2000), "image/jpeg", "")
-    assert first.text == "accessible description 5"
-    assert helper.starts("--serve") == 2
-    sizes = [r["image_bytes"] for r in helper.requests()]
-    assert sizes[4] == sizes[0], "the fresh helper is sent the picture at full size first"
-    provider.describe(_photo(3000, 2000), "image/jpeg", "")
-    assert helper.starts("--serve") == 2, "the fresh helper carries on for the next picture"
-
-
-def test_a_refusal_from_the_fresh_helper_is_reported_as_itself(helper):
-    helper.configure(serve=["code:internal_error"] * 4 + ["code:too_much_text"])
-    with pytest.raises(WindowsAIError) as caught:
-        WindowsAIProvider().describe(_photo(3000, 2000), "image/jpeg", "")
-    assert caught.value.code == "too_much_text" and caught.value.per_image
-
-
-def test_restart_is_not_a_stop(helper):
-    """A stop tells a waiting request it was cancelled; a restart must not, or the next
-    picture's failure would read as the user's Stop."""
-    helper.configure(serve=["ok", "ok"])
-    provider = WindowsAIProvider()
-    provider.describe(JPEG, "image/jpeg", "")
-    windows_ai.helper().restart()
-    assert not windows_ai.helper().is_running()
-    assert provider.describe(JPEG, "image/jpeg", "").text == "accessible description 2"
-    assert helper.starts("--serve") == 2
 
 
 def test_only_sizes_smaller_than_the_picture_are_tried(helper):
     helper.configure(serve=["code:internal_error"] * 4)
     with pytest.raises(WindowsAIError):
         WindowsAIProvider().describe(_photo(800, 600), "image/jpeg", "")
-    assert len(helper.requests()) == 4, "full size, then 512, on each of two helpers"
+    assert len(helper.requests()) == 2, "full size, then 512"
 
 
 def test_a_different_failure_at_a_smaller_size_is_reported_as_itself(helper):
