@@ -9,7 +9,9 @@
 - `idt watch` stops only the batch that was failing and keeps watching. It says how to describe the images that batch didn't reach.
 
 **Describing a folder again no longer extracts its videos' frames again**
-- `idt describe` read every video again on each run, even when its frames were already in the workspace. For a large library on a network share, that was half an hour of extraction before any picture was described. A video whose frames are all still there is now skipped, as ImageDescriber already does. A video whose frames were stopped partway, or deleted, is extracted again.
+- `idt describe` and `idt video` read every video again on each run, even when its frames were already in the workspace. For a large library on a network share, that was half an hour of extraction before any picture was described. Now a video is skipped when all its frames are still there and were made with the same options. Its line then says "(already extracted)".
+- A video is extracted again if it was stopped partway, if any of its frames were deleted, if reading it ended early (a network share dropping out, for example), or if you ask for different options, such as `idt video --interval 1` after `--interval 5`.
+- Videos in workspaces made before this version, or by ImageDescriber, are extracted once more. After that they're skipped.
 
 ## [4.8.0] - 2026-10-06
 

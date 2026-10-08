@@ -137,6 +137,68 @@ def test_cli_rerun_does_not_extract_a_finished_video_again(tmp_path, monkeypatch
     assert second[0].described, "the frames keep their descriptions"
 
 
+def test_cli_extracts_again_with_different_options(tmp_path):
+    """`idt video --interval 1` after `--interval 5` must not quietly keep the old frames."""
+    pytest.importorskip("cv2")
+    from cli.main import _extract_one_video_into_workspace
+    from idt_core.video import VideoExtractionOptions
+    src = tmp_path / "phone"
+    clip = src / "jan" / "IMG_0001.mp4"
+    _video(clip, 20, 90)
+    ws = Workspace.create(tmp_path / "w.idtw")
+    five = _extract_one_video_into_workspace(
+        ws, clip, VideoExtractionOptions(mode="interval", interval_seconds=5.0), src)
+    one = _extract_one_video_into_workspace(
+        ws, clip, VideoExtractionOptions(mode="interval", interval_seconds=1.0), src)
+    assert not one.reused and len(one) > len(five)
+    again = _extract_one_video_into_workspace(
+        ws, clip, VideoExtractionOptions(mode="interval", interval_seconds=1.0), src)
+    assert again.reused and len(again) == len(one)
+
+
+def test_a_read_that_stops_short_is_extracted_again_next_time(tmp_path, monkeypatch):
+    """A share dropping out mid-read ends the read like the end of the video."""
+    cv2 = pytest.importorskip("cv2")
+    from cli.main import _extract_one_video_into_workspace
+    from idt_core.video import VideoExtractionOptions
+    src = tmp_path / "phone"
+    clip = src / "jan" / "IMG_0001.mp4"
+    _video(clip, 20, 90)
+    ws = Workspace.create(tmp_path / "w.idtw")
+    opts = VideoExtractionOptions(mode="interval", interval_seconds=5.0)
+
+    real_capture = cv2.VideoCapture
+
+    class DropsOut:
+        def __init__(self, path):
+            self._cap, self._reads = real_capture(path), 0
+
+        def read(self):
+            self._reads += 1
+            return (False, None) if self._reads > 60 else self._cap.read()
+
+        def __getattr__(self, name):
+            return getattr(self._cap, name)
+
+    monkeypatch.setattr(cv2, "VideoCapture", DropsOut)
+    short = _extract_one_video_into_workspace(ws, clip, opts, src)
+    monkeypatch.setattr(cv2, "VideoCapture", real_capture)
+    full = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert not full.reused and len(full) > len(short)
+    assert _extract_one_video_into_workspace(ws, clip, opts, src).reused
+
+
+def test_extract_frames_to_dir_says_when_it_reached_the_end(tmp_path):
+    pytest.importorskip("cv2")
+    from idt_core.video import VideoExtractionOptions, extract_frames_to_dir
+    clip = tmp_path / "clip.mp4"
+    _video(clip, 10, 90)
+    assert extract_frames_to_dir(clip, tmp_path / "a", VideoExtractionOptions()).complete
+    capped = extract_frames_to_dir(clip, tmp_path / "b", VideoExtractionOptions(
+        interval_seconds=1.0, max_frames=2))
+    assert capped.complete and len(capped.frame_paths) == 2, "stopping at --max-frames is finishing"
+
+
 def test_cli_extracts_again_when_a_recorded_frame_is_gone(tmp_path):
     pytest.importorskip("cv2")
     from cli.main import _extract_one_video_into_workspace

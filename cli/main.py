@@ -695,11 +695,13 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     """
     Extract one video's frames into ws.derived_dir()/frames_relpath(...) and
     register the video (reference item) plus each frame (extracted_frame item)
-    in the workspace. Returns the list of frame WorkspaceItems (for describing).
+    in the workspace. Frames a previous run extracted completely, with the same
+    options, are reused instead. Returns the frame WorkspaceItems (for
+    describing), whose ``reused`` attribute says which happened.
 
     Raises ImportError if opencv-python is not installed.
     """
-    from idt_core.video import extract_frames_to_dir
+    from idt_core.video import extract_frames_to_dir, extraction_signature
     from idt_core.workspace import (
         WorkspaceItem, choose_frames_relpath, claim_frames_dir,
     )
@@ -736,18 +738,24 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
         frames_rel = choose_frames_relpath(ws.derived_dir(), video, video_subfolder)
     frames_dir = ws.derived_dir() / frames_rel
 
-    # Already extracted: the frame list is only recorded once a video's extraction
-    # finishes, so if every recorded frame is still in its folder, use them rather
-    # than read the whole video again. A large library on a network share spent its
-    # first half hour re-extracting videos on every run (10/8/2026). ImageDescriber
-    # skips such videos too.
-    recorded = ((video_wi.extra or {}).get("extracted_frames") or []) if video_wi else []
-    existing = [frames_dir / Path(p).name for p in recorded]
-    if existing and all(f.is_file() for f in existing):
-        frame_paths_on_disk = existing
+    # Already extracted: reuse the frames rather than read the whole video again. A
+    # large library on a network share spent its first half hour re-extracting
+    # videos on every run (10/8/2026). Only when the frames were made with the same
+    # options (so `idt video --interval 1` after `--interval 5` still extracts), the
+    # read reached the end of the video (a share dropping out mid-read looks like
+    # the end), and every recorded frame is still in its folder. Bundles from before
+    # the options were recorded, and ImageDescriber's, are extracted once more.
+    signature = extraction_signature(opts)
+    extra = (video_wi.extra or {}) if video_wi else {}
+    existing = [frames_dir / Path(p).name for p in extra.get("extracted_frames") or []]
+    reused = bool(existing) and extra.get("extraction") == signature \
+        and all(f.is_file() for f in existing)
+    claim_frames_dir(frames_dir, video)   # keeps the folder's owner record current
+    if reused:
+        frame_paths_on_disk, complete = existing, True
     else:
-        claim_frames_dir(frames_dir, video)
-        frame_paths_on_disk = extract_frames_to_dir(video, frames_dir, opts).frame_paths
+        result = extract_frames_to_dir(video, frames_dir, opts)
+        frame_paths_on_disk, complete = result.frame_paths, result.complete
 
     if video_wi is None:
         video_wi = WorkspaceItem(
@@ -773,10 +781,23 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
         frame_items.append(frame_wi)
         frame_paths.append(str(ws.image_path(frame_wi)))
 
-    # Store the frame list on the video so the GUI can show the frame count.
+    # Store the frame list on the video so the GUI can show the frame count, and
+    # how they were made, so the next run can tell whether to reuse them. An
+    # extraction cut short records no options, so the next run extracts again.
     video_wi.extra["extracted_frames"] = frame_paths
+    if complete:
+        video_wi.extra["extraction"] = signature
+    else:
+        video_wi.extra.pop("extraction", None)
     ws.save_item(video_wi)
+    frame_items = _FrameItems(frame_items)
+    frame_items.reused = reused
     return frame_items
+
+
+class _FrameItems(list):
+    """A video's frame items, and whether they were reused rather than extracted."""
+    reused = False
 
 
 def _previous_frames_rel(ws, video_wi, video: Path):
@@ -820,6 +841,7 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     interval = getattr(args, "video_interval", 5.0)
     opts = VideoExtractionOptions(mode="interval", interval_seconds=interval)
     total_frames = 0
+    reused_videos = 0
     cv_missing = False
     # Extraction can run for many minutes on a large library, and until it
     # finishes cmd_describe has not reached its own title updates. Without this
@@ -835,8 +857,11 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
                 f"IDT - Extracting Video Frames ({_n} of {len(videos)}, "
                 f"{total_frames} frames)"
             )
+            if frame_items.reused:
+                reused_videos += 1
             if not args.quiet:
-                print(f"  {video.name}: {len(frame_items)} frames")
+                note = " (already extracted)" if frame_items.reused else ""
+                print(f"  {video.name}: {len(frame_items)} frames{note}")
         except ImportError:
             cv_missing = True
             break
@@ -847,7 +872,11 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
         print("  Skipping video extraction: opencv-python not installed")
         print("  Install with: pip install opencv-python")
     elif total_frames and not args.quiet:
-        print(f"  {total_frames} frames added to workspace")
+        if reused_videos:
+            print(f"  {total_frames} frames in the workspace ({reused_videos} of "
+                  f"{len(videos)} videos already extracted)")
+        else:
+            print(f"  {total_frames} frames added to workspace")
     if not args.quiet:
         print()
 
@@ -1175,7 +1204,8 @@ def cmd_video(args):
             if not args.quiet:
                 where = (Path(frame_items[0].source_path).parent if frame_items
                          else ws.derived_dir("frames"))
-                print(f"    {len(frame_items)} frames -> {where}")
+                note = " (already extracted)" if frame_items.reused else ""
+                print(f"    {len(frame_items)} frames{note} -> {where}")
         except ImportError as e:
             print(f"Error: {e}", file=sys.stderr)
             print("Install with: pip install opencv-python", file=sys.stderr)
