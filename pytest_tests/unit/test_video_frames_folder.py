@@ -19,7 +19,8 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from idt_core.workspace import (  # noqa: E402
-    Workspace, choose_frames_relpath, claim_frames_dir, frames_dir_taken, frames_relpath,
+    Workspace, WorkspaceDescription, choose_frames_relpath, claim_frames_dir, frames_dir_taken,
+    frames_relpath,
 )
 
 
@@ -109,6 +110,47 @@ def test_cli_rerun_does_not_duplicate_frames(tmp_path):
     assert len(first) == len(second)
     frames = [i for i in ws.items() if i.item_type == "extracted_frame"]
     assert len(frames) == len(first)
+
+
+def test_cli_rerun_does_not_extract_a_finished_video_again(tmp_path, monkeypatch):
+    """A second run reuses the frames on disk instead of reading the video again: a large
+    library on a network share spent its first half hour re-extracting (10/8/2026)."""
+    pytest.importorskip("cv2")
+    import idt_core.video as video_mod
+    from cli.main import _extract_one_video_into_workspace
+    from idt_core.video import VideoExtractionOptions
+    src = tmp_path / "phone"
+    clip = src / "jan" / "IMG_0001.mp4"
+    _video(clip, 20, 90)
+    ws = Workspace.create(tmp_path / "w.idtw")
+    opts = VideoExtractionOptions(mode="interval", interval_seconds=5.0)
+    first = _extract_one_video_into_workspace(ws, clip, opts, src)
+    first[0].add_description(WorkspaceDescription.create(text="kept", provider="p", model="m"))
+    ws.save_item(first[0])
+
+    def must_not_run(*a, **k):
+        raise AssertionError("extracted again")
+
+    monkeypatch.setattr(video_mod, "extract_frames_to_dir", must_not_run)
+    second = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert [i.image for i in second] == [i.image for i in first]
+    assert second[0].described, "the frames keep their descriptions"
+
+
+def test_cli_extracts_again_when_a_recorded_frame_is_gone(tmp_path):
+    pytest.importorskip("cv2")
+    from cli.main import _extract_one_video_into_workspace
+    from idt_core.video import VideoExtractionOptions
+    src = tmp_path / "phone"
+    clip = src / "jan" / "IMG_0001.mp4"
+    _video(clip, 20, 90)
+    ws = Workspace.create(tmp_path / "w.idtw")
+    opts = VideoExtractionOptions(mode="interval", interval_seconds=5.0)
+    first = _extract_one_video_into_workspace(ws, clip, opts, src)
+    gone = Path(ws.image_path(first[-1]))
+    gone.unlink()
+    second = _extract_one_video_into_workspace(ws, clip, opts, src)
+    assert len(second) == len(first) and gone.exists()
 
 
 def test_cli_keeps_a_legacy_frames_folder(tmp_path):

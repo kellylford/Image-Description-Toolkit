@@ -735,8 +735,19 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     if frames_rel is None:
         frames_rel = choose_frames_relpath(ws.derived_dir(), video, video_subfolder)
     frames_dir = ws.derived_dir() / frames_rel
-    claim_frames_dir(frames_dir, video)
-    result = extract_frames_to_dir(video, frames_dir, opts)
+
+    # Already extracted: the frame list is only recorded once a video's extraction
+    # finishes, so if every recorded frame is still in its folder, use them rather
+    # than read the whole video again. A large library on a network share spent its
+    # first half hour re-extracting videos on every run (10/8/2026). ImageDescriber
+    # skips such videos too.
+    recorded = ((video_wi.extra or {}).get("extracted_frames") or []) if video_wi else []
+    existing = [frames_dir / Path(p).name for p in recorded]
+    if existing and all(f.is_file() for f in existing):
+        frame_paths_on_disk = existing
+    else:
+        claim_frames_dir(frames_dir, video)
+        frame_paths_on_disk = extract_frames_to_dir(video, frames_dir, opts).frame_paths
 
     if video_wi is None:
         video_wi = WorkspaceItem(
@@ -752,7 +763,7 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
 
     frame_items = []
     frame_paths = []
-    for frame_path in result.frame_paths:
+    for frame_path in frame_paths_on_disk:
         # Frames already live in derived/frames/ — reference them there rather
         # than copying into images/ (that would duplicate every frame).
         frame_wi = ws.add_image(frame_path, subfolder=frames_rel, copy=False)

@@ -8,6 +8,9 @@
 - The last line says "Stopped." instead of "Done." and counts the images not tried. Below it, IDT says why it stopped and gives the exact command to carry on. The window title says the run stopped early, and the reason is written to the run log.
 - `idt watch` stops only the batch that was failing and keeps watching. It says how to describe the images that batch didn't reach.
 
+**Describing a folder again no longer extracts its videos' frames again**
+- `idt describe` read every video again on each run, even when its frames were already in the workspace. For a large library on a network share, that was half an hour of extraction before any picture was described. A video whose frames are all still there is now skipped, as ImageDescriber already does. A video whose frames were stopped partway, or deleted, is extracted again.
+
 ## [4.8.0] - 2026-10-06
 
 ### ✨ New
