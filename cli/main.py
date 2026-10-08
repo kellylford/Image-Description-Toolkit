@@ -695,11 +695,13 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     """
     Extract one video's frames into ws.derived_dir()/frames_relpath(...) and
     register the video (reference item) plus each frame (extracted_frame item)
-    in the workspace. Returns the list of frame WorkspaceItems (for describing).
+    in the workspace. Frames a previous run extracted completely, with the same
+    options, are reused instead. Returns the frame WorkspaceItems (for
+    describing), whose ``reused`` attribute says which happened.
 
     Raises ImportError if opencv-python is not installed.
     """
-    from idt_core.video import extract_frames_to_dir
+    from idt_core.video import extract_frames_to_dir, extraction_signature
     from idt_core.workspace import (
         WorkspaceItem, choose_frames_relpath, claim_frames_dir,
     )
@@ -735,8 +737,37 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
     if frames_rel is None:
         frames_rel = choose_frames_relpath(ws.derived_dir(), video, video_subfolder)
     frames_dir = ws.derived_dir() / frames_rel
-    claim_frames_dir(frames_dir, video)
-    result = extract_frames_to_dir(video, frames_dir, opts)
+
+    # Already extracted: reuse the frames rather than read the whole video again. A
+    # large library on a network share spent its first half hour re-extracting
+    # videos on every run (10/8/2026). Only when the frames were made with the same
+    # options (so `idt video --interval 1` after `--interval 5` still extracts), the
+    # read reached the end of the video (a share dropping out mid-read looks like
+    # the end), and every recorded frame is still in its folder. Bundles from before
+    # the options were recorded, and ImageDescriber's, are extracted once more.
+    signature = extraction_signature(opts)
+    extra = (video_wi.extra or {}) if video_wi else {}
+    existing = [frames_dir / Path(p).name for p in extra.get("extracted_frames") or []]
+    reused = bool(existing) and extra.get("extraction") == signature \
+        and all(f.is_file() for f in existing)
+    claim_frames_dir(frames_dir, video)   # keeps the folder's owner record current
+    short, short_stop = False, None
+    if reused:
+        frame_paths_on_disk, complete = existing, True
+    else:
+        result = extract_frames_to_dir(video, frames_dir, opts)
+        frame_paths_on_disk, complete = result.frame_paths, result.complete
+        if not complete:
+            # Some files always end before the frame count their container gives
+            # (a clip trimmed without re-encoding keeps its full sample table). A
+            # read that stops at the same frame twice is the real end, not a share
+            # dropping out, which won't stop at the same place again.
+            stop = {"signature": signature, "frames_read": result.frames_read}
+            if extra.get("extraction_short") == stop:
+                complete = True
+            else:
+                short = True
+                short_stop = stop
 
     if video_wi is None:
         video_wi = WorkspaceItem(
@@ -752,7 +783,7 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
 
     frame_items = []
     frame_paths = []
-    for frame_path in result.frame_paths:
+    for frame_path in frame_paths_on_disk:
         # Frames already live in derived/frames/ — reference them there rather
         # than copying into images/ (that would duplicate every frame).
         frame_wi = ws.add_image(frame_path, subfolder=frames_rel, copy=False)
@@ -762,10 +793,37 @@ def _extract_one_video_into_workspace(ws, video: Path, opts,
         frame_items.append(frame_wi)
         frame_paths.append(str(ws.image_path(frame_wi)))
 
-    # Store the frame list on the video so the GUI can show the frame count.
+    # Store the frame list on the video so the GUI can show the frame count, and
+    # how they were made, so the next run can tell whether to reuse them. An
+    # extraction cut short records no options, so the next run extracts again.
     video_wi.extra["extracted_frames"] = frame_paths
+    if complete:
+        video_wi.extra["extraction"] = signature
+        video_wi.extra.pop("extraction_short", None)
+    else:
+        video_wi.extra.pop("extraction", None)
+        video_wi.extra["extraction_short"] = short_stop
     ws.save_item(video_wi)
+    frame_items = _FrameItems(frame_items)
+    frame_items.reused, frame_items.short = reused, short
     return frame_items
+
+
+class _FrameItems(list):
+    """A video's frame items, whether they were reused rather than extracted, and
+    whether reading the video ended early (so it will be read again next time).
+    Callers read the flags with getattr, so a plain list reads as neither."""
+    reused = False
+    short = False
+
+
+def _frames_note(frame_items) -> str:
+    """What to say after a video's frame count: reused, or read short."""
+    if getattr(frame_items, "reused", False):
+        return " (already extracted)"
+    if getattr(frame_items, "short", False):
+        return " (reading ended before the end of the video; it will be read again next time)"
+    return ""
 
 
 def _previous_frames_rel(ws, video_wi, video: Path):
@@ -809,6 +867,7 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
     interval = getattr(args, "video_interval", 5.0)
     opts = VideoExtractionOptions(mode="interval", interval_seconds=interval)
     total_frames = 0
+    reused_videos = 0
     cv_missing = False
     # Extraction can run for many minutes on a large library, and until it
     # finishes cmd_describe has not reached its own title updates. Without this
@@ -824,8 +883,11 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
                 f"IDT - Extracting Video Frames ({_n} of {len(videos)}, "
                 f"{total_frames} frames)"
             )
+            if getattr(frame_items, "reused", False):
+                reused_videos += 1
             if not args.quiet:
-                print(f"  {video.name}: {len(frame_items)} frames")
+                note = _frames_note(frame_items)
+                print(f"  {video.name}: {len(frame_items)} frames{note}")
         except ImportError:
             cv_missing = True
             break
@@ -836,7 +898,11 @@ def _extract_videos_into_workspace(ws, source: Path, args) -> None:
         print("  Skipping video extraction: opencv-python not installed")
         print("  Install with: pip install opencv-python")
     elif total_frames and not args.quiet:
-        print(f"  {total_frames} frames added to workspace")
+        if reused_videos:
+            print(f"  {total_frames} frames in the workspace ({reused_videos} of "
+                  f"{len(videos)} videos already extracted)")
+        else:
+            print(f"  {total_frames} frames added to workspace")
     if not args.quiet:
         print()
 
@@ -1164,7 +1230,8 @@ def cmd_video(args):
             if not args.quiet:
                 where = (Path(frame_items[0].source_path).parent if frame_items
                          else ws.derived_dir("frames"))
-                print(f"    {len(frame_items)} frames -> {where}")
+                note = _frames_note(frame_items)
+                print(f"    {len(frame_items)} frames{note} -> {where}")
         except ImportError as e:
             print(f"Error: {e}", file=sys.stderr)
             print("Install with: pip install opencv-python", file=sys.stderr)

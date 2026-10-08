@@ -33,6 +33,10 @@ class VideoExtractionResult:
     frame_paths: List[Path]
     duration_seconds: float = 0.0
     fps: float = 0.0
+    #: False when reading stopped well short of the video's end (see extract_frames_to_dir).
+    complete: bool = True
+    #: How many frames were read before reading stopped.
+    frames_read: int = 0
 
 
 def extract_frames_to_dir(
@@ -69,6 +73,7 @@ def extract_frames_to_dir(
     frame_number = 0
     saved_count = 0
     interval_frames = max(1, int(fps * opts.interval_seconds))
+    stopped_at_max = False
 
     while True:
         ret, frame = cap.read()
@@ -92,6 +97,7 @@ def extract_frames_to_dir(
 
         if should_save:
             if opts.max_frames and saved_count >= opts.max_frames:
+                stopped_at_max = True
                 break
             # Name frames by their timestamp in the video (seconds in) so the
             # filename tells you where each frame came from — matches the GUI.
@@ -111,13 +117,30 @@ def extract_frames_to_dir(
 
     cap.release()
 
+    # A read that fails looks the same as the end of the video, so a network share
+    # dropping out or a damaged file ends the loop early without an error. Compare
+    # with the frame count the container reports, which is approximate, hence the
+    # margin. With no count to compare against, there's no telling: call it complete.
+    complete = stopped_at_max or total_frames <= 0 or frame_number >= total_frames * 0.95
+
     return VideoExtractionResult(
         video_path=video_path,
         frames_dir=output_dir,
         frame_paths=frame_paths,
         duration_seconds=duration,
         fps=fps,
+        complete=complete,
+        frames_read=frame_number,
     )
+
+
+def extraction_signature(options: Optional[VideoExtractionOptions]) -> dict:
+    """The options that decide which frames a video gives, for telling whether frames
+    extracted before were made the same way."""
+    opts = options or VideoExtractionOptions()
+    if opts.mode == "scene":
+        return {"mode": "scene", "scene_threshold": opts.scene_threshold, "max_frames": opts.max_frames}
+    return {"mode": opts.mode, "interval_seconds": opts.interval_seconds, "max_frames": opts.max_frames}
 
 
 def scan_videos(directory: Path) -> Iterator[Path]:
