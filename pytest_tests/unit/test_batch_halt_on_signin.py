@@ -333,6 +333,25 @@ def test_a_refusal_does_not_hide_a_real_streak(monkeypatch):
     assert done.halted == "failed: plain"
 
 
+def test_one_videos_frames_failing_do_not_stop_the_batch(monkeypatch):
+    """Windows AI failed on every frame of one screen recording while describing the
+    frames around it (10/8/2026); counted as ten failures, it stopped every run there."""
+    bad = [f"ws/derived/frames/iPhone/RPReplay/RPReplay_{t}.00s.jpg" for t in range(0, 75, 5)]
+    names = ["ws/images/a.jpg"] + bad + ["ws/images/b.jpg"]
+    script = {Path(n).name: "plain" for n in bad}
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert _FakeImageWorker.seen == [Path(n).name for n in names]
+    assert done.halted is None
+
+
+def test_ten_videos_failing_in_a_row_still_stop_the_batch(monkeypatch):
+    names = [f"ws/derived/frames/v{n}/v{n}_0.00s.jpg" for n in range(12)]
+    script = {Path(n).name: "plain" for n in names}
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert len(_FakeImageWorker.seen) == workers_wx.SAME_FAILURE_STREAK
+    assert done.halted == "failed: plain"
+
+
 def test_guardrail_refusal_is_per_image_through_the_adapter():
     """The flag must survive the adapter's re-raise and the worker's wrap,
     which is what the batch actually sees."""

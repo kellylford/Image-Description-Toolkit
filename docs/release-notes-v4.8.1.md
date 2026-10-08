@@ -45,6 +45,12 @@ iPhone library on a network share with Windows AI.
   past, such as the Windows AI helper not being installed, and when the provider
   declines 25 pictures in a row, which usually means it is declining the prompt itself.
   A few declined pictures don't count toward the 10.
+- **One video that fails doesn't stop a run.** Frames taken from the same video count
+  as one picture toward the 10, in the command-line tool and in ImageDescriber.
+  Windows AI can fail on every frame of a video, such as an iPhone screen recording,
+  while describing everything around it. Those frames used to stop a batch, at the
+  same place every time it was run. Now the frames are marked as failed and the batch
+  carries on.
 - **It tells you why it stopped, and how to carry on.** The last line says
   **Stopped.** instead of **Done.** and counts the pictures not tried. Next comes the
   reason, then the exact command to carry on from where it stopped. The window title

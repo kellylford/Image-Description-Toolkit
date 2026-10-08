@@ -111,7 +111,7 @@ RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 #: Code plan, Ollama not running). REFUSAL_STREAK: consecutive images the provider
 #: declined (#352). Shared with the command line's runs, so the two can't drift.
 from idt_core.pipeline import (  # noqa: E402
-    REFUSAL_STREAK, SAME_FAILURE_STREAK,
+    REFUSAL_STREAK, SAME_FAILURE_STREAK, failure_source,
     is_per_image_failure as _is_per_image_failure,
     normalise_failure_text as _normalise_failure_text,
 )
@@ -1287,7 +1287,7 @@ class BatchProcessingWorker(threading.Thread):
             halted_files = []
             halted_streak = False
             halted_refusals = False
-            streak, streak_key = [], None
+            streak, streak_key, streak_sources = [], None, set()
             refusals = []
             i = 0
             while True:
@@ -1388,7 +1388,7 @@ class BatchProcessingWorker(threading.Thread):
                 # trip's worth of the same scene) halted the whole batch as if
                 # the provider were down (#352).
                 if worker.result_ok:
-                    streak = []
+                    streak, streak_sources = [], set()
                     refusals = []
                 elif getattr(worker, 'result_per_image', False):
                     refusals.append(file_path)
@@ -1397,8 +1397,12 @@ class BatchProcessingWorker(threading.Thread):
                     key = worker.result_signature
                     if streak and streak_key != key:
                         streak = []
+                        streak_sources = set()
                     streak_key = key
                     streak.append(file_path)
+                    # Frames of one video count once (see failure_source): one
+                    # video Windows AI fails on stopped the batch, every time.
+                    streak_sources.add(failure_source(file_path))
 
                 # Signed out / credentials refused / provider not set up: every
                 # remaining image would fail identically, so stop here. The
@@ -1408,7 +1412,7 @@ class BatchProcessingWorker(threading.Thread):
                 # costs a resume, not the images.
                 fatal = not worker.result_ok and worker.result_kind in RUN_FATAL_KINDS
                 refused_out = not fatal and len(refusals) >= REFUSAL_STREAK
-                if fatal or refused_out or len(streak) >= SAME_FAILURE_STREAK:
+                if fatal or refused_out or len(streak_sources) >= SAME_FAILURE_STREAK:
                     halted = worker.result_error or "The provider refused the request."
                     if refused_out:
                         # Declined, not untried: the same prompt declines

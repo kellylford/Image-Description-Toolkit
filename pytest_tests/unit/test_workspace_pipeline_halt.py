@@ -67,7 +67,7 @@ def test_ten_identical_failures_in_a_row_stop_the_run(tmp_path):
     pipeline, events = _run(ws, provider)
     assert len(events) == SAME_FAILURE_STREAK == 10
     assert provider.calls == 10, "the other 20 images aren't tried"
-    assert "10 images in a row failed with the same error" in pipeline.halted
+    assert "10 pictures or videos in a row failed with the same error" in pipeline.halted
     assert "timed out" in pipeline.halted
     assert pipeline.not_tried == 20 and not pipeline.halted_by_refusals
     log = next((ws.path / "logs").glob("run_*.log")).read_text(encoding="utf-8")
@@ -201,7 +201,7 @@ def test_the_stop_message_names_the_command_that_carries_on(tmp_path, capsys):
     ws, pipeline = _halted(tmp_path, [_timeout() for _ in range(12)], 12)
     _report_halt(pipeline, ws, redescribe=False)
     err = capsys.readouterr().err
-    assert "Why it stopped: 10 images in a row failed" in err
+    assert "Why it stopped: 10 pictures or videos in a row failed" in err
     assert f'run: idt describe "{ws.path}"' in err and "--redescribe" not in err
 
 
@@ -246,3 +246,48 @@ def test_no_message_when_the_run_finished(tmp_path, capsys):
     ws, pipeline = _halted(tmp_path, [], 3)
     _report_halt(pipeline, ws, redescribe=False)
     assert capsys.readouterr().err == ""
+
+
+# ---------------------------------------------------------------------------
+# Frames of one video count once
+# ---------------------------------------------------------------------------
+
+
+def _with_frames(tmp_path, frames_per_video):
+    """A workspace whose items are frames of the given videos, in that order."""
+    ws = _workspace(tmp_path, sum(frames_per_video))
+    items = sorted(ws.media_items(), key=lambda i: i.image)
+    n = 0
+    for v, count in enumerate(frames_per_video):
+        for _ in range(count):
+            items[n].item_type = "extracted_frame"
+            items[n].parent_video = f"/videos/clip{v}.mov"
+            ws.save_item(items[n])
+            n += 1
+    return ws
+
+
+def test_one_videos_frames_failing_do_not_stop_the_run(tmp_path):
+    """Windows AI failed at every size on all 15 frames of one screen recording while
+    describing the frames around it (10/8/2026). That stopped every run at that video."""
+    ws = _with_frames(tmp_path, [15, 3])
+    internal = lambda: RuntimeError("Windows couldn't describe this picture (InternalError).")
+    pipeline, events = _run(ws, ScriptedProvider([internal() for _ in range(15)] + ["ok"] * 3))
+    assert len(events) == 18 and pipeline.halted is None
+
+
+def test_ten_videos_failing_in_a_row_still_stop_the_run(tmp_path):
+    ws = _with_frames(tmp_path, [2] * 12)
+    pipeline, events = _run(ws, ScriptedProvider([_timeout() for _ in range(24)]))
+    assert pipeline.halted and len(events) == 19, "the 10th video's first frame"
+
+
+def test_failure_source():
+    from idt_core.pipeline import failure_source
+
+    assert failure_source("x.jpg", "/v/clip.mov") == "/v/clip.mov"
+    frame = "C:/ws.idtw/derived/frames/iPhone/IMG_1/IMG_1_5.00s.jpg"
+    assert failure_source(frame) == str(Path(frame).parent)
+    assert failure_source(frame.replace("derived", "Derived")) == str(Path(frame.replace("derived", "Derived")).parent)
+    assert failure_source("C:/pics/a.jpg") == str(Path("C:/pics/a.jpg"))
+    assert failure_source("C:/pics/frames/a.jpg") == str(Path("C:/pics/frames/a.jpg")), "only derived/frames"

@@ -220,6 +220,28 @@ def normalise_failure_text(text: str) -> str:
     return _REQUEST_ID.sub(lambda m: (m.group(1) or "") + "<id>", text)
 
 
+def failure_source(path, parent_video: Optional[str] = None) -> str:
+    """What a failure counts against for the identical-failure stop: the video, for a
+    frame extracted from one; otherwise the picture itself.
+
+    Frames of one video look alike, and a provider can fail on all of them: Windows AI
+    failed with InternalError at every size on every frame of one iPhone screen
+    recording while describing the frames on either side (10/8/2026). Counted as ten
+    failures, that one video stopped the run, and stopped it again at the same place
+    on every run after. A frame's video comes from ``parent_video`` when the caller
+    knows it, else from where frames are kept: each video's own folder under the
+    workspace's derived/frames.
+    """
+    if parent_video:
+        return str(parent_video)
+    p = Path(path)
+    lowered = [part.lower() for part in p.parts]
+    for i in range(len(lowered) - 1):
+        if lowered[i] == "derived" and lowered[i + 1] == "frames":
+            return str(p.parent)
+    return str(p)
+
+
 def _chain_says(exc: Optional[BaseException], attribute: str) -> bool:
     """True if `exc`, or anything it was raised from, has `attribute` set to True."""
     seen = set()
@@ -319,7 +341,8 @@ class WorkspacePipeline:
         self.halted = None
         self.halted_by_refusals = False
         self.not_tried = 0
-        last_signature, same_failures, refusals = None, 0, 0
+        # The identical failures in a row, by what each counts against (failure_source).
+        last_signature, failed_sources, refusals = None, set(), 0
 
         try:
             for index, item in enumerate(queue, start=1):
@@ -338,18 +361,20 @@ class WorkspacePipeline:
                 yield event
 
                 if event.success:
-                    last_signature, same_failures, refusals = None, 0, 0
+                    last_signature, failed_sources, refusals = None, set(), 0
                 elif event.per_image:
                     refusals += 1
                 else:
-                    same_failures = same_failures + 1 if event.signature == last_signature else 1
+                    if event.signature != last_signature:
+                        failed_sources = set()
+                    failed_sources.add(failure_source(item.source_path or item.image, item.parent_video))
                     last_signature, refusals = event.signature, 0
                 if index < total:
                     if event.setup:
                         self.halted = event.error
-                    elif same_failures >= SAME_FAILURE_STREAK:
-                        self.halted = (f"{same_failures} images in a row failed with the same "
-                                       f"error: {event.error}")
+                    elif len(failed_sources) >= SAME_FAILURE_STREAK:
+                        self.halted = (f"{len(failed_sources)} pictures or videos in a row failed "
+                                       f"with the same error: {event.error}")
                     elif refusals >= REFUSAL_STREAK:
                         self.halted_by_refusals = True
                         self.halted = (f"{self.provider.provider_name} declined {refusals} images in "
