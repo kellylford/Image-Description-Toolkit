@@ -62,7 +62,9 @@ class Progress:
         if not self.quiet:
             print(text, file=self._out, flush=True)
 
-    def summary(self, described: int, errors: int = 0, skipped: int = 0) -> None:
+    def summary(self, described: int, errors: int = 0, skipped: int = 0, not_tried: int = 0) -> None:
+        """The run's last line. ``not_tried`` is images a run that stopped early never reached;
+        it makes the line start "Stopped." rather than "Done."."""
         if self.quiet:
             return
         parts = [f"{described} described"]
@@ -70,4 +72,6 @@ class Progress:
             parts.append(f"{errors} error{'s' if errors != 1 else ''}")
         if skipped:
             parts.append(f"{skipped} skipped")
-        print(f"\nDone. {', '.join(parts)}.", file=self._out, flush=True)
+        if not_tried:
+            parts.append(f"{not_tried} not tried")
+        print(f"\n{'Stopped' if not_tried else 'Done'}. {', '.join(parts)}.", file=self._out, flush=True)

@@ -106,33 +106,18 @@ def _windows_ai_needs_preparing() -> bool:
 #: (an expired Claude Code sign-in failed 533 images in 17 minutes).
 RUN_FATAL_KINDS = frozenset({ErrorKind.AUTH, ErrorKind.UNAVAILABLE})
 
-#: Consecutive images failing with the identical error that also halt a batch,
-#: for failures that carry no run-fatal kind: a used-up Claude Code plan,
-#: Ollama not running. Large enough that a few bad files in a row don't trip it.
-SAME_FAILURE_STREAK = 10
-
-#: Consecutive images the provider declined (per-image refusals, which the
-#: identical-failure rule ignores). A few dozen similar photos can each be
-#: refused; this many in a row is the prompt itself being refused on every
-#: image, and the batch stops rather than fail the whole library (#352).
-REFUSAL_STREAK = 25
+#: SAME_FAILURE_STREAK: consecutive images failing with the identical error that
+#: also halt a batch, for failures that carry no run-fatal kind (a used-up Claude
+#: Code plan, Ollama not running). REFUSAL_STREAK: consecutive images the provider
+#: declined (#352). Shared with the command line's runs, so the two can't drift.
+from idt_core.pipeline import (  # noqa: E402
+    REFUSAL_STREAK, SAME_FAILURE_STREAK,
+    is_per_image_failure as _is_per_image_failure,
+    normalise_failure_text as _normalise_failure_text,
+)
 
 
 _TIMESTAMP_TAIL = re.compile(r"\s*-\s*\(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(,\d+)?\)\s*$")
-_HEX_ADDRESS = re.compile(r"\b0x[0-9a-fA-F]+\b")
-#: Per-request identifiers that API error bodies embed (Anthropic puts
-#: 'request_id': 'req_…' in str(exc)); with them, no two failures matched.
-#: A bare req_ only when id-length, so a file called req_0001.jpg in a
-#: "file not found" message stays distinct; "request ID" in any spelling.
-_REQUEST_ID = re.compile(
-    r"\breq_[A-Za-z0-9]{16,}|"
-    r"""(request[\s_-]?id['"]?\s*[:=]?\s*['"]?)[A-Za-z0-9_-]{6,}""",
-    re.IGNORECASE)
-
-
-def _normalise_failure_text(text: str) -> str:
-    text = _HEX_ADDRESS.sub("0x", text)
-    return _REQUEST_ID.sub(lambda m: (m.group(1) or "") + "<id>", text)
 
 
 def _failure_signature(exc: BaseException):
@@ -154,18 +139,6 @@ def _failure_signature(exc: BaseException):
         probe = probe.__cause__ or probe.__context__
     text = _TIMESTAMP_TAIL.sub("", str(exc))
     return (_provider_error_kind(exc), None, _normalise_failure_text(text))
-
-
-def _is_per_image_failure(exc: BaseException) -> bool:
-    """True if `exc`, or anything it was raised from, says the provider
-    declined this one image (``per_image``) rather than failed."""
-    seen = set()
-    while exc is not None and id(exc) not in seen:
-        seen.add(id(exc))
-        if getattr(exc, "per_image", False) is True:
-            return True
-        exc = exc.__cause__ or exc.__context__
-    return False
 
 
 def _provider_error_kind(exc: BaseException):
