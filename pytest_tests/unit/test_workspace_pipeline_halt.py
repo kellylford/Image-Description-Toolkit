@@ -389,7 +389,7 @@ def test_redescribe_or_another_prompt_asks_again(tmp_path):
     ws2 = _workspace(tmp_path / "two", 2)
     _run(ws2, ScriptedProvider([Declined("no"), Declined("no")]))
     redo = ScriptedProvider([])
-    events = list(WorkspacePipeline(ws2, redo).run(RunOptions(
+    list(WorkspacePipeline(ws2, redo).run(RunOptions(
         prompt_name="none", prompt_text="", extract_metadata=False, redescribe=True)))
     assert redo.calls == 2
 
@@ -401,7 +401,8 @@ def test_a_picture_described_later_loses_its_declined_mark(tmp_path):
     assert item.extra.get("declined")
     list(WorkspacePipeline(ws, ScriptedProvider(["ok"])).run(RunOptions(
         prompt_name="none", prompt_text="", extract_metadata=False, redescribe=True)))
-    assert "declined" not in Workspace.open(ws.path).media_items()[0].extra
+    reopened = Workspace.open(ws.path).media_items()[0]
+    assert "declined" not in reopened.extra
 
 
 def test_the_refusal_stop_counts_pictures_or_videos(tmp_path):
@@ -460,7 +461,8 @@ def test_a_failure_mark_is_cleared_once_described(tmp_path):
     _run(ws, ScriptedProvider([_internal()]))
     assert ws.media_items()[0].extra.get("failed")
     _run(ws, ScriptedProvider(["ok"]))
-    assert "failed" not in Workspace.open(ws.path).media_items()[0].extra
+    reopened = Workspace.open(ws.path).media_items()[0]
+    assert "failed" not in reopened.extra
 
 
 
@@ -525,7 +527,7 @@ def test_another_custom_prompt_text_asks_again(tmp_path):
     list(WorkspacePipeline(ws, ScriptedProvider([Declined("no")])).run(
         RunOptions(prompt_name="custom", prompt_text="Describe it.", extract_metadata=False)))
     again = ScriptedProvider([])
-    events = list(WorkspacePipeline(ws, again).run(
+    list(WorkspacePipeline(ws, again).run(
         RunOptions(prompt_name="custom", prompt_text="Describe the text in it.", extract_metadata=False)))
     assert again.calls == 1
 
