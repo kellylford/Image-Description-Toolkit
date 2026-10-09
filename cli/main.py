@@ -596,13 +596,16 @@ def cmd_describe(args):
 
     queue = available if args.redescribe else [i for i in available if not i.described]
     pipeline = WorkspacePipeline(ws, provider)
-    queue = pipeline.drop_declined(queue, options)
+    queue = pipeline.plan_queue(queue, options)
     if args.limit:
         queue = queue[: args.limit]
     if pipeline.previously_declined and not args.quiet:
         print(f"Declined:   {pipeline.previously_declined} picture(s) that {provider_name} / "
               f"{model} declined before are left out. To try them again, use --redescribe, "
               "or another provider or prompt style.")
+    if pipeline.retrying_failed and not args.quiet:
+        print(f"Retrying:   {pipeline.retrying_failed} picture(s) that failed before, after the "
+              "rest.")
 
     if not queue:
         if not args.quiet:

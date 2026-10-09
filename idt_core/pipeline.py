@@ -324,6 +324,15 @@ class FailureStreak:
         self._signature = signature
         self._refused, self._refusal_run = set(), (None, 0)
         self._sources.add(failure_source(path, parent_video))
+        self._count_video_failure(path, signature, parent_video)
+
+    def known_failure(self, path, signature, parent_video: Optional[str] = None) -> None:
+        """A picture failing again exactly as it did on an earlier run. It says nothing
+        about whether the provider has stopped working, so it neither counts toward nor
+        breaks the identical-failure stop; it still counts toward skipping its video."""
+        self._count_video_failure(path, signature, parent_video)
+
+    def _count_video_failure(self, path, signature, parent_video: Optional[str]) -> None:
         video = frame_video(path, parent_video)
         if video is not None:
             key = (video, signature)
@@ -394,8 +403,9 @@ class WorkspacePipeline:
         #: Frames the last run skipped because earlier frames of their video failed.
         self.skipped = 0
         #: Pictures left out of the last run because this provider, model and prompt
-        #: declined them before (see drop_declined).
+        #: declined them before, and ones that failed before, tried last (see plan_queue).
         self.previously_declined = 0
+        self.retrying_failed = 0
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
         all_items = self.workspace.media_items()
@@ -411,7 +421,7 @@ class WorkspacePipeline:
                 continue
             live_items.append(i)
         queue = live_items if options.redescribe else [i for i in live_items if not i.described]
-        queue = self.drop_declined(queue, options)
+        queue = self.plan_queue(queue, options)
         if options.limit is not None:
             queue = queue[: options.limit]
 
@@ -421,22 +431,28 @@ class WorkspacePipeline:
         return {"provider": self.provider.provider_name, "model": self.provider.model_name,
                 "prompt": options.prompt_name}
 
-    def drop_declined(self, queue: list, options: RunOptions) -> list:
-        """The queue without pictures this provider, model and prompt declined before.
+    def plan_queue(self, queue: list, options: RunOptions) -> list:
+        """The queue without pictures this provider, model and prompt declined before,
+        and with the ones that failed before moved to the end.
 
-        A refusal (Windows AI's "too much text", a content filter) comes back the same
-        every time it is asked the same way, so retrying costs time on every run, and
-        the refused pictures, still undescribed, came first in the queue: a run over an
-        iPhone library opened with a hundred of them (10/9/2026). --redescribe, another
-        provider, model or prompt style tries them again.
+        Pictures that were declined or failed stay undescribed, so they came first in
+        every rerun: a rerun over an iPhone library opened with a hundred of them
+        (10/9/2026), declined again or failing again, and ten failing again stopped the
+        run as if Windows AI had stopped working. A refusal ("too much text", a content
+        filter) comes back the same when asked the same way, so those are left out;
+        --redescribe, another provider, model or prompt style asks again. A failure may
+        not recur, so those are tried again, after everything not yet tried.
         """
-        self.previously_declined = 0
+        self.previously_declined = self.retrying_failed = 0
         if options.redescribe:
             return queue
         key = self._declined_key(options)
         kept = [i for i in queue if (i.extra or {}).get("declined") != key]
         self.previously_declined = len(queue) - len(kept)
-        return kept
+        fresh = [i for i in kept if not (i.extra or {}).get("failed")]
+        failed = [i for i in kept if (i.extra or {}).get("failed")]
+        self.retrying_failed = len(failed)
+        return fresh + failed
 
     def run_items(self, items: list[WorkspaceItem], options: RunOptions) -> Iterator[WorkspaceEvent]:
         """
@@ -449,7 +465,7 @@ class WorkspacePipeline:
         shared workspace.
         """
         queue = list(items) if options.redescribe else [i for i in items if not i.described]
-        queue = self.drop_declined(queue, options)
+        queue = self.plan_queue(queue, options)
         if options.limit is not None:
             queue = queue[: options.limit]
 
@@ -511,7 +527,14 @@ class WorkspacePipeline:
                     item.extra["declined"] = self._declined_key(options)
                     self.workspace.save_item(item)
                 else:
-                    streak.failure(path, event.signature, item.parent_video)
+                    key = self._declined_key(options)
+                    before = (item.extra or {}).get("failed") or {}
+                    if before.get("key") == key and before.get("signature") == event.signature:
+                        streak.known_failure(path, event.signature, item.parent_video)
+                    else:
+                        streak.failure(path, event.signature, item.parent_video)
+                    item.extra["failed"] = {"key": key, "signature": event.signature}
+                    self.workspace.save_item(item)
                 if index < total:
                     if event.setup:
                         self.halted = event.error
@@ -575,7 +598,9 @@ class WorkspacePipeline:
             )
             item.add_description(desc)
             if item.extra:
-                item.extra.pop("declined", None)   # described now, however it was declined before
+                # Described now, however it was declined or failed before.
+                item.extra.pop("declined", None)
+                item.extra.pop("failed", None)
             self.workspace.save_item(item)
             return WorkspaceEvent(item=item, index=index, total=total, metadata=meta)
 

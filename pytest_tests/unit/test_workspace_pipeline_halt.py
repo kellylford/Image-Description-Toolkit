@@ -410,3 +410,54 @@ def test_the_refusal_stop_counts_pictures_or_videos(tmp_path):
     pipeline, events = _run(ws, ScriptedProvider([Declined("no") for _ in range(90)]))
     assert pipeline.halted_by_refusals
     assert sum(1 for e in events if not e.skipped) == 3 * 24 + 1
+
+
+# ---------------------------------------------------------------------------
+# Pictures that failed before: tried last, and a repeat isn't a stuck provider
+# ---------------------------------------------------------------------------
+
+
+def _internal():
+    return RuntimeError("Windows couldn't describe this picture (InternalError) at any size.")
+
+
+def test_pictures_that_failed_before_are_tried_after_the_rest(tmp_path):
+    ws = _workspace(tmp_path, 3)
+    _run(ws, ScriptedProvider([_internal(), "ok", "ok"]))
+    names = sorted(i.image for i in ws.media_items())
+    never_tried = next(i for i in ws.media_items() if i.image == names[1])
+    never_tried.descriptions.clear()
+    ws.save_item(never_tried)
+    pipeline = WorkspacePipeline(ws, ScriptedProvider([]))
+    undescribed = sorted((i for i in ws.media_items() if not i.described), key=lambda i: i.image)
+    order = [i.image for i in pipeline.plan_queue(undescribed, RunOptions(prompt_name="none", prompt_text=""))]
+    assert order == [names[1], names[0]], "never tried first, failed before last"
+    assert pipeline.retrying_failed == 1
+
+
+def test_failing_again_the_same_way_is_not_a_stuck_provider(tmp_path):
+    """A rerun stopped at picture 72: ten pictures that had failed with InternalError
+    before failed the same way again, which looked like Windows AI stopping (10/9/2026)."""
+    ws = _workspace(tmp_path, 15)
+    _run(ws, ScriptedProvider([_internal() for _ in range(15)]))   # stops at 10
+    pipeline, events = _run(ws, ScriptedProvider([_internal() for _ in range(15)]))
+    assert pipeline.halted is None, "ten repeats then five new ones isn't ten new failures"
+    assert len(events) == 15
+
+
+def test_a_stuck_provider_is_still_caught_among_repeats(tmp_path):
+    ws = _workspace(tmp_path, 25)
+    _run(ws, ScriptedProvider([_internal()] * 5 + ["ok"] * 20))
+    for item in ws.media_items():           # make everything undescribed again
+        item.descriptions.clear()
+        ws.save_item(item)
+    pipeline, events = _run(ws, ScriptedProvider([_timeout() for _ in range(25)]))
+    assert pipeline.halted and "timed out" in pipeline.halted
+
+
+def test_a_failure_mark_is_cleared_once_described(tmp_path):
+    ws = _workspace(tmp_path, 1)
+    _run(ws, ScriptedProvider([_internal()]))
+    assert ws.media_items()[0].extra.get("failed")
+    _run(ws, ScriptedProvider(["ok"]))
+    assert "failed" not in Workspace.open(ws.path).media_items()[0].extra

@@ -64,6 +64,12 @@ a batch treats a video whose frames all fail, applies to ImageDescriber too.
   declined, leaves them out of later runs, and says how many it left out. To try them
   again, use `--redescribe`, another provider, or another prompt style. A video whose
   frames are declined is skipped after 3 of them, as for failures.
+- **Pictures that failed before are tried last, and failing again doesn't stop the
+  run.** A picture Windows AI couldn't describe may work another time, so a rerun
+  tries it again, but only after every picture not yet tried. One that fails again
+  exactly as it did before doesn't count toward the 10 that stop a run: a rerun of the
+  iPhone library stopped at picture 72 when ten such pictures failed again, though
+  Windows AI was working.
 - **It tells you why it stopped, and how to carry on.** The last line says
   **Stopped.** instead of **Done.** and counts the pictures not tried. Next comes the
   reason, then the exact command to carry on from where it stopped. The window title
