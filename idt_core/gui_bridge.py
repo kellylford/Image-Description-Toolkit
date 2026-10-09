@@ -162,6 +162,28 @@ def gui_workspace_to_bundle(workspace_dict: dict, dest: Path,
     return ws
 
 
+#: Item marks the command line keeps in a sidecar's ``extra`` that ImageDescriber
+#: doesn't load: how a video's frames were extracted (reused only when it matches),
+#: and the provider that declined or failed on a picture (left out, or tried last,
+#: on the next run). A GUI save must keep them, or the next run re-extracts every
+#: video and asks again about every declined picture.
+_CLI_ITEM_MARKS = ("extraction", "extraction_short", "declined", "failed")
+#: Marks that stop being true once the picture has a description.
+_OUTCOME_MARKS = ("declined", "failed")
+
+
+def _keep_cli_marks(extra: dict, old_extra: Optional[dict], described: bool) -> dict:
+    """`extra` with the command line's marks carried over from the sidecar it replaces,
+    less the outcome marks once the picture is described."""
+    for key in _CLI_ITEM_MARKS:
+        if key not in extra and key in (old_extra or {}):
+            extra[key] = old_extra[key]
+    if described:
+        for key in _OUTCOME_MARKS:
+            extra.pop(key, None)
+    return extra
+
+
 def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
                               copy_images: bool) -> None:
     src = Path(file_path)
@@ -178,6 +200,7 @@ def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
             if existing.descriptions:
                 existing.active_description_id = existing.descriptions[-1].id
             existing.extra.update({k: v for k, v in item.items() if k not in _ITEM_CORE_GUI_KEYS})
+            _keep_cli_marks(existing.extra, None, bool(existing.descriptions))
             ws.save_item(existing)
             return
     except ValueError:
@@ -216,7 +239,9 @@ def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
     if wi.descriptions:
         wi.active_description_id = wi.descriptions[-1].id
     # Preserve GUI-only item fields (batch state, extracted_frames, display_name…)
-    wi.extra = {k: v for k, v in item.items() if k not in _ITEM_CORE_GUI_KEYS}
+    previous = ws.get_item(src.name, item.get("subfolder"))
+    wi.extra = _keep_cli_marks({k: v for k, v in item.items() if k not in _ITEM_CORE_GUI_KEYS},
+                               previous.extra if previous else None, bool(wi.descriptions))
     ws.save_item(wi)
 
 
@@ -452,6 +477,7 @@ def gui_item_to_ws_item(ws: Workspace, file_path: str, gui_item: dict,
             existing.active_description_id = existing.descriptions[-1].id
         existing.is_missing = gui_item.get("is_missing", False)
         existing.extra.update(extra)
+        _keep_cli_marks(existing.extra, None, bool(existing.descriptions))
         # ImageDescriber 4.6.0 and earlier recorded extracted frames as copied into
         # images/ without copying them. Correct the record when it is rewritten.
         # Same scope as Workspace.image_path's fallback: only frames under this

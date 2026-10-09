@@ -601,11 +601,10 @@ def cmd_describe(args):
         queue = queue[: args.limit]
     if pipeline.previously_declined and not args.quiet:
         print(f"Declined:   {pipeline.previously_declined} picture(s) that {provider_name} / "
-              f"{model} declined before are left out. To try them again, use --redescribe, "
-              "or another provider or prompt style.")
-    if pipeline.retrying_failed and not args.quiet:
-        print(f"Retrying:   {pipeline.retrying_failed} picture(s) that failed before, after the "
-              "rest.")
+              f"{model} declined before are left out. {_ask_again_hint(provider_name)}")
+    retrying = sum(1 for i in queue if (i.extra or {}).get("failed")) if not args.redescribe else 0
+    if retrying and not args.quiet:
+        print(f"Retrying:   {retrying} picture(s) that failed before, after the rest.")
 
     if not queue:
         if not args.quiet:
@@ -651,7 +650,7 @@ def cmd_describe(args):
 
     progress.summary(described=described, errors=errors, skipped=pipeline.skipped,
                      not_tried=pipeline.not_tried)
-    _report_halt(pipeline, ws, redescribe=args.redescribe)
+    _report_halt(pipeline, ws, redescribe=args.redescribe, declined_announced=True)
     if missing and not args.quiet:
         print(f"Skipped {len(missing)} missing original(s) not found on disk.")
     if pipeline.halted:
@@ -674,14 +673,33 @@ def cmd_describe(args):
         _auto_export_workspace(ws, args.quiet)
 
 
+def _ask_again_hint(provider_name: str) -> str:
+    """How to get pictures a provider declined asked again. Asking the same way gets the
+    same answer, and --redescribe redoes every picture, which on a large library is the
+    expensive way."""
+    if _uses_prompt(provider_name):
+        other = "another prompt style or model"
+    else:
+        other = "another --model (it takes no prompt)"
+    return (f"To try them again, use {other}, or another provider; --redescribe also "
+            "does, but describes every picture again.")
+
+
 #: The most of the failure that the stop message repeats; each image's line already showed it all.
 _HALT_REASON_CHARS = 300
 
 
-def _report_halt(pipeline, ws, redescribe: bool, watching: bool = False) -> None:
+def _report_halt(pipeline, ws, redescribe: bool, watching: bool = False,
+                 declined_announced: bool = False) -> None:
     """Say why a describing run stopped early, if it did, and how to carry on. On stderr, so
     --quiet still shows it and the tab-separated output on stdout stays clean. Also says
-    why any video frames were skipped."""
+    why any video frames were skipped, and, unless the caller already did, that pictures
+    declined before were left out."""
+    declined = getattr(pipeline, "previously_declined", 0)
+    if declined and not declined_announced:
+        name = pipeline.provider.provider_name
+        print(f"{declined} picture(s) that {name} declined before were left out. "
+              f"{_ask_again_hint(name)}", file=sys.stderr, flush=True)
     if getattr(pipeline, "skipped", 0):
         if redescribe:
             again = ("They keep any earlier descriptions; to try them again, run: "
