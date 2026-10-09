@@ -239,7 +239,12 @@ def _gui_image_item_to_bundle(ws: Workspace, file_path: str, item: dict,
     if wi.descriptions:
         wi.active_description_id = wi.descriptions[-1].id
     # Preserve GUI-only item fields (batch state, extracted_frames, display_name…)
-    previous = ws.get_item(src.name, item.get("subfolder"))
+    # This picture's own sidecar only: get_item would search every subfolder for the
+    # name, slow on a first save of a large library and liable to find another
+    # picture of the same name.
+    sidecar = ws._sidecar_path(src.name, item.get("subfolder"))
+    previous = (WorkspaceItem.from_dict(json.loads(sidecar.read_text(encoding="utf-8")))
+                if sidecar.exists() else None)
     wi.extra = _keep_cli_marks({k: v for k, v in item.items() if k not in _ITEM_CORE_GUI_KEYS},
                                previous.extra if previous else None, bool(wi.descriptions))
     ws.save_item(wi)

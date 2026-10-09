@@ -406,24 +406,18 @@ def is_setup_failure(exc: BaseException) -> bool:
 _FILE_PROBLEM_CODES = {"decode_failed", "unsupported_format", "too_large"}
 
 
-def _chain_values(exc: Optional[BaseException], attribute: str) -> list:
-    seen, values = set(), []
-    while exc is not None and id(exc) not in seen:
-        seen.add(id(exc))
-        if getattr(exc, attribute, None) is not None:
-            values.append(getattr(exc, attribute))
-        exc = exc.__cause__ or exc.__context__
-    return values
-
-
 def _failure_event(item: WorkspaceItem, index: int, total: int, exc: BaseException) -> WorkspaceEvent:
     per_image = is_per_image_failure(exc)
     return WorkspaceEvent(
         item=item, index=index, total=total, error=str(exc),
         signature=f"{type(exc).__name__}: {normalise_failure_text(str(exc))}",
         per_image=per_image, setup=is_setup_failure(exc),
-        declinable=per_image and not (set(_chain_values(exc, "code")) & _FILE_PROBLEM_CODES),
-        transient=_chain_says(exc, "timeout") or 503 in _chain_values(exc, "status_code"),
+        # The outermost error only: what a provider raises in the end may carry the
+        # attempts before it. Windows AI's "at any size" InternalError is raised while
+        # handling the first attempt's error, which is marked retryable (503), and read
+        # down the chain every repeat looked transient.
+        declinable=per_image and getattr(exc, "code", None) not in _FILE_PROBLEM_CODES,
+        transient=getattr(exc, "timeout", False) is True or getattr(exc, "status_code", None) == 503,
     )
 
 

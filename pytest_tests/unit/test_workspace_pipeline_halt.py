@@ -589,3 +589,53 @@ def test_an_imagedescriber_save_round_trip_keeps_the_marks(tmp_path):
     ws.save_item(gui_item_to_ws_item(ws, str(ws.image_path(item)), described))
     after = next(i for i in Workspace.open(ws.path).media_items() if i.image == item.image)
     assert "declined" not in after.extra and "failed" not in after.extra
+
+
+def test_windows_ais_real_internal_error_repeats_as_a_known_failure(tmp_path, monkeypatch):
+    """Through the real WindowsAIProvider: its final "at any size" error is raised while
+    handling the first attempt's, which is marked retryable (503). Read down the chain,
+    every repeat looked transient and a rerun stopped after ten, as at picture 72."""
+    from PIL import Image
+
+    from idt_core.providers import windows_ai
+
+    monkeypatch.setattr(windows_ai._helper, "request", lambda *a, **k: (_ for _ in ()).throw(
+        windows_ai.error_for_code("internal_error", "Windows couldn't describe this picture (InternalError).")))
+    src = tmp_path / "Pics"
+    src.mkdir()
+    for n in range(12):
+        Image.new("RGB", (1000, 800), (n * 20, 0, 0)).save(src / f"{n:03}.jpg", "JPEG")
+    ws = Workspace.create(tmp_path / "WS")
+    ws.add_source_folder(src, recursive=True)
+    provider = windows_ai.WindowsAIProvider(check=False)
+    options = RunOptions(prompt_name="none", prompt_text="", extract_metadata=False)
+
+    first = WorkspacePipeline(ws, provider)
+    events = list(first.run(options))
+    assert first.halted and len(events) == 10, "ten new failures: stop"
+    assert not events[0].transient and events[0].error.endswith("at a smaller size either.")
+
+    second = WorkspacePipeline(ws, provider)
+    events = list(second.run(options))
+    assert second.halted is None and len(events) == 12, "two new, then ten repeats"
+
+
+def test_a_gui_save_takes_marks_only_from_the_pictures_own_sidecar(tmp_path):
+    """Another picture of the same name in a subfolder must not lend it its marks."""
+    from PIL import Image
+
+    from idt_core.gui_bridge import _gui_image_item_to_bundle
+    from idt_core.workspace import WorkspaceItem
+
+    ws = Workspace.create(tmp_path / "WS.idtw")
+    other = WorkspaceItem(image="IMG_0001.jpg", source_path=str(tmp_path / "Trip" / "IMG_0001.jpg"),
+                          storage="reference", subfolder="Trip")
+    other.extra["declined"] = {"provider": "windows-ai"}
+    ws.save_item(other)
+    new = tmp_path / "IMG_0001.jpg"
+    Image.new("RGB", (8, 8)).save(new, "JPEG")
+    _gui_image_item_to_bundle(ws, str(new), {"descriptions": []}, copy_images=False)
+    root = ws._sidecar_path("IMG_0001.jpg", None)
+    assert root.exists()
+    import json
+    assert "declined" not in json.loads(root.read_text(encoding="utf-8")).get("extra", {})
