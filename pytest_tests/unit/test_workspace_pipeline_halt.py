@@ -353,3 +353,291 @@ def test_failure_source():
     # A source subfolder called derived/frames inside a bundle: the bundle's own pair counts.
     inner = "C:/w.idtw/derived/frames/derived/frames/IMG/x.jpg"
     assert frame_video(inner) == str(Path(inner).parent)
+
+
+# ---------------------------------------------------------------------------
+# Declined pictures: remembered, and a video of them skipped
+# ---------------------------------------------------------------------------
+
+
+def test_a_video_whose_frames_are_declined_is_skipped_after_three(tmp_path):
+    """Windows AI declined every frame of an iPhone screen recording of text."""
+    ws = _with_frames(tmp_path, [15, 3])
+    text = lambda: Declined("This picture has too much text for Windows to describe.")
+    provider = ScriptedProvider([text() for _ in range(3)] + ["ok"] * 3)
+    pipeline, events = _run(ws, provider)
+    assert provider.calls == 6 and pipeline.skipped == 12 and pipeline.halted is None
+
+
+def test_declined_pictures_are_not_asked_again_the_same_way(tmp_path):
+    ws = _workspace(tmp_path, 4)
+    first = ScriptedProvider([Declined("no"), "ok", Declined("no"), "ok"])
+    _run(ws, first)
+    second = ScriptedProvider([])
+    pipeline, events = _run(ws, second)
+    assert second.calls == 0 and events == [] and pipeline.previously_declined == 2
+
+
+def test_redescribe_or_another_prompt_asks_again(tmp_path):
+    ws = _workspace(tmp_path, 2)
+    _run(ws, ScriptedProvider([Declined("no"), Declined("no")]))
+    again = ScriptedProvider([])
+    pipeline = WorkspacePipeline(ws, again)
+    events = list(pipeline.run(RunOptions(prompt_name="other", prompt_text="", extract_metadata=False)))
+    assert len(events) == 2 and again.calls == 2, "another prompt style is another question"
+    (tmp_path / "two").mkdir()
+    ws2 = _workspace(tmp_path / "two", 2)
+    _run(ws2, ScriptedProvider([Declined("no"), Declined("no")]))
+    redo = ScriptedProvider([])
+    list(WorkspacePipeline(ws2, redo).run(RunOptions(
+        prompt_name="none", prompt_text="", extract_metadata=False, redescribe=True)))
+    assert redo.calls == 2
+
+
+def test_a_picture_described_later_loses_its_declined_mark(tmp_path):
+    ws = _workspace(tmp_path, 1)
+    _run(ws, ScriptedProvider([Declined("no")]))
+    item = ws.media_items()[0]
+    assert item.extra.get("declined")
+    list(WorkspacePipeline(ws, ScriptedProvider(["ok"])).run(RunOptions(
+        prompt_name="none", prompt_text="", extract_metadata=False, redescribe=True)))
+    reopened = Workspace.open(ws.path).media_items()[0]
+    assert "declined" not in reopened.extra
+
+
+def test_the_refusal_stop_counts_pictures_or_videos(tmp_path):
+    """Declined frames of 10 videos are 10 refusals toward the 25, not 30."""
+    ws = _with_frames(tmp_path, [3] * 30)
+    pipeline, events = _run(ws, ScriptedProvider([Declined("no") for _ in range(90)]))
+    assert pipeline.halted_by_refusals
+    assert sum(1 for e in events if not e.skipped) == 3 * 24 + 1
+
+
+# ---------------------------------------------------------------------------
+# Pictures that failed before: tried last, and a repeat isn't a stuck provider
+# ---------------------------------------------------------------------------
+
+
+def _internal():
+    return RuntimeError("Windows couldn't describe this picture (InternalError) at any size.")
+
+
+def test_pictures_that_failed_before_are_tried_after_the_rest(tmp_path):
+    ws = _workspace(tmp_path, 3)
+    _run(ws, ScriptedProvider([_internal(), "ok", "ok"]))
+    names = sorted(i.image for i in ws.media_items())
+    never_tried = next(i for i in ws.media_items() if i.image == names[1])
+    never_tried.descriptions.clear()
+    ws.save_item(never_tried)
+    pipeline = WorkspacePipeline(ws, ScriptedProvider([]))
+    undescribed = sorted((i for i in ws.media_items() if not i.described), key=lambda i: i.image)
+    order = [i.image for i in pipeline.plan_queue(undescribed, RunOptions(prompt_name="none", prompt_text=""))]
+    assert order == [names[1], names[0]], "never tried first, failed before last"
+    assert pipeline.retrying_failed == 1
+
+
+def test_failing_again_the_same_way_is_not_a_stuck_provider(tmp_path):
+    """A rerun stopped at picture 72: ten pictures that had failed with InternalError
+    before failed the same way again, which looked like Windows AI stopping (10/9/2026)."""
+    ws = _workspace(tmp_path, 15)
+    _run(ws, ScriptedProvider([_internal() for _ in range(15)]))   # stops at 10
+    pipeline, events = _run(ws, ScriptedProvider([_internal() for _ in range(15)]))
+    assert pipeline.halted is None, "the ten repeats, tried after the rest, are not ten new failures"
+    assert len(events) == 15
+
+
+def test_a_stuck_provider_is_still_caught_among_repeats(tmp_path):
+    ws = _workspace(tmp_path, 25)
+    _run(ws, ScriptedProvider([_internal()] * 5 + ["ok"] * 20))
+    for item in ws.media_items():           # make everything undescribed again
+        item.descriptions.clear()
+        ws.save_item(item)
+    pipeline, events = _run(ws, ScriptedProvider([_timeout() for _ in range(25)]))
+    assert pipeline.halted and "timed out" in pipeline.halted
+
+
+def test_a_failure_mark_is_cleared_once_described(tmp_path):
+    ws = _workspace(tmp_path, 1)
+    _run(ws, ScriptedProvider([_internal()]))
+    assert ws.media_items()[0].extra.get("failed")
+    _run(ws, ScriptedProvider(["ok"]))
+    reopened = Workspace.open(ws.path).media_items()[0]
+    assert "failed" not in reopened.extra
+
+
+
+# ---------------------------------------------------------------------------
+# Review fixes: a stuck provider among repeats, what's remembered, the GUI's saves
+# ---------------------------------------------------------------------------
+
+
+class TimedOut(RuntimeError):
+    timeout = True
+
+
+class FileProblem(RuntimeError):
+    per_image = True
+    code = "decode_failed"
+
+
+def test_a_stuck_provider_on_the_same_error_as_before_still_stops(tmp_path):
+    """40 pictures failed before with InternalError; the provider is now stuck on that
+    same error. Repeats don't count toward the 10, but 30 in a row with nothing
+    described stop the run."""
+    from idt_core.pipeline import REPEAT_FAILURE_STREAK
+
+    ws = _workspace(tmp_path, 40)
+    key = WorkspacePipeline(ws, ScriptedProvider([]))._declined_key(
+        RunOptions(prompt_name="none", prompt_text=""))
+    for item in ws.media_items():           # all 40 failed before, with this error
+        item.extra["failed"] = {"key": key, "signature": f"RuntimeError: {_internal()}"}
+        ws.save_item(item)
+    provider = ScriptedProvider([_internal() for _ in range(40)])
+    pipeline, events = _run(ws, provider)
+    assert pipeline.halted and "failed again" in pipeline.halted
+    assert provider.calls == REPEAT_FAILURE_STREAK
+
+
+def test_a_timeout_is_never_a_known_failure(tmp_path):
+    """Earlier stops for a stuck provider mark pictures with timeouts; timing out again
+    is the provider, not the pictures."""
+    ws = _workspace(tmp_path, 12)
+    _run(ws, ScriptedProvider([TimedOut("Windows AI timed out.") for _ in range(12)]))   # stops at 10
+    pipeline, events = _run(ws, ScriptedProvider([TimedOut("Windows AI timed out.") for _ in range(12)]))
+    assert pipeline.halted and len(events) == 10
+
+
+def test_a_known_failure_still_counts_toward_skipping_its_video(tmp_path):
+    ws = _with_frames(tmp_path, [6])
+    _run(ws, ScriptedProvider([_internal() for _ in range(3)]))
+    pipeline, events = _run(ws, ScriptedProvider([_internal() for _ in range(3)]))
+    assert pipeline.skipped == 3
+
+
+def test_a_file_problem_is_not_remembered_as_declined(tmp_path):
+    ws = _workspace(tmp_path, 1)
+    _run(ws, ScriptedProvider([FileProblem("couldn't be read as image/jpeg")]))
+    assert "declined" not in ws.media_items()[0].extra
+    pipeline, events = _run(ws, ScriptedProvider(["ok"]))
+    assert len(events) == 1 and events[0].success
+
+
+def test_another_custom_prompt_text_asks_again(tmp_path):
+    ws = _workspace(tmp_path, 1)
+    list(WorkspacePipeline(ws, ScriptedProvider([Declined("no")])).run(
+        RunOptions(prompt_name="custom", prompt_text="Describe it.", extract_metadata=False)))
+    again = ScriptedProvider([])
+    list(WorkspacePipeline(ws, again).run(
+        RunOptions(prompt_name="custom", prompt_text="Describe the text in it.", extract_metadata=False)))
+    assert again.calls == 1
+
+
+def test_a_declined_video_is_left_out_whole_next_time(tmp_path):
+    """Each rerun used to try three more of its frames."""
+    ws = _with_frames(tmp_path, [15])
+    _run(ws, ScriptedProvider([Declined("too much text") for _ in range(3)]))
+    provider = ScriptedProvider([])
+    pipeline, events = _run(ws, provider)
+    assert provider.calls == 0 and events == [] and pipeline.previously_declined == 15
+
+
+def test_imagedescriber_saves_keep_the_command_lines_marks(tmp_path):
+    """ImageDescriber doesn't load these marks, so its save dropped them: one save put
+    every declined picture back in front and re-extracted every video."""
+    from idt_core.gui_bridge import _keep_cli_marks
+
+    old = {"declined": {"provider": "p"}, "failed": {"key": 1}, "extraction": {"mode": "interval"}}
+    kept = _keep_cli_marks({"processing_state": "failed"}, old, described=False)
+    assert kept["declined"] and kept["failed"] and kept["extraction"]
+    described = _keep_cli_marks({}, old, described=True)
+    assert "declined" not in described and "failed" not in described
+    assert described["extraction"] == {"mode": "interval"}
+
+
+def test_the_cli_says_when_another_command_leaves_declined_pictures_out(tmp_path, capsys):
+    from cli.main import _report_halt
+
+    ws = _workspace(tmp_path, 2)
+    _run(ws, ScriptedProvider([Declined("no"), "ok"]))
+    pipeline = WorkspacePipeline(ws, ScriptedProvider([]))
+    list(pipeline.run_items(ws.media_items(), RunOptions(prompt_name="none", prompt_text="",
+                                                         extract_metadata=False)))
+    _report_halt(pipeline, ws, redescribe=False)
+    err = capsys.readouterr().err
+    assert "1 picture(s) that scripted declined before were left out" in err
+    _report_halt(pipeline, ws, redescribe=False, declined_announced=True)
+    assert "declined before" not in capsys.readouterr().err
+
+
+def test_an_imagedescriber_save_round_trip_keeps_the_marks(tmp_path):
+    """Through the real save path ImageDescriber's batch uses (gui_item_to_ws_item), for
+    a reference-mode picture whose GUI item doesn't carry the marks."""
+    from idt_core.gui_bridge import gui_item_to_ws_item
+
+    ws = _workspace(tmp_path, 2)
+    _run(ws, ScriptedProvider([Declined("too much text"), _internal()]))
+    for item in ws.media_items():
+        path = str(ws.image_path(item))
+        gui_item = {"descriptions": [], "subfolder": item.subfolder, "processing_state": "failed"}
+        saved = gui_item_to_ws_item(ws, path, gui_item)
+        ws.save_item(saved)
+    marks = sorted(k for i in Workspace.open(ws.path).media_items() for k in i.extra
+                   if k in ("declined", "failed"))
+    assert marks == ["declined", "failed"]
+    item = ws.media_items()[0]
+    described = {"descriptions": [{"text": "A described picture.", "model": "m", "provider": "p",
+                                   "prompt_style": "none", "created": "2026-10-09T00:00:00"}],
+                 "subfolder": item.subfolder}
+    ws.save_item(gui_item_to_ws_item(ws, str(ws.image_path(item)), described))
+    after = next(i for i in Workspace.open(ws.path).media_items() if i.image == item.image)
+    assert "declined" not in after.extra and "failed" not in after.extra
+
+
+def test_windows_ais_real_internal_error_repeats_as_a_known_failure(tmp_path, monkeypatch):
+    """Through the real WindowsAIProvider: its final "at any size" error is raised while
+    handling the first attempt's, which is marked retryable (503). Read down the chain,
+    every repeat looked transient and a rerun stopped after ten, as at picture 72."""
+    from PIL import Image
+
+    from idt_core.providers import windows_ai
+
+    monkeypatch.setattr(windows_ai._helper, "request", lambda *a, **k: (_ for _ in ()).throw(
+        windows_ai.error_for_code("internal_error", "Windows couldn't describe this picture (InternalError).")))
+    src = tmp_path / "Pics"
+    src.mkdir()
+    for n in range(12):
+        Image.new("RGB", (1000, 800), (n * 20, 0, 0)).save(src / f"{n:03}.jpg", "JPEG")
+    ws = Workspace.create(tmp_path / "WS")
+    ws.add_source_folder(src, recursive=True)
+    provider = windows_ai.WindowsAIProvider(check=False)
+    options = RunOptions(prompt_name="none", prompt_text="", extract_metadata=False)
+
+    first = WorkspacePipeline(ws, provider)
+    events = list(first.run(options))
+    assert first.halted and len(events) == 10, "ten new failures: stop"
+    assert not events[0].transient and events[0].error.endswith("at a smaller size either.")
+
+    second = WorkspacePipeline(ws, provider)
+    events = list(second.run(options))
+    assert second.halted is None and len(events) == 12, "two new, then ten repeats"
+
+
+def test_a_gui_save_takes_marks_only_from_the_pictures_own_sidecar(tmp_path):
+    """Another picture of the same name in a subfolder must not lend it its marks."""
+    from PIL import Image
+
+    from idt_core.gui_bridge import _gui_image_item_to_bundle
+    from idt_core.workspace import WorkspaceItem
+
+    ws = Workspace.create(tmp_path / "WS.idtw")
+    other = WorkspaceItem(image="IMG_0001.jpg", source_path=str(tmp_path / "Trip" / "IMG_0001.jpg"),
+                          storage="reference", subfolder="Trip")
+    other.extra["declined"] = {"provider": "windows-ai"}
+    ws.save_item(other)
+    new = tmp_path / "IMG_0001.jpg"
+    Image.new("RGB", (8, 8)).save(new, "JPEG")
+    _gui_image_item_to_bundle(ws, str(new), {"descriptions": []}, copy_images=False)
+    root = ws._sidecar_path("IMG_0001.jpg", None)
+    assert root.exists()
+    import json
+    assert "declined" not in json.loads(root.read_text(encoding="utf-8")).get("extra", {})

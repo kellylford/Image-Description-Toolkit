@@ -345,6 +345,16 @@ def test_one_videos_frames_failing_do_not_stop_the_batch(monkeypatch):
     assert done.halted is None
 
 
+def test_a_video_whose_frames_are_declined_is_skipped_after_three(monkeypatch):
+    """Windows AI declined every frame of a screen recording of text ("too much text")."""
+    bad = [f"ws.idtw/derived/frames/iPhone/RPReplay/RPReplay_{t}.00s.jpg" for t in range(0, 75, 5)]
+    names = bad + ["ws.idtw/images/b.jpg"]
+    script = {Path(n).name: "declined" for n in bad}
+    done, _ = _run_batch(monkeypatch, names, script)
+    assert _FakeImageWorker.seen == [Path(n).name for n in bad[:3] + [names[-1]]]
+    assert done.halted is None
+
+
 def test_ten_videos_failing_in_a_row_still_stop_the_batch(monkeypatch):
     """Two frames each: the stop counts videos, and requeues every frame it counted."""
     names = [f"ws.idtw/derived/frames/v{n}/v{n}_{t}.00s.jpg" for n in range(12) for t in (0, 5)]

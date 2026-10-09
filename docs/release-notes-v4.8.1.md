@@ -33,9 +33,10 @@ people want the installer, which puts all three on the Start menu.
 
 ## What changed in 4.8.1
 
-A maintenance release, mostly for the `idt` command-line tool, from a run over an
-11,000-picture iPhone library on a network share with Windows AI. One change, to how
-a batch treats a video whose frames all fail, applies to ImageDescriber too.
+A maintenance release, mostly for the `idt` command-line tool, from runs over an
+11,000-picture iPhone library on a network share with Windows AI. How a batch treats a
+video whose frames all fail or are declined, and the 25-refusals stop, change in
+ImageDescriber too; the rest is the command-line tool.
 
 - **A run stops when every picture is failing the same way.** If 10 different pictures
   or videos in a row fail with exactly the same error, `idt describe`, `idt guideme` and the other
@@ -44,8 +45,8 @@ a batch treats a video whose frames all fail, applies to ImageDescriber too.
   through a large batch, each picture waited three minutes to time out, with over
   10,000 still to go. A run also stops at once for a problem nothing else will get
   past, such as the Windows AI helper not being installed, and when the provider
-  declines 25 pictures in a row, which usually means it is declining the prompt itself.
-  A few declined pictures don't count toward the 10.
+  declines 25 different pictures or videos in a row, which usually means it is
+  declining the prompt itself. A few declined pictures don't count toward the 10.
 - **One video that fails doesn't stop a run.** Windows AI can fail on every frame of a
   video, such as an iPhone screen recording, while describing everything around it.
   Those frames used to stop a batch, at the same place every time it was run. Now,
@@ -56,6 +57,26 @@ a batch treats a video whose frames all fail, applies to ImageDescriber too.
   try them again. ImageDescriber marks them as failed, and **Describe All Undescribed**
   tries them again. If the batch stopped because the provider stopped working,
   resuming it tries those frames as well.
+- **Declined pictures aren't asked about again.** When Windows AI declines a picture
+  ("too much text", or its content filter), asking the same way again gets the same
+  answer. Before, every run tried them all again, and since they were still
+  undescribed they came first: a rerun over an iPhone library opened with a hundred of
+  them. Now the command-line tool remembers which pictures a provider, model and
+  prompt declined, leaves them out of later runs, and says how many it left out. A
+  picture it couldn't read isn't a refusal, so that is tried again. To ask again, use
+  another model (with Windows AI, which takes no prompt, another `--model`), another
+  prompt style or provider, or `--redescribe`, which describes every picture again. A
+  video whose frames are declined is skipped after 3 of them, as for failures, in the
+  command-line tool and ImageDescriber, and next time the command-line tool leaves the
+  whole video out.
+- **Pictures that failed before are tried last, and failing again doesn't stop the
+  run.** In the command-line tool, a picture Windows AI couldn't describe is tried
+  again, but only after every picture not yet tried. One that fails again exactly as
+  it did before doesn't count toward the 10 that stop a run: a rerun of the iPhone
+  library stopped at picture 72 when ten such pictures failed again, though Windows AI
+  was working. A timeout always counts, and 30 pictures in a row failing again with
+  none described still stop the run, so a provider that gets stuck is caught either
+  way.
 - **It tells you why it stopped, and how to carry on.** The last line says
   **Stopped.** instead of **Done.** and counts the pictures not tried. Next comes the
   reason, then the exact command to carry on from where it stopped. The window title

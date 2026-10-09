@@ -1361,7 +1361,7 @@ class BatchProcessingWorker(threading.Thread):
                 # nor breaks the identical-failure stop.
                 if skipping:
                     note = ("Not tried: the frames before it from the same video "
-                            "failed the same way.")
+                            "failed, or were declined, the same way.")
                     skipped_by_video.setdefault(frame_video(file_path), []).append(file_path)
                     wx.PostEvent(self.parent_window, ProcessingFailedEventData(
                         file_path=file_path, error=note, batch=self))
@@ -1411,7 +1411,7 @@ class BatchProcessingWorker(threading.Thread):
                     streak = []
                     rules.success()
                 elif getattr(worker, 'result_per_image', False):
-                    rules.refusal()
+                    rules.refusal(file_path)
                 else:
                     key = worker.result_signature
                     if streak and streak_key != key:

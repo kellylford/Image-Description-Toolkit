@@ -12,6 +12,7 @@ Design:
 """
 from __future__ import annotations
 
+import hashlib
 import re
 import time
 from dataclasses import dataclass
@@ -184,6 +185,11 @@ class WorkspaceEvent:
     signature: Optional[str] = None
     per_image: bool = False
     setup: bool = False
+    #: A refusal worth remembering: the provider declined the picture itself, not a
+    #: file it couldn't read (see _failure_event).
+    declinable: bool = False
+    #: A failure that may not recur: a timeout, or one the provider marks retryable.
+    transient: bool = False
     #: Not tried: a video frame whose video's earlier frames failed the same way. Neither
     #: a success nor a failure; ``error`` holds the reason.
     skipped: bool = False
@@ -229,8 +235,15 @@ def normalise_failure_text(text: str) -> str:
 #: toward SAME_FAILURE_STREAK would have taken 18 hours to reach the next video.
 FRAMES_TRIED_PER_VIDEO = 3
 
+#: Pictures in a row failing again exactly as they did on an earlier run, with nothing
+#: described between, that stop a run anyway. Repeats don't count toward
+#: SAME_FAILURE_STREAK, so without this a provider stuck on the same error those
+#: pictures failed with before would go uncaught among them.
+REPEAT_FAILURE_STREAK = 3 * SAME_FAILURE_STREAK
+
 #: Why a frame was skipped, as the run log and the command line say it.
-SKIPPED_FRAME_REASON = "the frames before it from the same video failed the same way"
+SKIPPED_FRAME_REASON = ("the frames before it from the same video failed, or were declined, "
+                        "the same way")
 
 
 def frame_video(path, parent_video: Optional[str] = None) -> Optional[str]:
@@ -277,8 +290,11 @@ class FailureStreak:
     * After FRAMES_TRIED_PER_VIDEO frames of one video fail the same way in a row, the
       rest of that video is skipped (:meth:`skips`), so one bad video costs a few
       frames and a stuck provider can't spend hours inside one long video.
-    * REFUSAL_STREAK pictures in a row declined (:attr:`declined_out`) stop it too;
-      refusals neither count toward nor break the identical-failure streak.
+    * REFUSAL_STREAK different pictures or videos in a row declined
+      (:attr:`declined_out`) stop it too; refusals neither count toward nor break the
+      identical-failure streak. A video whose frames are declined
+      FRAMES_TRIED_PER_VIDEO times in a row is skipped the same way: Windows AI
+      declined every frame of an iPhone screen recording of text, "too much text".
     """
 
     def __init__(self) -> None:
@@ -286,7 +302,9 @@ class FailureStreak:
         self._sources: set = set()
         self._video_run = (None, 0)   # ((video, signature), identical failures in a row)
         self._skipped: set = set()
-        self.refusals = 0
+        self._refused: set = set()          # pictures or videos declined in a row
+        self.repeats = 0                    # known failures since the last success
+        self._refusal_run = (None, 0)       # (video, its frames declined in a row)
 
     def skips(self, path, parent_video: Optional[str] = None) -> bool:
         """True if this is a frame of a video whose remaining frames are being skipped."""
@@ -294,16 +312,45 @@ class FailureStreak:
         return video is not None and video in self._skipped
 
     def success(self) -> None:
-        self._signature, self._sources, self._video_run, self.refusals = None, set(), (None, 0), 0
+        self._signature, self._sources, self._video_run = None, set(), (None, 0)
+        self.repeats = 0
+        self._refused, self._refusal_run = set(), (None, 0)
 
-    def refusal(self) -> None:
-        self.refusals += 1
+    def refusal(self, path, parent_video: Optional[str] = None) -> None:
+        self._refused.add(failure_source(path, parent_video))
+        video = frame_video(path, parent_video)
+        if video is not None:
+            run = self._refusal_run[1] + 1 if self._refusal_run[0] == video else 1
+            self._refusal_run = (video, run)
+            if run >= FRAMES_TRIED_PER_VIDEO:
+                self._skipped.add(video)
+        else:
+            self._refusal_run = (None, 0)
+
+    @property
+    def refusals(self) -> int:
+        """Different pictures or videos in a row that the provider declined."""
+        return len(self._refused)
 
     def failure(self, path, signature, parent_video: Optional[str] = None) -> None:
         if signature != self._signature:
             self._sources = set()
-        self._signature, self.refusals = signature, 0
+        self._signature = signature
+        self._refused, self._refusal_run = set(), (None, 0)
         self._sources.add(failure_source(path, parent_video))
+        self._count_video_failure(path, signature, parent_video)
+
+    def known_failure(self, path, signature, parent_video: Optional[str] = None) -> None:
+        """A picture failing again exactly as it did on an earlier run. It says nothing
+        about whether the provider has stopped working, so it neither counts toward nor
+        breaks the identical-failure stop; it still counts toward skipping its video.
+        So many in a row with nothing described does stop the run (stuck_on_repeats):
+        a provider stuck on the error those pictures failed with before can't hide
+        among them."""
+        self.repeats += 1
+        self._count_video_failure(path, signature, parent_video)
+
+    def _count_video_failure(self, path, signature, parent_video: Optional[str]) -> None:
         video = frame_video(path, parent_video)
         if video is not None:
             key = (video, signature)
@@ -322,6 +369,10 @@ class FailureStreak:
     @property
     def stuck(self) -> bool:
         return self.same_failures >= SAME_FAILURE_STREAK
+
+    @property
+    def stuck_on_repeats(self) -> bool:
+        return self.repeats >= REPEAT_FAILURE_STREAK
 
     @property
     def declined_out(self) -> bool:
@@ -350,11 +401,23 @@ def is_setup_failure(exc: BaseException) -> bool:
     return _chain_says(exc, "setup")
 
 
+#: Per-picture failures that are about the file, not a refusal of the picture: worth
+#: trying again after the file is fixed, so never remembered as declined.
+_FILE_PROBLEM_CODES = {"decode_failed", "unsupported_format", "too_large"}
+
+
 def _failure_event(item: WorkspaceItem, index: int, total: int, exc: BaseException) -> WorkspaceEvent:
+    per_image = is_per_image_failure(exc)
     return WorkspaceEvent(
         item=item, index=index, total=total, error=str(exc),
         signature=f"{type(exc).__name__}: {normalise_failure_text(str(exc))}",
-        per_image=is_per_image_failure(exc), setup=is_setup_failure(exc),
+        per_image=per_image, setup=is_setup_failure(exc),
+        # The outermost error only: what a provider raises in the end may carry the
+        # attempts before it. Windows AI's "at any size" InternalError is raised while
+        # handling the first attempt's error, which is marked retryable (503), and read
+        # down the chain every repeat looked transient.
+        declinable=per_image and getattr(exc, "code", None) not in _FILE_PROBLEM_CODES,
+        transient=getattr(exc, "timeout", False) is True or getattr(exc, "status_code", None) == 503,
     )
 
 
@@ -373,6 +436,10 @@ class WorkspacePipeline:
         self.not_tried = 0
         #: Frames the last run skipped because earlier frames of their video failed.
         self.skipped = 0
+        #: Pictures left out of the last run because this provider, model and prompt
+        #: declined them before, and ones that failed before, tried last (see plan_queue).
+        self.previously_declined = 0
+        self.retrying_failed = 0
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
         all_items = self.workspace.media_items()
@@ -388,10 +455,58 @@ class WorkspacePipeline:
                 continue
             live_items.append(i)
         queue = live_items if options.redescribe else [i for i in live_items if not i.described]
+        queue = self.plan_queue(queue, options)
         if options.limit is not None:
             queue = queue[: options.limit]
 
         yield from self._run_queue(queue, options)
+
+    def _declined_key(self, options: RunOptions) -> dict:
+        """How the provider was asked: the same picture asked the same way gets the same
+        answer. The prompt's text counts, not just its name, so an edited or custom
+        prompt is another question."""
+        text = hashlib.sha1((options.prompt_text or "").encode("utf-8")).hexdigest()[:12]
+        return {"provider": self.provider.provider_name, "model": self.provider.model_name,
+                "prompt": options.prompt_name, "prompt_text": text}
+
+    def _save_mark(self, item, log) -> None:
+        """Save a declined or failed mark. A sidecar that can't be written (OneDrive
+        holding the file, say) costs only the mark, never the run."""
+        try:
+            self.workspace.save_item(item)
+        except OSError as exc:
+            log.warning(f"couldn't record the outcome for {item.image}: {exc}")
+
+    def plan_queue(self, queue: list, options: RunOptions) -> list:
+        """The queue without pictures this provider, model and prompt declined before,
+        and with the ones that failed before moved to the end.
+
+        Pictures that were declined or failed stay undescribed, so they came first in
+        every rerun: a rerun over an iPhone library opened with a hundred of them
+        (10/9/2026), declined again or failing again, and ten failing again stopped the
+        run as if Windows AI had stopped working. A refusal ("too much text", a content
+        filter) comes back the same when asked the same way, so those are left out;
+        --redescribe, another provider, model or prompt style asks again. A failure may
+        not recur, so those are tried again, after everything not yet tried.
+        """
+        self.previously_declined = self.retrying_failed = 0
+        if options.redescribe:
+            return queue
+        key = self._declined_key(options)
+        # A video with FRAMES_TRIED_PER_VIDEO frames declined is left out whole, as a run
+        # skips it: otherwise each rerun tried three more of its frames.
+        declined_frames: dict = {}
+        for i in queue:
+            if i.parent_video and (i.extra or {}).get("declined") == key:
+                declined_frames[i.parent_video] = declined_frames.get(i.parent_video, 0) + 1
+        declined_videos = {v for v, n in declined_frames.items() if n >= FRAMES_TRIED_PER_VIDEO}
+        kept = [i for i in queue if (i.extra or {}).get("declined") != key
+                and i.parent_video not in declined_videos]
+        self.previously_declined = len(queue) - len(kept)
+        fresh = [i for i in kept if not (i.extra or {}).get("failed")]
+        failed = [i for i in kept if (i.extra or {}).get("failed")]
+        self.retrying_failed = len(failed)
+        return fresh + failed
 
     def run_items(self, items: list[WorkspaceItem], options: RunOptions) -> Iterator[WorkspaceEvent]:
         """
@@ -404,6 +519,7 @@ class WorkspacePipeline:
         shared workspace.
         """
         queue = list(items) if options.redescribe else [i for i in items if not i.described]
+        queue = self.plan_queue(queue, options)
         if options.limit is not None:
             queue = queue[: options.limit]
 
@@ -460,12 +576,30 @@ class WorkspacePipeline:
                 if event.success:
                     streak.success()
                 elif event.per_image:
-                    streak.refusal()
+                    streak.refusal(path, item.parent_video)
+                    if event.declinable:
+                        # Remembered, so the next run doesn't ask the same way again.
+                        item.extra["declined"] = self._declined_key(options)
+                        self._save_mark(item, log)
                 else:
-                    streak.failure(path, event.signature, item.parent_video)
+                    key = self._declined_key(options)
+                    before = (item.extra or {}).get("failed") or {}
+                    # A picture failing again as it did before says nothing about the
+                    # provider, unless the failure is one that comes and goes (a
+                    # timeout): those are what a stuck provider gives.
+                    if (not event.transient and before.get("key") == key
+                            and before.get("signature") == event.signature):
+                        streak.known_failure(path, event.signature, item.parent_video)
+                    else:
+                        streak.failure(path, event.signature, item.parent_video)
+                    item.extra["failed"] = {"key": key, "signature": event.signature}
+                    self._save_mark(item, log)
                 if index < total:
                     if event.setup:
                         self.halted = event.error
+                    elif streak.stuck_on_repeats:
+                        self.halted = (f"{streak.repeats} pictures in a row failed again, each as "
+                                       f"it did before, with none described: {event.error}")
                     elif streak.stuck:
                         self.halted = (f"{streak.same_failures} pictures or videos in a row failed "
                                        f"with the same error: {event.error}")
@@ -525,6 +659,10 @@ class WorkspacePipeline:
                 metadata_context=meta_context or None,
             )
             item.add_description(desc)
+            if item.extra:
+                # Described now, however it was declined or failed before.
+                item.extra.pop("declined", None)
+                item.extra.pop("failed", None)
             self.workspace.save_item(item)
             return WorkspaceEvent(item=item, index=index, total=total, metadata=meta)
 
