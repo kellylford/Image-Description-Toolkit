@@ -230,7 +230,8 @@ def normalise_failure_text(text: str) -> str:
 FRAMES_TRIED_PER_VIDEO = 3
 
 #: Why a frame was skipped, as the run log and the command line say it.
-SKIPPED_FRAME_REASON = "the frames before it from the same video failed the same way"
+SKIPPED_FRAME_REASON = ("the frames before it from the same video failed, or were declined, "
+                        "the same way")
 
 
 def frame_video(path, parent_video: Optional[str] = None) -> Optional[str]:
@@ -277,8 +278,11 @@ class FailureStreak:
     * After FRAMES_TRIED_PER_VIDEO frames of one video fail the same way in a row, the
       rest of that video is skipped (:meth:`skips`), so one bad video costs a few
       frames and a stuck provider can't spend hours inside one long video.
-    * REFUSAL_STREAK pictures in a row declined (:attr:`declined_out`) stop it too;
-      refusals neither count toward nor break the identical-failure streak.
+    * REFUSAL_STREAK different pictures or videos in a row declined
+      (:attr:`declined_out`) stop it too; refusals neither count toward nor break the
+      identical-failure streak. A video whose frames are declined
+      FRAMES_TRIED_PER_VIDEO times in a row is skipped the same way: Windows AI
+      declined every frame of an iPhone screen recording of text, "too much text".
     """
 
     def __init__(self) -> None:
@@ -286,7 +290,8 @@ class FailureStreak:
         self._sources: set = set()
         self._video_run = (None, 0)   # ((video, signature), identical failures in a row)
         self._skipped: set = set()
-        self.refusals = 0
+        self._refused: set = set()          # pictures or videos declined in a row
+        self._refusal_run = (None, 0)       # (video, its frames declined in a row)
 
     def skips(self, path, parent_video: Optional[str] = None) -> bool:
         """True if this is a frame of a video whose remaining frames are being skipped."""
@@ -294,15 +299,30 @@ class FailureStreak:
         return video is not None and video in self._skipped
 
     def success(self) -> None:
-        self._signature, self._sources, self._video_run, self.refusals = None, set(), (None, 0), 0
+        self._signature, self._sources, self._video_run = None, set(), (None, 0)
+        self._refused, self._refusal_run = set(), (None, 0)
 
-    def refusal(self) -> None:
-        self.refusals += 1
+    def refusal(self, path, parent_video: Optional[str] = None) -> None:
+        self._refused.add(failure_source(path, parent_video))
+        video = frame_video(path, parent_video)
+        if video is not None:
+            run = self._refusal_run[1] + 1 if self._refusal_run[0] == video else 1
+            self._refusal_run = (video, run)
+            if run >= FRAMES_TRIED_PER_VIDEO:
+                self._skipped.add(video)
+        else:
+            self._refusal_run = (None, 0)
+
+    @property
+    def refusals(self) -> int:
+        """Different pictures or videos in a row that the provider declined."""
+        return len(self._refused)
 
     def failure(self, path, signature, parent_video: Optional[str] = None) -> None:
         if signature != self._signature:
             self._sources = set()
-        self._signature, self.refusals = signature, 0
+        self._signature = signature
+        self._refused, self._refusal_run = set(), (None, 0)
         self._sources.add(failure_source(path, parent_video))
         video = frame_video(path, parent_video)
         if video is not None:
@@ -373,6 +393,9 @@ class WorkspacePipeline:
         self.not_tried = 0
         #: Frames the last run skipped because earlier frames of their video failed.
         self.skipped = 0
+        #: Pictures left out of the last run because this provider, model and prompt
+        #: declined them before (see drop_declined).
+        self.previously_declined = 0
 
     def run(self, options: RunOptions) -> Iterator[WorkspaceEvent]:
         all_items = self.workspace.media_items()
@@ -388,10 +411,32 @@ class WorkspacePipeline:
                 continue
             live_items.append(i)
         queue = live_items if options.redescribe else [i for i in live_items if not i.described]
+        queue = self.drop_declined(queue, options)
         if options.limit is not None:
             queue = queue[: options.limit]
 
         yield from self._run_queue(queue, options)
+
+    def _declined_key(self, options: RunOptions) -> dict:
+        return {"provider": self.provider.provider_name, "model": self.provider.model_name,
+                "prompt": options.prompt_name}
+
+    def drop_declined(self, queue: list, options: RunOptions) -> list:
+        """The queue without pictures this provider, model and prompt declined before.
+
+        A refusal (Windows AI's "too much text", a content filter) comes back the same
+        every time it is asked the same way, so retrying costs time on every run, and
+        the refused pictures, still undescribed, came first in the queue: a run over an
+        iPhone library opened with a hundred of them (10/9/2026). --redescribe, another
+        provider, model or prompt style tries them again.
+        """
+        self.previously_declined = 0
+        if options.redescribe:
+            return queue
+        key = self._declined_key(options)
+        kept = [i for i in queue if (i.extra or {}).get("declined") != key]
+        self.previously_declined = len(queue) - len(kept)
+        return kept
 
     def run_items(self, items: list[WorkspaceItem], options: RunOptions) -> Iterator[WorkspaceEvent]:
         """
@@ -404,6 +449,7 @@ class WorkspacePipeline:
         shared workspace.
         """
         queue = list(items) if options.redescribe else [i for i in items if not i.described]
+        queue = self.drop_declined(queue, options)
         if options.limit is not None:
             queue = queue[: options.limit]
 
@@ -460,7 +506,10 @@ class WorkspacePipeline:
                 if event.success:
                     streak.success()
                 elif event.per_image:
-                    streak.refusal()
+                    streak.refusal(path, item.parent_video)
+                    # Remembered, so the next run doesn't ask the same way again.
+                    item.extra["declined"] = self._declined_key(options)
+                    self.workspace.save_item(item)
                 else:
                     streak.failure(path, event.signature, item.parent_video)
                 if index < total:
@@ -525,6 +574,8 @@ class WorkspacePipeline:
                 metadata_context=meta_context or None,
             )
             item.add_description(desc)
+            if item.extra:
+                item.extra.pop("declined", None)   # described now, however it was declined before
             self.workspace.save_item(item)
             return WorkspaceEvent(item=item, index=index, total=total, metadata=meta)
 

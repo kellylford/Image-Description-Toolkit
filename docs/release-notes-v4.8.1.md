@@ -56,6 +56,14 @@ a batch treats a video whose frames all fail, applies to ImageDescriber too.
   try them again. ImageDescriber marks them as failed, and **Describe All Undescribed**
   tries them again. If the batch stopped because the provider stopped working,
   resuming it tries those frames as well.
+- **Declined pictures aren't asked about again.** When Windows AI declines a picture
+  ("too much text", or its content filter), asking the same way again gets the same
+  answer. Before, every run tried them all again, and since they were still
+  undescribed they came first: a rerun over an iPhone library opened with a hundred of
+  them. Now `idt describe` remembers which pictures a provider, model and prompt style
+  declined, leaves them out of later runs, and says how many it left out. To try them
+  again, use `--redescribe`, another provider, or another prompt style. A video whose
+  frames are declined is skipped after 3 of them, as for failures.
 - **It tells you why it stopped, and how to carry on.** The last line says
   **Stopped.** instead of **Done.** and counts the pictures not tried. Next comes the
   reason, then the exact command to carry on from where it stopped. The window title

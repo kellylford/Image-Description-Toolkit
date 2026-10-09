@@ -595,14 +595,23 @@ def cmd_describe(args):
         print(f"Missing:    {len(missing)} referenced original(s) not found on disk — skipping")
 
     queue = available if args.redescribe else [i for i in available if not i.described]
+    pipeline = WorkspacePipeline(ws, provider)
+    queue = pipeline.drop_declined(queue, options)
     if args.limit:
         queue = queue[: args.limit]
+    if pipeline.previously_declined and not args.quiet:
+        print(f"Declined:   {pipeline.previously_declined} picture(s) that {provider_name} / "
+              f"{model} declined before are left out. To try them again, use --redescribe, "
+              "or another provider or prompt style.")
 
     if not queue:
         if not args.quiet:
             st = ws.status()
             n = st["described"]
-            print(f"All {n} image{'s are' if n != 1 else ' is'} already described.")
+            if pipeline.previously_declined:
+                print(f"Nothing left to describe: {n} described, and the rest were declined before.")
+            else:
+                print(f"All {n} image{'s are' if n != 1 else ' is'} already described.")
             print("Use --redescribe to generate additional descriptions.")
         return
 
@@ -613,7 +622,6 @@ def cmd_describe(args):
     _set_console_title(f"IDT - Describing Images (0%, 0 of {_total})")
 
     described = errors = 0
-    pipeline = WorkspacePipeline(ws, provider)
 
     _show = getattr(args, "show_descriptions", False)
     for event in pipeline.run(options):
@@ -679,7 +687,8 @@ def _report_halt(pipeline, ws, redescribe: bool, watching: bool = False) -> None
             again = ("They stay undescribed, and describing the workspace again tries them "
                      "again.")
         print(f"{pipeline.skipped} video frame(s) were skipped: the frames before them from "
-              f"the same video failed the same way. {again}", file=sys.stderr, flush=True)
+              f"the same video failed, or were declined, the same way. {again}",
+              file=sys.stderr, flush=True)
     if not pipeline.halted:
         return
     reason = pipeline.halted

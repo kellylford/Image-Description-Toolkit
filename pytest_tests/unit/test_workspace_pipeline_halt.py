@@ -353,3 +353,60 @@ def test_failure_source():
     # A source subfolder called derived/frames inside a bundle: the bundle's own pair counts.
     inner = "C:/w.idtw/derived/frames/derived/frames/IMG/x.jpg"
     assert frame_video(inner) == str(Path(inner).parent)
+
+
+# ---------------------------------------------------------------------------
+# Declined pictures: remembered, and a video of them skipped
+# ---------------------------------------------------------------------------
+
+
+def test_a_video_whose_frames_are_declined_is_skipped_after_three(tmp_path):
+    """Windows AI declined every frame of an iPhone screen recording of text."""
+    ws = _with_frames(tmp_path, [15, 3])
+    text = lambda: Declined("This picture has too much text for Windows to describe.")
+    provider = ScriptedProvider([text() for _ in range(3)] + ["ok"] * 3)
+    pipeline, events = _run(ws, provider)
+    assert provider.calls == 6 and pipeline.skipped == 12 and pipeline.halted is None
+
+
+def test_declined_pictures_are_not_asked_again_the_same_way(tmp_path):
+    ws = _workspace(tmp_path, 4)
+    first = ScriptedProvider([Declined("no"), "ok", Declined("no"), "ok"])
+    _run(ws, first)
+    second = ScriptedProvider([])
+    pipeline, events = _run(ws, second)
+    assert second.calls == 0 and events == [] and pipeline.previously_declined == 2
+
+
+def test_redescribe_or_another_prompt_asks_again(tmp_path):
+    ws = _workspace(tmp_path, 2)
+    _run(ws, ScriptedProvider([Declined("no"), Declined("no")]))
+    again = ScriptedProvider([])
+    pipeline = WorkspacePipeline(ws, again)
+    events = list(pipeline.run(RunOptions(prompt_name="other", prompt_text="", extract_metadata=False)))
+    assert len(events) == 2 and again.calls == 2, "another prompt style is another question"
+    (tmp_path / "two").mkdir()
+    ws2 = _workspace(tmp_path / "two", 2)
+    _run(ws2, ScriptedProvider([Declined("no"), Declined("no")]))
+    redo = ScriptedProvider([])
+    events = list(WorkspacePipeline(ws2, redo).run(RunOptions(
+        prompt_name="none", prompt_text="", extract_metadata=False, redescribe=True)))
+    assert redo.calls == 2
+
+
+def test_a_picture_described_later_loses_its_declined_mark(tmp_path):
+    ws = _workspace(tmp_path, 1)
+    _run(ws, ScriptedProvider([Declined("no")]))
+    item = ws.media_items()[0]
+    assert item.extra.get("declined")
+    list(WorkspacePipeline(ws, ScriptedProvider(["ok"])).run(RunOptions(
+        prompt_name="none", prompt_text="", extract_metadata=False, redescribe=True)))
+    assert "declined" not in Workspace.open(ws.path).media_items()[0].extra
+
+
+def test_the_refusal_stop_counts_pictures_or_videos(tmp_path):
+    """Declined frames of 10 videos are 10 refusals toward the 25, not 30."""
+    ws = _with_frames(tmp_path, [3] * 30)
+    pipeline, events = _run(ws, ScriptedProvider([Declined("no") for _ in range(90)]))
+    assert pipeline.halted_by_refusals
+    assert sum(1 for e in events if not e.skipped) == 3 * 24 + 1
