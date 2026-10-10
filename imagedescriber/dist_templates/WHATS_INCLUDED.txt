@@ -191,7 +191,7 @@ A: YES - Copy the .exe anywhere. It's fully portable!
    - Help menu in ImageDescriber application
 
 🌐 Online:
-   - GitHub: github.com/kellylford/Image-Description-Toolkit
+   - GitHub: github.com/TheIdeaPlace/Image-Description-Toolkit
    - Report bugs: GitHub Issues tab
    - Ask questions: GitHub Discussions tab
 

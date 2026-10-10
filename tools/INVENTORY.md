@@ -111,7 +111,7 @@ These tools are kept for reference but are NOT part of the active build process.
 ### Scenario 1: Brand New AMD64 Machine
 ```batch
 # Step 1: Download bootstrap.bat from GitHub
-# https://raw.githubusercontent.com/kellylford/Image-Description-Toolkit/main/tools/bootstrap.bat
+# https://raw.githubusercontent.com/TheIdeaPlace/Image-Description-Toolkit/main/tools/bootstrap.bat
 
 # Step 2: Run bootstrap
 bootstrap.bat

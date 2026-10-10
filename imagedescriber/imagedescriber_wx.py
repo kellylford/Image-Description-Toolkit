@@ -9668,7 +9668,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_user_guide(self, event):
         """Open user guide in web browser"""
-        user_guide_url = "https://kellylford.github.io/Image-Description-Toolkit/user-guide.html"
+        user_guide_url = "https://theideaplace.github.io/Image-Description-Toolkit/user-guide.html"
         try:
             webbrowser.open(user_guide_url)
         except Exception as e:
@@ -9708,7 +9708,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
 
     def on_report_issue(self, event):
         """Open GitHub new issue page in web browser"""
-        new_issue_url = "https://github.com/kellylford/Image-Description-Toolkit/issues/new"
+        new_issue_url = "https://github.com/TheIdeaPlace/Image-Description-Toolkit/issues/new"
         try:
             webbrowser.open(new_issue_url)
         except Exception as e:
@@ -10052,7 +10052,7 @@ class ImageDescriberFrame(wx.Frame, ModifiedStateMixin):
                 "• Integrated viewer mode for browsing workflow results\n"
                 "• Integrated prompt editor and configuration manager",
                 developers=["Kelly Ford"],
-                website="https://github.com/kellylford/Image-Description-Toolkit"
+                website="https://github.com/TheIdeaPlace/Image-Description-Toolkit"
             )
         except Exception as e:
             logging.error(f"Error showing About dialog: {e}", exc_info=True)

@@ -6,7 +6,7 @@ AI-powered batch image description tool supporting multiple vision models (Ollam
 
 ### Installation
 
-Download from the [releases](https://github.com/kellylford/Image-Description-Toolkit/releases) page:
+Download from the [releases](https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases) page:
 
 | File | Platform |
 |---|---|
@@ -111,9 +111,9 @@ idt update
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)
+- **Issues**: [GitHub Issues](https://github.com/TheIdeaPlace/Image-Description-Toolkit/issues)
 - **Documentation**: See `docs/` directory
-- **Repository**: https://github.com/kellylford/Image-Description-Toolkit
+- **Repository**: https://github.com/TheIdeaPlace/Image-Description-Toolkit
 
 ## License
 

@@ -35,7 +35,7 @@ The build automatically runs when you:
 
 ### Manual Trigger (Primary Method)
 Trigger builds manually whenever you need them:
-1. Go to: https://github.com/kellylford/Image-Description-Toolkit/actions
+1. Go to: https://github.com/TheIdeaPlace/Image-Description-Toolkit/actions
 2. Click "Build Windows AMD64 Release" or "Build Linux ARM64 Release" in the left sidebar
 3. Click the "Run workflow" button
 4. Select the branch you want to build
@@ -69,7 +69,7 @@ See `.github/workflows/build-windows.yml` for the authoritative step list.
 
 After a build completes:
 
-1. **Go to Actions tab**: https://github.com/kellylford/Image-Description-Toolkit/actions
+1. **Go to Actions tab**: https://github.com/TheIdeaPlace/Image-Description-Toolkit/actions
 2. **Click on a completed workflow run** (green checkmark)
 3. **Scroll to the "Artifacts" section** at the bottom
 4. **Download the ZIP files**:

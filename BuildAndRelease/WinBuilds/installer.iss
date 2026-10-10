@@ -8,7 +8,7 @@
 #expr FileClose(VersionFile)
 #define MyFileVersion StringChange(MyAppVersion, " ", "_")
 #define MyAppPublisher "Kelly Ford"
-#define MyAppURL "https://github.com/kellylford/Image-Description-Toolkit"
+#define MyAppURL "https://github.com/TheIdeaPlace/Image-Description-Toolkit"
 #define MyAppExeName "idt.exe"
 #define LicensePath SourcePath + "\\..\\..\\LICENSE"
 ; Windows AI's helper packages, built and signed by the Windows build workflow
@@ -329,4 +329,4 @@ Name: "{autodesktop}\IDT Chat"; Filename: "{app}\IDTChat.exe"; WorkingDir: "{app
 Filename: "cmd.exe"; Parameters: "/k cd /d ""{app}"" && echo Image Description Toolkit v{#MyAppVersion} && echo. && echo Type 'idt --help' for usage && echo."; Description: "{cm:LaunchProgram,Image Description Toolkit (CLI)}"; Flags: nowait postinstall skipifsilent unchecked
 Filename: "{app}\ImageDescriber.exe"; Description: "{cm:LaunchProgram,ImageDescriber}"; Flags: nowait postinstall skipifsilent
 Filename: "https://ollama.com"; Description: "Open Ollama website to download (if not installed)"; Flags: shellexec postinstall skipifsilent unchecked; Check: ShouldShowOllamaWebsiteLink
-Filename: "https://kellylford.github.io/Image-Description-Toolkit/user-guide.html"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked
+Filename: "https://theideaplace.github.io/Image-Description-Toolkit/user-guide.html"; Description: "View Documentation"; Flags: shellexec postinstall skipifsilent unchecked

@@ -75,7 +75,7 @@ python show_metadata.py /path/to/images \
 python show_metadata.py /path/to/images \
   --recursive \
   --geocode \
-  --geocode-user-agent "IDT-ShowMetadata/3.0 (+https://github.com/kellylford/Image-Description-Toolkit)" \
+  --geocode-user-agent "IDT-ShowMetadata/3.0 (+https://github.com/TheIdeaPlace/Image-Description-Toolkit)" \
   --geocode-cache geocode_cache.json \
   --csv-out metadata_full_report.csv
 ```

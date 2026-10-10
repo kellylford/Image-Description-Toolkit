@@ -68,7 +68,7 @@ class WorkflowGeotagger:
         if geocode:
             cache_path = Path(cache_file) if cache_file else Path('geocode_cache.json')
             self.geocoder = NominatimGeocoder(
-                user_agent='IDT-Geotag/1.0 (+https://github.com/kellylford/Image-Description-Toolkit)',
+                user_agent='IDT-Geotag/1.0 (+https://github.com/TheIdeaPlace/Image-Description-Toolkit)',
                 delay_seconds=1.0,
                 cache_path=cache_path
             )

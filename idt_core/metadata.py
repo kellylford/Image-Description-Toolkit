@@ -272,7 +272,7 @@ class NominatimGeocoder:
     Requires: pip install requests
     """
 
-    _USER_AGENT = "IDT/4.5 (+https://github.com/kellylford/Image-Description-Toolkit)"
+    _USER_AGENT = "IDT/4.5 (+https://github.com/TheIdeaPlace/Image-Description-Toolkit)"
 
     def __init__(
         self,

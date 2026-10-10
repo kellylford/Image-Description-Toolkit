@@ -88,10 +88,10 @@ echo ========================================================================
 echo CLONING REPOSITORY
 echo ========================================================================
 echo.
-echo Cloning from: https://github.com/kellylford/Image-Description-Toolkit.git
+echo Cloning from: https://github.com/TheIdeaPlace/Image-Description-Toolkit.git
 echo.
 
-git clone https://github.com/kellylford/Image-Description-Toolkit.git
+git clone https://github.com/TheIdeaPlace/Image-Description-Toolkit.git
 
 if errorlevel 1 (
     echo.

@@ -274,7 +274,7 @@ if exist "dist_templates\USER_SETUP_GUIDE.md" (
     echo User guide not found in current directory.
     echo.
     echo Please see the documentation at:
-    echo https://github.com/kellylford/Image-Description-Toolkit
+    echo https://github.com/TheIdeaPlace/Image-Description-Toolkit
     echo.
     pause
 )
@@ -340,7 +340,7 @@ echo.
 echo Quick Reference:
 echo   - Run this script anytime to check status or set up features
 echo   - See dist_templates\USER_SETUP_GUIDE.md for detailed instructions
-echo   - GitHub: github.com/kellylford/Image-Description-Toolkit
+echo   - GitHub: github.com/TheIdeaPlace/Image-Description-Toolkit
 echo.
 echo Happy describing!
 echo.

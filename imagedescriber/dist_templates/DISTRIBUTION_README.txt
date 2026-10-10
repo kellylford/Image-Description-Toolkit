@@ -39,7 +39,7 @@ Welcome! You have everything you need to get started.
 - **Quick Reference**: Read `WHATS_INCLUDED.txt` (2 minutes)
 - **Detailed Guide**: Read `USER_SETUP_GUIDE.md` (full instructions)
 - **Interactive Setup**: Run `setup_imagedescriber.bat` (automated assistant)
-- **Online Help**: [GitHub Repository](https://github.com/kellylford/Image-Description-Toolkit)
+- **Online Help**: [GitHub Repository](https://github.com/TheIdeaPlace/Image-Description-Toolkit)
 
 ---
 
@@ -118,7 +118,7 @@ Welcome! You have everything you need to get started.
 2. **Later**: Run setup_imagedescriber.bat to add AI features
 3. **Anytime**: Read the documentation for tips and tricks
 
-**Questions?** Check the documentation files or visit our [GitHub](https://github.com/kellylford/Image-Description-Toolkit)
+**Questions?** Check the documentation files or visit our [GitHub](https://github.com/TheIdeaPlace/Image-Description-Toolkit)
 
 ---
 

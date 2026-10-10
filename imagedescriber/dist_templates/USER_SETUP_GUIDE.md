@@ -261,7 +261,7 @@ Use this checklist to track what you've set up:
 - **Advanced Features**: See ImageDescriber's Help menu
 
 ### Online Resources
-- **GitHub**: [kellylford/Image-Description-Toolkit](https://github.com/kellylford/Image-Description-Toolkit)
+- **GitHub**: [TheIdeaPlace/Image-Description-Toolkit](https://github.com/TheIdeaPlace/Image-Description-Toolkit)
 - **Issues**: Report bugs or request features
 - **Discussions**: Ask questions, share tips
 

@@ -913,4 +913,4 @@ This 1.0 release establishes a solid foundation for future enhancements includin
 
 ---
 
-**Full Changelog**: https://github.com/kellylford/Image-Description-Toolkit/commits/v1.0.0
+**Full Changelog**: https://github.com/TheIdeaPlace/Image-Description-Toolkit/commits/v1.0.0
