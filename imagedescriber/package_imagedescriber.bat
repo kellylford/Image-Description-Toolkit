@@ -99,7 +99,7 @@ if not exist "%STAGE_DIR%\README.txt" (
     echo - AI provider ^(Ollama recommended, or OpenAI/Anthropic API keys^)
     echo.
     echo For the full Image Description Toolkit, visit:
-    echo https://github.com/kellylford/Image-Description-Toolkit
+    echo https://github.com/TheIdeaPlace/Image-Description-Toolkit
     echo.
     echo License: See LICENSE file
     ) > "%STAGE_DIR%\README.txt"

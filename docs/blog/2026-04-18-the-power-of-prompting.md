@@ -5,7 +5,7 @@ Since writing about [The Image Description Toolkit (IDT)  4.0 Beta 1](https://th
 
 ### What Has Changed Since Beta 1
 
-The [February post](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, [4.0.0Beta3 has shipped](https://github.com/kellylford/Image-Description-Toolkit/releases/tag/v4.0.0Beta3) with a number of additions worth knowing about:
+The [February post](https://theideaplace.net/introducing-idt-4-0-beta-1-an-enhanced-way-to-describe-your-digital-images/) introduced IDT 4.0's two main tools — the `ImageDescriber` GUI and the `idt` command line — along with support for Ollama, OpenAI, and Claude models. Since then, [4.0.0Beta3 has shipped](https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases/tag/v4.0.0Beta3) with a number of additions worth knowing about:
 
 - **`idt describe`** — a friendlier alias for `idt workflow`. Same command, easier to remember.
 - **`idt redescribe`** — re-runs AI description on a set of images you have already processed, skipping the video extraction and conversion steps. Useful for quickly testing a new model or prompt on the same images without starting from scratch.
@@ -199,14 +199,14 @@ The AI Alt Text prompt was only run on Kimi-K2.5 and Gemma4 models for this data
 You can obtain the full set of image descriptions and prompts used for this set of NASA images at the following locations.
 
 - [CSV of all descriptions](http://theideaplace.net/wp-content/uploads/2026/04/NasaDescriptions.csv)
-- [Markdown file of all prompts](https://github.com/kellylford/Image-Description-Toolkit/blob/v4.0.0Beta3/docs/archive/prompts.md)
-- [AI models used in this dataset](https://github.com/kellylford/Image-Description-Toolkit/blob/v4.0.0Beta3/docs/archive/models.md)
+- [Markdown file of all prompts](https://github.com/TheIdeaPlace/Image-Description-Toolkit/blob/v4.0.0Beta3/docs/archive/prompts.md)
+- [AI models used in this dataset](https://github.com/TheIdeaPlace/Image-Description-Toolkit/blob/v4.0.0Beta3/docs/archive/models.md)
 
 The CSV includes descriptions from eight models across six providers: Claude Haiku 4.5, Claude Sonnet 4.6, Gemma4 31b, Kimi K2, Moondream, Qwen3-VL 235b, GPT-4.1 Mini, and GPT-4.1 Nano. For a brief description of each model and links to official documentation, see the models file above.
 
 ### Try It Yourself
 
-The latest version of the Image Description Toolkit can be obtained from the [GitHub releases page](https://github.com/kellylford/Image-Description-Toolkit/releases/latest) or on the [project page at theideaplace.net](https://www.theideaplace.net/projects). Full documentation is in the [User Guide on GitHub](https://github.com/kellylford/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_COMPLETE.md).
+The latest version of the Image Description Toolkit can be obtained from the [GitHub releases page](https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases/latest) or on the [project page at theideaplace.net](https://www.theideaplace.net/projects). Full documentation is in the [User Guide on GitHub](https://github.com/TheIdeaPlace/Image-Description-Toolkit/blob/main/docs/USER_GUIDE_COMPLETE.md).
 
 If you want to replicate the NASA experiment, try:
 
@@ -216,6 +216,6 @@ idt workflow https://www.nasa.gov/image-of-the-day/
 
 That will download the current Image of the Day collection and describe the images using your configured model and prompt. From there, `idt combinedescriptions` will compile everything into a CSV you can explore in Excel or any spreadsheet tool.
 
-Questions, issues, and pull requests are welcome at [github.com/kellylford/Image-Description-Toolkit](https://github.com/kellylford/Image-Description-Toolkit).
+Questions, issues, and pull requests are welcome at [github.com/TheIdeaPlace/Image-Description-Toolkit](https://github.com/TheIdeaPlace/Image-Description-Toolkit).
 
 *This blog post used AI for parts of the image research, content organization and overall editorial review.

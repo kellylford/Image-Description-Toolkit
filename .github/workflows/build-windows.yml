@@ -30,7 +30,8 @@ jobs:
     runs-on: windows-latest
     # The OIDC subject includes the environment name, so it must match the
     # federated credential configured in Azure for THIS repository:
-    #   repo:kellylford/Image-Description-Toolkit:environment:azure-signing
+    #   repo:TheIdeaPlace@340125137/Image-Description-Toolkit@915671217:environment:azure-signing
+    #   (the numeric-id form, credential gh-idt-immutable; the repo moved from kellylford on 2026-10-10)
     # Unprotected; not a gate.
     environment: azure-signing
 

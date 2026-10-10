@@ -39,7 +39,7 @@ from urllib.request import url2pathname
 
 import requests
 
-GITHUB_REPO = "kellylford/Image-Description-Toolkit"
+GITHUB_REPO = "TheIdeaPlace/Image-Description-Toolkit"
 DEFAULT_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=30"
 RELEASES_PAGE = f"https://github.com/{GITHUB_REPO}/releases/latest"
 

@@ -74,7 +74,7 @@ def _release(*asset_names, tag="v4.9.0", **kw):
     rel = {
         "tag_name": tag,
         "body": "Notes.",
-        "html_url": f"https://github.com/kellylford/Image-Description-Toolkit/releases/tag/{tag}",
+        "html_url": f"https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases/tag/{tag}",
         "assets": [
             {"name": n, "browser_download_url": f"https://example.invalid/{n}"}
             for n in asset_names
@@ -259,7 +259,7 @@ def test_unknown_current_version_suppresses_check(feed, monkeypatch):
 # ---------------------------------------------------------------- #
 
 @pytest.mark.parametrize("url", [
-    "https://github.com/kellylford/Image-Description-Toolkit/releases/download/v1/a.exe",
+    "https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases/download/v1/a.exe",
     "https://objects.githubusercontent.com/x/a.exe",
     "https://github-releases.githubusercontent.com/x/a.dmg",
 ])
@@ -331,7 +331,7 @@ def test_expected_sha256_none_without_url():
 # download_asset                                                    #
 # ---------------------------------------------------------------- #
 
-GOOD_URL = "https://github.com/kellylford/Image-Description-Toolkit/releases/download/v4.9.0/Setup.exe"
+GOOD_URL = "https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases/download/v4.9.0/Setup.exe"
 PAYLOAD = b"x" * (65536 * 3 + 17)
 
 

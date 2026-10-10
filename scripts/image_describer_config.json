@@ -146,7 +146,7 @@
     "include_location_prefix": true,
     "geocoding": {
       "enabled": true,
-      "user_agent": "IDT/3.1 (+https://github.com/kellylford/Image-Description-Toolkit)",
+      "user_agent": "IDT/3.1 (+https://github.com/TheIdeaPlace/Image-Description-Toolkit)",
       "delay_seconds": 1.0,
       "cache_file": "geocode_cache.json"
     }

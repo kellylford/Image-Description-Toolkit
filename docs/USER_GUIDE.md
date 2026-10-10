@@ -1,6 +1,6 @@
 # Image Description Toolkit — User Guide
 
-**Version 4.5** · [Report an issue](https://github.com/kellylford/Image-Description-Toolkit/issues)
+**Version 4.5** · [Report an issue](https://github.com/TheIdeaPlace/Image-Description-Toolkit/issues)
 
 ---
 
@@ -71,7 +71,7 @@ IDT includes three standalone applications that share the same AI provider infra
 
 **Option 1: Pre-built executables (recommended)**
 
-1. Download `idt.exe` and `ImageDescriber.exe` from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases).
+1. Download `idt.exe` and `ImageDescriber.exe` from the [releases page](https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases).
 2. Place them in any folder on your system—no installation required.
 3. To run `idt` from any terminal: add the folder to your `PATH` environment variable (Control Panel → System → Advanced → Environment Variables).
 4. Launch `ImageDescriber.exe` by double-clicking.
@@ -79,7 +79,7 @@ IDT includes three standalone applications that share the same AI provider infra
 **Option 2: From source**
 
 ```bat
-git clone https://github.com/kellylford/Image-Description-Toolkit.git
+git clone https://github.com/TheIdeaPlace/Image-Description-Toolkit.git
 cd Image-Description-Toolkit
 
 :: Create virtual environment
@@ -100,7 +100,7 @@ python imagedescriber/imagedescriber_wx.py
 
 **Option 1: Pre-built app bundle (recommended)**
 
-1. Download `ImageDescriber.app` and `idt` from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases).
+1. Download `ImageDescriber.app` and `idt` from the [releases page](https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases).
 2. Drag `ImageDescriber.app` to your `/Applications` folder.
 3. Copy `idt` to `/usr/local/bin/` and mark it executable:
    ```bash
@@ -111,7 +111,7 @@ python imagedescriber/imagedescriber_wx.py
 **Option 2: From source**
 
 ```bash
-git clone https://github.com/kellylford/Image-Description-Toolkit.git
+git clone https://github.com/TheIdeaPlace/Image-Description-Toolkit.git
 cd Image-Description-Toolkit
 
 python3 -m venv venv
@@ -191,7 +191,7 @@ telemetry, no data sent.
 
 **Installing an update by hand**
 
-1. Download the latest installer (Windows) or disk image (macOS) from the [releases page](https://github.com/kellylford/Image-Description-Toolkit/releases).
+1. Download the latest installer (Windows) or disk image (macOS) from the [releases page](https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases).
 2. Run the installer, or drag the new `ImageDescriber.app` to `/Applications`. If you use the standalone executables instead, replace the old `idt.exe` and `ImageDescriber.exe` in your folder.
 3. Your existing `.idtw` workspace bundles and `~/.idt/config.json` settings are preserved — no migration needed.
 
@@ -766,7 +766,7 @@ Asks GitHub whether a newer release exists and prints where to get it:
 Installed: idt 4.5.0
 Available: idt 4.5.1
 
-Download:  https://github.com/kellylford/Image-Description-Toolkit/releases/download/v4.5.1/ImageDescriptionToolkitSetup-4.5.1-windows.exe
+Download:  https://github.com/TheIdeaPlace/Image-Description-Toolkit/releases/download/v4.5.1/ImageDescriptionToolkitSetup-4.5.1-windows.exe
 Installing it updates both idt and ImageDescriber.
 ```
 
@@ -2145,4 +2145,4 @@ the source by the test suite.
 
 ---
 
-*Image Description Toolkit is an open-source project. Contributions, bug reports, and feedback are welcome at the [project repository](https://github.com/kellylford/Image-Description-Toolkit).*
+*Image Description Toolkit is an open-source project. Contributions, bug reports, and feedback are welcome at the [project repository](https://github.com/TheIdeaPlace/Image-Description-Toolkit).*

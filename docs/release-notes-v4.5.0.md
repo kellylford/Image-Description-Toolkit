@@ -66,7 +66,7 @@ JSON in `~/.idt/chats/` in the format ImageDescriber uses — so a conversation 
 one can be opened in the other.
 
 **Full documentation:** [Part 7 of the User
-Guide](https://kellylford.github.io/Image-Description-Toolkit/user-guide.html).
+Guide](https://theideaplace.github.io/Image-Description-Toolkit/user-guide.html).
 
 ---
 
@@ -393,8 +393,8 @@ idt version     Version information
 
 ## Help
 
-- **[User Guide](https://kellylford.github.io/Image-Description-Toolkit/user-guide.html)** — the full manual
-- **[Report an issue](https://github.com/kellylford/Image-Description-Toolkit/issues)**
+- **[User Guide](https://theideaplace.github.io/Image-Description-Toolkit/user-guide.html)** — the full manual
+- **[Report an issue](https://github.com/TheIdeaPlace/Image-Description-Toolkit/issues)**
 - In the desktop app: **Help → User Guide**
 
 ---

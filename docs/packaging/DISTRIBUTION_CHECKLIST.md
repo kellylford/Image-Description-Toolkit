@@ -147,9 +147,9 @@ ImageDescriber_v2.0_AMD64.zip
 - OpenAI or Claude API key (for cloud AI descriptions) - paid, entered in Settings
 
 ### 📞 Support
-- [Report Issues](https://github.com/kellylford/Image-Description-Toolkit/issues)
-- [Ask Questions](https://github.com/kellylford/Image-Description-Toolkit/discussions)
-- [Documentation](https://github.com/kellylford/Image-Description-Toolkit/tree/main/docs)
+- [Report Issues](https://github.com/TheIdeaPlace/Image-Description-Toolkit/issues)
+- [Ask Questions](https://github.com/TheIdeaPlace/Image-Description-Toolkit/discussions)
+- [Documentation](https://github.com/TheIdeaPlace/Image-Description-Toolkit/tree/main/docs)
 ```
 
 ---

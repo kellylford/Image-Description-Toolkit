@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/kellylford/Image-Description-Toolkit/gallery_config_schema.json",
+  "$id": "https://github.com/TheIdeaPlace/Image-Description-Toolkit/gallery_config_schema.json",
   "title": "Gallery Configuration Schema",
   "description": "Configuration schema for identify_gallery_content.py tool",
   "type": "object",

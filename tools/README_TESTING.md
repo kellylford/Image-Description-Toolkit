@@ -159,6 +159,6 @@ These tests mirror what GitHub Actions runs in `.github/workflows/test.yml`:
 
 ## GitHub Actions Status
 
-Check: https://github.com/kellylford/Image-Description-Toolkit/actions
+Check: https://github.com/TheIdeaPlace/Image-Description-Toolkit/actions
 
 All tests run automatically on push to `main` or `develop` branches.
