@@ -76,7 +76,7 @@ jobs:
     # the signed exes (Verify signatures prints it). On a pull request nothing is signed,
     # so that build's installer can't install the helper; it says so and carries on.
     - name: Set up .NET for the Windows AI helper
-      uses: actions/setup-dotnet@v5
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: '10.0.x'
 
